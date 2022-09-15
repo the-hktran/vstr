@@ -24,17 +24,21 @@ def HamV(mVHCI):
             mVHCI.H[i, i] += (n + 0.5) * mVHCI.w[j] # HO diagonal elements
 
     # Now we loop through each V
-    for D in mVHCI.Ds:
+    for i, D in enumerate(mVHCI.Ds):
         for W in mVHCI.Ws:
+            # Go through each derivative
             WShape = W.shape
             WN = np.prod(W.shape)
             WFlat = W.reshape(WN)
             ConnectedD = []
-            for i in range(WN):
-                WElement = WFlat[i]
-                QIndices = np.unravel_index(i, WShape)
+            for iw in range(WN):
+                WElement = WFlat[iw]
+                if abs(WElement) < 1e-12:
+                    continue
+                QIndices = np.unravel_index(iw, WShape)
                 Conn0 = [D.copy()]
                 Conn1 = []
+                # Determine the connected determinants for this derivative
                 for q in QIndices:
                     for Con0 in Conn0:
                         Co0p = Con0.copy()
@@ -51,6 +55,7 @@ def HamV(mVHCI):
                     if Co0 not in Conn1:
                         Conn1.append(Co0)
                 Conn0 = Conn1
+                # Loop through the connected determinants and add in matrix elements
                 for DConn in Conn0:
                     try:
                         j = mVHCI.Ds.index(DConn)
@@ -61,8 +66,8 @@ def HamV(mVHCI):
                         if D[Di] != DConn[Di]:
                             n = max(D[Di], DConn[Di])
                             Hij *= np.sqrt(n)
-                    mVHCI.H[i, j] = Hij
-                    mVHCI.H[j, i] = Hij
+                    Hij *= WElement
+                    mVHCI.H[i, j] += Hij
             
 '''
 Class that handles VHCI
@@ -83,9 +88,9 @@ class VHCI:
         pass
 
 if __name__ == "__main__":
-    V2 = np.asarray([[1, 1], [1, 1]])
-    Ds = [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]
-    w = np.asarray([10, 20])
+    V2 = np.asarray([[0, 1], [1, 0]])
+    Ds = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]
+    w = np.asarray([1, 1])
 
     mVHCI = VHCI([V2], w, Ds)
     mVHCI.HamV()
