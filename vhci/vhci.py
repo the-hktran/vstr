@@ -106,6 +106,7 @@ def HamV(mVHCI, Ds = None, DLefts = None, DiagonalOnly = False):
         # DLefts is the Bras, if off diagonal elements are desired.
         OffDiagonal = False
         DLefts = Ds
+    if OffDiagonal:
     N = len(Ds)
     NL = len(DLefts)
     H = np.zeros((NL, N))
