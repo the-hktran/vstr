@@ -1,5 +1,6 @@
 import numpy as np
 from functools import reduce
+import itertools
 
 def FormW(mVHCI, V):
     Order = len(V.shape)
@@ -13,8 +14,8 @@ def FormW(mVHCI, V):
 
     return V * wProd
 
-def ConnectedD(D, Qs):
-    Conn0 = [D.copy()]
+def ConnectedBasis(mVHCI, B, Qs):
+    Conn0 = [B.copy()]
     Conn1 = []
     for q in Qs:
         for Con0 in Conn0:
@@ -34,15 +35,14 @@ def ConnectedD(D, Qs):
     for C0 in Conn0:
         if C0 not in Conn1:
             Conn1.append(C0)
-    
     return Conn1
 
-def ScreenD(mVHCI, Ws = None, C = None, eps = 1):
+def ScreenBasis(mVHCI, Ws = None, C = None, eps = 1):
     if Ws is None:
         Ws = mVHCI.Ws
     if C is None:
         C = mVHCI.Cs[0]
-    NewDs = []
+    NewBasis = []
     for W in Ws:
         WShape = W.shape
         WN = np.prod(W.shape)
@@ -53,25 +53,25 @@ def ScreenD(mVHCI, Ws = None, C = None, eps = 1):
             for n in CSortedIndex:
                 if abs(WFlat[i] * C[n]) > eps:
                     Qs = np.unravel_index(i, WShape)
-                    AddedD = ConnectedD(mVHCI.Ds[n], Qs)
-                    NewDs += AddedD
+                    AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Qs)
+                    NewBasis += AddedB
                 else:
                     break
-    NewDsUnique = []
-    for D in NewDs:
-        if D not in NewDsUnique and D not in mVHCI.Ds:
-            NewDsUnique.append(D)
-    return NewDsUnique, len(NewDsUnique)
+    UniqueBasis = []
+    for B in NewBasis:
+        if B not in UniqueBasis and B not in mVHCI.Basis:
+            UniqueBasis.append(B)
+    return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 1):
-    NewDs, NAdded = mVHCI.ScreenD(Ws = mVHCI.Ws, C = mVHCI.Cs[0], eps = eps)
-    mVHCI.Ds += NewDs
+    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = mVHCI.Cs[0], eps = eps)
+    mVHCI.Basis += NewBasis
     return NAdded
 
 def HCI(mVHCI):
-    NAdded = len(mVHCI.Ds)
+    NAdded = len(mVHCI.Basis)
     it = 1
-    while float(NAdded) / float(len(mVHCI.Ds)) > mVHCI.tol:
+    while float(NAdded) / float(len(mVHCI.Basis)) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
         mVHCI.Diagonalize()
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations.")
@@ -82,9 +82,9 @@ def HCI(mVHCI):
 def PT2(mVHCI, NStates = 1):
     dEs_PT2 = [None] * NStates
     for i in range(NStates):
-        PertDs, NPert = mVHCI.ScreenD(Ws = mVHCI.Ws, C = mVHCI.Cs[i], eps = mVHCI.eps2)
-        H_MN = mVHCI.HamV(Ds = mVHCI.Ds, DLefts = PertDs) # OD Hamiltonian between original and perturbative space
-        E_M = mVHCI.HamV(Ds = PertDs, DiagonalOnly = True)
+        PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = mVHCI.Cs[i], eps = mVHCI.eps2)
+        H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
+        E_M = mVHCI.HamV(Basis = PertBasis, DiagonalOnly = True)
         Hc2 = H_MN @ mVHCI.Cs[i]
         Hc2 = Hc2 * Hc2
         Denom = (mVHCI.Es[i] - E_M)**(-1)
@@ -96,29 +96,28 @@ def Diagonalize(mVHCI):
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
 
 '''
-Forms the explicit vibrational Hamiltonian in the basis given by Ds
+Forms the explicit vibrational Hamiltonian in the basis given by self.Basis
 '''
-def HamV(mVHCI, Ds = None, DLefts = None, DiagonalOnly = False):
-    if Ds is None:
-        Ds = mVHCI.Ds
+def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
+    if Basis is None:
+        Basis = mVHCI.Basis
     OffDiagonal = True 
-    if DLefts is None:
-        # DLefts is the Bras, if off diagonal elements are desired.
+    if BasisBras is None:
+        # BasisBras is the Bras, if off diagonal elements are desired.
         OffDiagonal = False
-        DLefts = Ds
-    if OffDiagonal:
-    N = len(Ds)
-    NL = len(DLefts)
+        BasisBras = Basis
+    N = len(Basis)
+    NL = len(BasisBras)
     H = np.zeros((NL, N))
     if not OffDiagonal:
         for i in range(N):
-            for j, n in enumerate(Ds[i]):
+            for j, n in enumerate(Basis[i]):
                 H[i, i] += (n + 0.5) * mVHCI.w[j] # HO diagonal elements
     if DiagonalOnly:
         return H.diagonal()
 
     # Now we loop through each V
-    for i, D in enumerate(Ds):
+    for i, B in enumerate(Basis):
         for W in mVHCI.Ws:
             # Go through each derivative
             WShape = W.shape
@@ -130,19 +129,19 @@ def HamV(mVHCI, Ds = None, DLefts = None, DiagonalOnly = False):
                     continue
                 QIndices = np.unravel_index(iw, WShape)
                 # Determine the connected determinants for this derivative
-                Conn0 = ConnectedD(D, QIndices)
+                Conn0 = mVHCI.ConnectedBasis(B, QIndices)
                 # Loop through the connected determinants and add in matrix elements
-                for DConn in Conn0:
+                for BConn in Conn0:
                     try:
-                        j = DLefts.index(DConn)
+                        j = BasisBras.index(BConn)
                     except:
                         continue
                     if not OffDiagonal and j < i:
                         continue
                     Hji = 1
-                    for Di, Dv in enumerate(D):
-                        if D[Di] != DConn[Di]:
-                            n = max(D[Di], DConn[Di])
+                    for Bi, Bv in enumerate(B):
+                        if B[Bi] != BConn[Bi]:
+                            n = max(B[Bi], BConn[Bi])
                             Hji *= np.sqrt(n)
                     Hji *= WElement
                     H[j, i] += Hji
@@ -152,6 +151,19 @@ def HamV(mVHCI, Ds = None, DLefts = None, DiagonalOnly = False):
         assert(np.allclose(H, H.T))
     return H
 
+'''
+Defines basis set with a max quanta designation for each mode
+    MaxQuanta: (list) Maximum quanta in each mode
+    return: List of lists, each list is a HO basis function
+'''
+def InitTruncatedBasis(mVHCI, MaxQuanta):
+    QuantaList = []
+    for n in MaxQuanta:
+        QuantaList.append(list(range(n)))
+    Basis = list(itertools.product(*QuantaList))
+    for i in range(len(Basis)):
+        Basis[i] = list(Basis[i])
+    return Basis
 
             
 '''
@@ -163,21 +175,26 @@ class VHCI:
     HCI = HCI
     Diagonalize = Diagonalize
     HCIStep = HCIStep
-    ConnectedD = ConnectedD
-    ScreenD = ScreenD
+    ConnectedBasis = ConnectedBasis
+    ScreenBasis = ScreenBasis
     PT2 = PT2
+    InitTruncatedBasis = InitTruncatedBasis
 
-    def __init__(self, w, Vs, Ds):
+    def __init__(self, w, Vs, MaxQuanta = 2, **kwargs):
         self.w = w # Harmonic Frequencies
-        self.Vs = Vs
-        self.Ws = []
-        self.Ds = Ds
+        self.Vs = Vs # Derivatives of the PES
+        self.Ws = [] # Scaled derivatives to be filled later
+        for V in self.Vs:
+            self.Ws.append(self.FormW(V))
+        if isinstance(MaxQuanta, int):
+            MaxQuanta = [MaxQuanta] * len(w)
+        self.Basis = self.InitTruncatedBasis(MaxQuanta)
         self.eps1 = 0.1
         self.eps2 = 0.01
         self.tol = 0.01
-        for V in self.Vs:
-            self.Ws.append(self.FormW(V))
         self.MaxIter = 1000
+
+        self.__dict__.update(kwargs)
 
         # Initialize the Energies and Coefficients
         self.Diagonalize()
@@ -190,7 +207,7 @@ if __name__ == "__main__":
     Ds = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]
     w = np.asarray([1, 2])
 
-    mVHCI = VHCI(w, [V2], Ds)
+    mVHCI = VHCI(w, [V2], MaxQuanta = 3)
     print(mVHCI.Es)
     mVHCI.HCI()
     print(mVHCI.Es)
