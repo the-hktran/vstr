@@ -1,8 +1,10 @@
 import numpy as np
 from functools import reduce
 import itertools
+import math
 
 def FormW(mVHCI, V):
+    print('form W...')
     Order = len(V.shape)
     Modes = mVHCI.w.shape[0]
     ws = []
@@ -11,10 +13,12 @@ def FormW(mVHCI, V):
     wProd = reduce(np.multiply, np.ix_(*ws))
     wProd *= 2**Order
     wProd = wProd**-0.5
+    print('...done')
 
     return V * wProd
 
 def ConnectedBasis(mVHCI, B, Qs):
+#    print('form connections...')
     Conn0 = [B.copy()]
     Conn1 = []
     for q in Qs:
@@ -35,9 +39,11 @@ def ConnectedBasis(mVHCI, B, Qs):
     for C0 in Conn0:
         if C0 not in Conn1:
             Conn1.append(C0)
+#    print('...done')
     return Conn1
 
 def ScreenBasis(mVHCI, Ws = None, C = None, eps = 1):
+    print('screen basis...')
     if Ws is None:
         Ws = mVHCI.Ws
     if C is None:
@@ -61,6 +67,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 1):
     for B in NewBasis:
         if B not in UniqueBasis and B not in mVHCI.Basis:
             UniqueBasis.append(B)
+    print('..done')
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 1):
@@ -93,7 +100,9 @@ def PT2(mVHCI, NStates = 1):
 
 def Diagonalize(mVHCI):
     mVHCI.H = mVHCI.HamV()
+    print('diagonalize...')
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
+    print('...done')
 
 '''
 Forms the explicit vibrational Hamiltonian in the basis given by self.Basis
@@ -109,6 +118,7 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
     N = len(Basis)
     NL = len(BasisBras)
     H = np.zeros((NL, N))
+    BasisBrasDict = {str(B): i for B, i in enumerate(BasisBras)}
     if not OffDiagonal:
         for i in range(N):
             for j, n in enumerate(Basis[i]):
@@ -116,6 +126,7 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
     if DiagonalOnly:
         return H.diagonal()
 
+    print('forming H...')
     # Now we loop through each V
     for i, B in enumerate(Basis):
         for W in mVHCI.Ws:
@@ -133,7 +144,8 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                 # Loop through the connected determinants and add in matrix elements
                 for BConn in Conn0:
                     try:
-                        j = BasisBras.index(BConn)
+                        j = BasisBrasDict[str(BConn)] #BasisBras.index(BConn)
+                        print(j)
                     except:
                         continue
                     if not OffDiagonal and j < i:
@@ -149,6 +161,7 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                         H[i, j] += Hji
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
+    print('...done')
     return H
 
 '''
@@ -184,11 +197,14 @@ class VHCI:
         self.w = w # Harmonic Frequencies
         self.Vs = Vs # Derivatives of the PES
         self.Ws = [] # Scaled derivatives to be filled later
+        print(len(Vs))
         for V in self.Vs:
             self.Ws.append(self.FormW(V))
         if isinstance(MaxQuanta, int):
             MaxQuanta = [MaxQuanta] * len(w)
+        print('init basis...')
         self.Basis = self.InitTruncatedBasis(MaxQuanta)
+        print('...done')
         self.eps1 = 0.1
         self.eps2 = 0.01
         self.tol = 0.01
@@ -203,6 +219,7 @@ class VHCI:
         pass
 
 if __name__ == "__main__":
+    '''
     V2 = np.asarray([[0, 1], [1, 0]])
     Ds = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]]
     w = np.asarray([1, 2])
@@ -212,3 +229,11 @@ if __name__ == "__main__":
     mVHCI.HCI()
     print(mVHCI.Es)
     mVHCI.PT2(NStates = 1)
+    '''
+
+    from read_jf_input import Read
+    w, MaxQuanta, Vs, eps1, eps2, NStates = Read('C2H4_quartic.inp')
+    print(w)
+    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = 3, eps1 = eps1, eps2 = eps2)
+    mVHCI.HCI()
+    print(mVHCI.Es)

@@ -19,7 +19,10 @@ def Read(FilePath):
     MaxNs = [None] * NModes
     for i in range(NModes):
         a, ws[i], MaxNs[i] = f.readline().split()
-    #ws = np.asarray(ws)
+    for i in range(NModes):
+        ws[i] = float(ws[i])
+        MaxNs[i] = int(MaxNs[i])
+    ws = np.asarray(ws)
 
     NFC = int(f.readline().split()[1])
     Vs = [None] * 6 # will need to remove unused orders later
