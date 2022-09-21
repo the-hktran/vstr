@@ -1,7 +1,7 @@
 import numpy as np
+from vstr.utils import math
 from functools import reduce
 import itertools
-import math
 
 def FormW(mVHCI, V):
     print('form W...')
@@ -137,10 +137,19 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
             for iw in range(WN):
                 WElement = WFlat[iw]
                 if abs(WElement) < 1e-12:
-                    continue
+                    continue # If there are zeros, skip them
                 QIndices = np.unravel_index(iw, WShape)
+
+                # Determine the multinomial coefficient for this element
+                QIndUniq = list(set(list(QIndices)))
+                QIndCount = []
+                for k in QIndUniq:
+                    QIndCount.append(QIndUniq.count(k))
+                Coeff = math.multinomial(QIndCount)
+                
                 # Determine the connected determinants for this derivative
                 Conn0 = mVHCI.ConnectedBasis(B, QIndices)
+
                 # Loop through the connected determinants and add in matrix elements
                 for BConn in Conn0:
                     try:
@@ -155,7 +164,7 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                         if B[Bi] != BConn[Bi]:
                             n = max(B[Bi], BConn[Bi])
                             Hji *= np.sqrt(n)
-                    Hji *= WElement
+                    Hji *= Coeff * WElement
                     H[j, i] += Hji
                     if not OffDiagonal:
                         H[i, j] += Hji
@@ -169,13 +178,20 @@ Defines basis set with a max quanta designation for each mode
     MaxQuanta: (list) Maximum quanta in each mode
     return: List of lists, each list is a HO basis function
 '''
-def InitTruncatedBasis(mVHCI, MaxQuanta):
+def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
     QuantaList = []
     for n in MaxQuanta:
         QuantaList.append(list(range(n)))
     Basis = list(itertools.product(*QuantaList))
     for i in range(len(Basis)):
         Basis[i] = list(Basis[i])
+    if MaxTotalQuanta is not None:
+        NewBasis = []
+        for B in Basis:
+            if sum(B) < MaxTotalQuanta + 1:
+                NewBasis.append(B)
+        Basis = NewBasis
+    print(Basis)
     return Basis
 
             
@@ -193,7 +209,7 @@ class VHCI:
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
 
-    def __init__(self, w, Vs, MaxQuanta = 2, **kwargs):
+    def __init__(self, w, Vs, MaxQuanta = 2, MaxTotalQuanta = 2, **kwargs):
         self.w = w # Harmonic Frequencies
         self.Vs = Vs # Derivatives of the PES
         self.Ws = [] # Scaled derivatives to be filled later
@@ -202,8 +218,9 @@ class VHCI:
             self.Ws.append(self.FormW(V))
         if isinstance(MaxQuanta, int):
             MaxQuanta = [MaxQuanta] * len(w)
+        self.MaxTotalQuanta = MaxTotalQuanta
         print('init basis...')
-        self.Basis = self.InitTruncatedBasis(MaxQuanta)
+        self.Basis = self.InitTruncatedBasis(MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
         print('...done')
         self.eps1 = 0.1
         self.eps2 = 0.01
@@ -231,9 +248,9 @@ if __name__ == "__main__":
     mVHCI.PT2(NStates = 1)
     '''
 
-    from read_jf_input import Read
-    w, MaxQuanta, Vs, eps1, eps2, NStates = Read('C2H4_quartic.inp')
+    from vstr.utils.read_jf_input import Read
+    w, MaxQuanta, MaxQuantaTotal, Vs, eps1, eps2, NStates = Read('CLO2.inp')
     print(w)
-    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = 3, eps1 = eps1, eps2 = eps2)
+    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxQuantaTotal = MaxQuantaTotal, eps1 = eps1, eps2 = eps2)
     mVHCI.HCI()
     print(mVHCI.Es)

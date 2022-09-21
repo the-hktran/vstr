@@ -42,7 +42,7 @@ def Read(FilePath):
         if not np.allclose(np.zeros(shape), Vs[i]):
             VsFinal.append(Vs[i])
 
-    return ws, MaxNs, VsFinal, eps1, eps2, NStates
+    return ws, MaxNs, MaxQuanta, VsFinal, eps1, eps2, NStates
 
 if __name__ == '__main__':
     Read('../../VHCI/input/C2H4.inp')

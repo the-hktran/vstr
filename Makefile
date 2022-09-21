@@ -48,7 +48,7 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr .pytest_cache
 
 lint/flake8: ## check style with flake8
-	flake8 vhci tests
+	flake8 vstr tests
 
 lint: lint/flake8 ## check style
 
@@ -59,15 +59,15 @@ test-all: ## run tests on every Python version with tox
 	tox
 
 coverage: ## check code coverage quickly with the default Python
-	coverage run --source vhci setup.py test
+	coverage run --source vstr setup.py test
 	coverage report -m
 	coverage html
 	$(BROWSER) htmlcov/index.html
 
 docs: ## generate Sphinx HTML documentation, including API docs
-	rm -f docs/vhci.rst
+	rm -f docs/vstr.rst
 	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ vhci
+	sphinx-apidoc -o docs/ vstr
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 	$(BROWSER) docs/_build/html/index.html

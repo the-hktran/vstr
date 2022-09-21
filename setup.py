@@ -31,14 +31,14 @@ setup(
     description="Vibrational structure theory methods based on heat bath CI",
     entry_points={
         'console_scripts': [
-            'vhci=vhci.cli:main',
+            'vstr=vstr.cli:main',
         ],
     },
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
-    keywords='vhci',
+    keywords='vstr',
     name='vstr',
     packages=find_packages(include=['vstr', 'vstr.*']),
     test_suite='tests',
