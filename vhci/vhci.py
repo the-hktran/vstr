@@ -1,7 +1,8 @@
 import numpy as np
-from vstr.utils import math
+from vstr import utils
 from functools import reduce
 import itertools
+import math
 
 def FormW(mVHCI, V):
     print('form W...')
@@ -15,32 +16,38 @@ def FormW(mVHCI, V):
     wProd = wProd**-0.5
     print('...done')
 
-    return V * wProd
+    return V / np.sqrt(2**Order) # * wProd
 
+'''
+Determines all possible basis funtions connected to the given coupling element
+and returns the connected basis function with the coefficient as a list of tuples 
+of a list and float. Each outer list element is a basis function connected to
+the given basis function. The inner list is the basis function and the float
+is the associated raising and lowering coefficient.
+'''
 def ConnectedBasis(mVHCI, B, Qs):
-#    print('form connections...')
-    Conn0 = [B.copy()]
+    Conn0 = [(B.copy(), 1.0)]
     Conn1 = []
+    # Loop through each derivative and generate the raised and lowered basis function for each.
+    # After each derivative, recursively replace the list of basis functions
     for q in Qs:
-        for Con0 in Conn0:
+        for Con0, Coeff in Conn0:
             tmpC = Con0.copy()
             tmpC[q] += 1
-            Conn1.append(tmpC)
+            tmpCoeff = Coeff
+            tmpCoeff *= np.sqrt(tmpC[q])
+            Conn1.append((tmpC, tmpCoeff))
             tmpC = Con0.copy()
+            tmpCoeff = Coeff
+            tmpCoeff *= np.sqrt(tmpC[q])
             tmpC[q] -= 1
             if tmpC[q] < 0:
                 continue
-            Conn1.append(tmpC)
+            Conn1.append((tmpC, tmpCoeff))
         Conn0 = Conn1.copy()
         Conn1 = []
-
-    # Now remove duplicates
-    Conn1 = []
-    for C0 in Conn0:
-        if C0 not in Conn1:
-            Conn1.append(C0)
-#    print('...done')
-    return Conn1
+    
+    return Conn0
 
 def ScreenBasis(mVHCI, Ws = None, C = None, eps = 1):
     print('screen basis...')
@@ -60,7 +67,8 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 1):
                 if abs(WFlat[i] * C[n]) > eps:
                     Qs = np.unravel_index(i, WShape)
                     AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Qs)
-                    NewBasis += AddedB
+                    for AddB in AddedB:
+                        NewBasis += [AddB[0]]
                 else:
                     break
     UniqueBasis = []
@@ -118,7 +126,8 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
     N = len(Basis)
     NL = len(BasisBras)
     H = np.zeros((NL, N))
-    BasisBrasDict = {str(B): i for B, i in enumerate(BasisBras)}
+    BasisBrasDict = {str(B): i for i, B in enumerate(BasisBras)}
+    print(Basis[0])
     if not OffDiagonal:
         for i in range(N):
             for j, n in enumerate(Basis[i]):
@@ -144,27 +153,25 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                 QIndUniq = list(set(list(QIndices)))
                 QIndCount = []
                 for k in QIndUniq:
-                    QIndCount.append(QIndUniq.count(k))
-                Coeff = math.multinomial(QIndCount)
-                
+                    QIndCount.append(QIndices.count(k))
+                #Coeff = utils.math.multinomial(QIndCount)
+                DerivCoeff = 1.0
+                for k in QIndCount:
+                    DerivCoeff /= math.factorial(k)
+
                 # Determine the connected determinants for this derivative
                 Conn0 = mVHCI.ConnectedBasis(B, QIndices)
 
                 # Loop through the connected determinants and add in matrix elements
                 for BConn in Conn0:
                     try:
-                        j = BasisBrasDict[str(BConn)] #BasisBras.index(BConn)
-                        print(j)
+                        j = BasisBrasDict[str(BConn[0])] #BasisBras.index(BConn)
                     except:
                         continue
-                    if not OffDiagonal and j < i:
+                    if not OffDiagonal and j > i:
                         continue
                     Hji = 1
-                    for Bi, Bv in enumerate(B):
-                        if B[Bi] != BConn[Bi]:
-                            n = max(B[Bi], BConn[Bi])
-                            Hji *= np.sqrt(n)
-                    Hji *= Coeff * WElement
+                    Hji *= (DerivCoeff * BConn[1] * WElement)
                     H[j, i] += Hji
                     if not OffDiagonal:
                         H[i, j] += Hji
@@ -213,7 +220,6 @@ class VHCI:
         self.w = w # Harmonic Frequencies
         self.Vs = Vs # Derivatives of the PES
         self.Ws = [] # Scaled derivatives to be filled later
-        print(len(Vs))
         for V in self.Vs:
             self.Ws.append(self.FormW(V))
         if isinstance(MaxQuanta, int):
@@ -253,4 +259,4 @@ if __name__ == "__main__":
     print(w)
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxQuantaTotal = MaxQuantaTotal, eps1 = eps1, eps2 = eps2)
     mVHCI.HCI()
-    print(mVHCI.Es)
+    print(mVHCI.Es[:20])
