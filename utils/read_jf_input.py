@@ -12,7 +12,7 @@ def Read(FilePath):
     NStates = int(f.readline().split()[1])
     doPT2 = bool(f.readline().split()[1])
     eps2 = float(f.readline().split()[1])
-    MaxQuanta = f.readline() #don't know what this is
+    MaxQuanta = int(f.readline().split()[1]) + 1
     NModes = int(f.readline().split()[1])
 
     ws = [None] * NModes

@@ -7,6 +7,9 @@ import math
 def FormW(mVHCI, V):
     print('form W...')
     Order = len(V.shape)
+    
+    # This part is for when the frequency appears in the denominator, but I guess that is usually included
+    '''
     Modes = mVHCI.w.shape[0]
     ws = []
     for i in range(Order):
@@ -14,9 +17,33 @@ def FormW(mVHCI, V):
     wProd = reduce(np.multiply, np.ix_(*ws))
     wProd *= 2**Order
     wProd = wProd**-0.5
+    '''
     print('...done')
 
-    return V / np.sqrt(2**Order) # * wProd
+    W = V / np.sqrt(2**Order) # * wProd
+    
+    # This part scales each element by the number of permuations of the indices.
+    WShape = W.shape
+    WN = np.prod(W.shape)
+    WFlat = W.reshape(WN)
+    for iw in range(WN):
+        WElement = WFlat[iw]
+        if abs(WElement) < 1e-12:
+            continue # If there are zeros, skip them
+        QIndices = np.unravel_index(iw, WShape)
+
+        # Determine the multinomial coefficient for this element
+        QIndUniq = list(set(list(QIndices)))
+        QIndCount = []
+        for k in QIndUniq:
+            QIndCount.append(QIndices.count(k))
+        #Coeff = utils.math.multinomial(QIndCount)
+        DerivCoeff = 1.0
+        for k in QIndCount:
+            DerivCoeff /= math.factorial(k)
+        WFlat[iw] *= DerivCoeff
+    return WFlat.reshape(WShape)
+
 
 '''
 Determines all possible basis funtions connected to the given coupling element
@@ -49,8 +76,8 @@ def ConnectedBasis(mVHCI, B, Qs):
     
     return Conn0
 
-def ScreenBasis(mVHCI, Ws = None, C = None, eps = 1):
-    print('screen basis...')
+def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
+    print('screen basis...', eps)
     if Ws is None:
         Ws = mVHCI.Ws
     if C is None:
@@ -78,8 +105,9 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 1):
     print('..done')
     return UniqueBasis, len(UniqueBasis)
 
-def HCIStep(mVHCI, eps = 1):
-    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = mVHCI.Cs[0], eps = eps)
+def HCIStep(mVHCI, eps = 0.01):
+    # We use the maximum Cn from the first NStates states as our C vector
+    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = abs(mVHCI.Cs[:,:mVHCI.NStates]).max(axis=1), eps = eps)
     mVHCI.Basis += NewBasis
     return NAdded
 
@@ -89,7 +117,7 @@ def HCI(mVHCI):
     while float(NAdded) / float(len(mVHCI.Basis)) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
         mVHCI.Diagonalize()
-        print("VHCI Iteration", it, "complete with", NAdded, "new configurations.")
+        print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
         it += 1
         if it > mVHCI.MaxIter:
             raise RuntimeError("VHCI did not converge.")
@@ -127,7 +155,6 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
     NL = len(BasisBras)
     H = np.zeros((NL, N))
     BasisBrasDict = {str(B): i for i, B in enumerate(BasisBras)}
-    print(Basis[0])
     if not OffDiagonal:
         for i in range(N):
             for j, n in enumerate(Basis[i]):
@@ -148,7 +175,7 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                 if abs(WElement) < 1e-12:
                     continue # If there are zeros, skip them
                 QIndices = np.unravel_index(iw, WShape)
-
+                '''
                 # Determine the multinomial coefficient for this element
                 QIndUniq = list(set(list(QIndices)))
                 QIndCount = []
@@ -158,6 +185,7 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                 DerivCoeff = 1.0
                 for k in QIndCount:
                     DerivCoeff /= math.factorial(k)
+                '''
 
                 # Determine the connected determinants for this derivative
                 Conn0 = mVHCI.ConnectedBasis(B, QIndices)
@@ -170,14 +198,14 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                         continue
                     if not OffDiagonal and j > i:
                         continue
-                    Hji = 1
-                    Hji *= (DerivCoeff * BConn[1] * WElement)
+                    Hji = (BConn[1] * WElement)
                     H[j, i] += Hji
-                    if not OffDiagonal:
+                    if not OffDiagonal and i != j:
                         H[i, j] += Hji
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
     print('...done')
+    print(H)
     return H
 
 '''
@@ -216,7 +244,7 @@ class VHCI:
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
 
-    def __init__(self, w, Vs, MaxQuanta = 2, MaxTotalQuanta = 2, **kwargs):
+    def __init__(self, w, Vs, MaxQuanta = 2, MaxTotalQuanta = 2, NStates = 10, **kwargs):
         self.w = w # Harmonic Frequencies
         self.Vs = Vs # Derivatives of the PES
         self.Ws = [] # Scaled derivatives to be filled later
@@ -232,6 +260,7 @@ class VHCI:
         self.eps2 = 0.01
         self.tol = 0.01
         self.MaxIter = 1000
+        self.NStates = NStates
 
         self.__dict__.update(kwargs)
 
@@ -257,6 +286,6 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxQuantaTotal, Vs, eps1, eps2, NStates = Read('CLO2.inp')
     print(w)
-    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxQuantaTotal = MaxQuantaTotal, eps1 = eps1, eps2 = eps2)
+    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxQuantaTotal = MaxQuantaTotal, eps1 = eps1, eps2 = eps2, NStates = NStates)
     mVHCI.HCI()
     print(mVHCI.Es[:20])
