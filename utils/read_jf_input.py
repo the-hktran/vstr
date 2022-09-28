@@ -27,19 +27,25 @@ def Read(FilePath):
     NFC = int(f.readline().split()[1])
     Vs = [None] * 6 # will need to remove unused orders later
     for i in range(6):
-        shape = [NModes] * (i + 1)
-        Vs[i] = np.zeros(shape)
+        #shape = [NModes] * (i + 1)
+        Vs[i] = []
     for i in range(NFC):
         FCLine = f.readline().split()
         order = int(FCLine[0])
-        I = ()
+        #I = ()
+        #for j in range(order):
+        #    I += (int(FCLine[j + 1]),)
+        #Vs[order - 1][I] = FCLine[-1]
+        I = []
         for j in range(order):
-            I += (int(FCLine[j + 1]),)
-        Vs[order - 1][I] = FCLine[-1]
+            I.append(int(FCLine[j + 1]))
+        Vs[order].append((float(FCLine[-1]), I))
     VsFinal = []
     for i in range(6):
-        shape = [NModes] * (i + 1)
-        if not np.allclose(np.zeros(shape), Vs[i]):
+        #shape = [NModes] * (i + 1)
+        #if not np.allclose(np.zeros(shape), Vs[i]):
+        #    VsFinal.append(Vs[i])
+        if len(Vs[i]) != 0:
             VsFinal.append(Vs[i])
 
     return ws, MaxNs, MaxQuanta, VsFinal, eps1, eps2, NStates

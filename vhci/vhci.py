@@ -5,8 +5,6 @@ import itertools
 import math
 
 def FormW(mVHCI, V):
-    Order = len(V.shape)
-    
     # This part is for when the frequency appears in the denominator, but I guess that is usually included
     '''
     Modes = mVHCI.w.shape[0]
@@ -17,32 +15,21 @@ def FormW(mVHCI, V):
     wProd *= 2**Order
     wProd = wProd**-0.5
     '''
-
-    W = V / np.sqrt(2**Order) # * wProd
-    
-    # This part scales each element by the number of permuations of the indices.
-    WShape = W.shape
-    WN = np.prod(W.shape)
-    WFlat = W.reshape(WN)
-    for iw in range(WN):
-        WElement = WFlat[iw]
-        if abs(WElement) < 1e-12:
-            continue # If there are zeros, skip them
-        QIndices = np.unravel_index(iw, WShape)
-
-        # Determine the multinomial coefficient for this element
-        QIndUniq = list(set(list(QIndices)))
+    W = []
+    Order = len(V[0][1])
+    for v in V:
+        WElement = v[0] / np.sqrt(2**Order)
+        QIndUniq = list(set(list(v[1])))
         QIndCount = []
         for k in QIndUniq:
-            QIndCount.append(QIndices.count(k))
-        #Coeff = utils.math.multinomial(QIndCount)
+            QIndCount.append(v[1].count(k))
         DerivCoeff = 1.0
         for k in QIndCount:
             DerivCoeff /= math.factorial(k)
-        WFlat[iw] *= DerivCoeff
-        print(WFlat[iw])
-    return WFlat.reshape(WShape)
-
+        WElement *= DerivCoeff
+        W.append((WElement, v[1]))
+    print(W)
+    return W
 
 '''
 Determines all possible basis funtions connected to the given coupling element
@@ -82,18 +69,17 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         C = mVHCI.Cs[0]
     NewBasis = []
     for W in Ws:
-        WShape = W.shape
-        WN = np.prod(W.shape)
-        WFlat = W.reshape(WN)
-        WSortedIndex = np.flip(np.argsort(abs(WFlat)))
+        WElement = []
+        for w in W:
+            WElement.append(w[0])
+        WElement = np.asarray(WElement)
+        WSortedIndex = np.flip(np.argsort(abs(WElement)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
         for i in WSortedIndex:
             #if abs(WFlat[i] * C[CSortedIndex[0]]) > eps:
                 for n in CSortedIndex:
-                    print(WFlat[i], C[n])
-                    if abs(WFlat[i] * C[n]) > eps:
-                        Qs = np.unravel_index(i, WShape)
-                        AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Qs)
+                    if abs(WElement[i] * C[n]) > eps:
+                        AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], W[i][1])
                         for AddB in AddedB:
                             NewBasis += [AddB[0]]
                     else:
@@ -163,25 +149,11 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
     for i, B in enumerate(Basis):
         for W in mVHCI.Ws:
             # Go through each derivative
-            WShape = W.shape
-            WN = np.prod(W.shape)
-            WFlat = W.reshape(WN)
-            for iw in range(WN):
-                WElement = WFlat[iw]
+            for w in W:
+                WElement = w[0]
                 if abs(WElement) < 1e-12:
                     continue # If there are zeros, skip them
-                QIndices = np.unravel_index(iw, WShape)
-                '''
-                # Determine the multinomial coefficient for this element
-                QIndUniq = list(set(list(QIndices)))
-                QIndCount = []
-                for k in QIndUniq:
-                    QIndCount.append(QIndices.count(k))
-                #Coeff = utils.math.multinomial(QIndCount)
-                DerivCoeff = 1.0
-                for k in QIndCount:
-                    DerivCoeff /= math.factorial(k)
-                '''
+                QIndices = w[1]
 
                 # Determine the connected determinants for this derivative
                 Conn0 = mVHCI.ConnectedBasis(B, QIndices)
@@ -280,7 +252,7 @@ if __name__ == "__main__":
 
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, NStates = Read('CLO2.inp')
-    print(w)
+    print(Vs)
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, NStates = NStates)
     #mVHCI.Diagonalize()
     mVHCI.HCI()
