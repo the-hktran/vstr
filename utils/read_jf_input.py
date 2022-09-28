@@ -12,7 +12,7 @@ def Read(FilePath):
     NStates = int(f.readline().split()[1])
     doPT2 = bool(f.readline().split()[1])
     eps2 = float(f.readline().split()[1])
-    MaxQuanta = int(f.readline().split()[1]) + 1
+    MaxQuanta = int(f.readline().split()[1])
     NModes = int(f.readline().split()[1])
 
     ws = [None] * NModes
@@ -21,7 +21,7 @@ def Read(FilePath):
         a, ws[i], MaxNs[i] = f.readline().split()
     for i in range(NModes):
         ws[i] = float(ws[i])
-        MaxNs[i] = int(MaxNs[i])
+        MaxNs[i] = int(MaxNs[i]) + 1
     ws = np.asarray(ws)
 
     NFC = int(f.readline().split()[1])

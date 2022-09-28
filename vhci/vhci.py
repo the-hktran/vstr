@@ -5,7 +5,6 @@ import itertools
 import math
 
 def FormW(mVHCI, V):
-    print('form W...')
     Order = len(V.shape)
     
     # This part is for when the frequency appears in the denominator, but I guess that is usually included
@@ -18,7 +17,6 @@ def FormW(mVHCI, V):
     wProd *= 2**Order
     wProd = wProd**-0.5
     '''
-    print('...done')
 
     W = V / np.sqrt(2**Order) # * wProd
     
@@ -77,11 +75,11 @@ def ConnectedBasis(mVHCI, B, Qs):
     return Conn0
 
 def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
-    print('screen basis...', eps)
     if Ws is None:
         Ws = mVHCI.Ws
     if C is None:
         C = mVHCI.Cs[0]
+    print("CMax\n", C)
     NewBasis = []
     for W in Ws:
         WShape = W.shape
@@ -90,24 +88,29 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         WSortedIndex = np.flip(np.argsort(abs(WFlat)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
         for i in WSortedIndex:
-            for n in CSortedIndex:
-                if abs(WFlat[i] * C[n]) > eps:
-                    Qs = np.unravel_index(i, WShape)
-                    AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Qs)
-                    for AddB in AddedB:
-                        NewBasis += [AddB[0]]
-                else:
-                    break
+            if abs(WFlat[i] * C[CSortedIndex[0]] > eps):
+                for n in CSortedIndex:
+                    if abs(WFlat[i] * C[n]) > eps:
+                        Qs = np.unravel_index(i, WShape)
+                        AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Qs)
+                        for AddB in AddedB:
+                            NewBasis += [AddB[0]]
+                    else:
+                        break
+            else:
+                break
     UniqueBasis = []
     for B in NewBasis:
         if B not in UniqueBasis and B not in mVHCI.Basis:
             UniqueBasis.append(B)
-    print('..done')
+            print("hi")
+            print("%d %d %d" % (B[0], B[1], B[2]))
+    print(UniqueBasis)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
-    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = abs(mVHCI.Cs[:,:mVHCI.NStates]).max(axis=1), eps = eps)
+    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
     mVHCI.Basis += NewBasis
     return NAdded
 
@@ -122,10 +125,12 @@ def HCI(mVHCI):
         if it > mVHCI.MaxIter:
             raise RuntimeError("VHCI did not converge.")
 
-def PT2(mVHCI, NStates = 1):
-    dEs_PT2 = [None] * NStates
-    for i in range(NStates):
+def PT2(mVHCI):
+    dEs_PT2 = [None] * mVHCI.NStates
+    '''
+    for i in range(mVHCI.NStates):
         PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = mVHCI.Cs[i], eps = mVHCI.eps2)
+        print("Perturbative Space contains", NPert, "basis states.")
         H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
         E_M = mVHCI.HamV(Basis = PertBasis, DiagonalOnly = True)
         Hc2 = H_MN @ mVHCI.Cs[i]
@@ -133,12 +138,26 @@ def PT2(mVHCI, NStates = 1):
         Denom = (mVHCI.Es[i] - E_M)**(-1)
         dEs_PT2[i] = np.einsum('m,m->', Hc2, Denom)
     mVHCI.dEs_PT2 = dEs_PT2
+    '''
+    PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
+    print("Perturbative Space contains", NPert, "basis states.")
+    H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
+    E_M = np.diag(mVHCI.HamV(Basis = PertBasis))
+    Hc = H_MN @ mVHCI.Cs[:, :mVHCI.NStates]
+    print(Hc)
+    #Hc =  Hc.sum(axis = 1)
+    print("Hc\n",Hc)
+    print("E_M\n", E_M)
+    print(mVHCI.Es[0] - E_M)
+    for n in range(mVHCI.NStates):
+        Denom = (mVHCI.Es[n] - E_M)**(-1)
+        print(Denom)
+        dEs_PT2[n] = np.einsum('m,m->', Hc[:, n]**2., Denom)
+    mVHCI.dEs_PT2 = dEs_PT2
 
 def Diagonalize(mVHCI):
     mVHCI.H = mVHCI.HamV()
-    print('diagonalize...')
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
-    print('...done')
 
 '''
 Forms the explicit vibrational Hamiltonian in the basis given by self.Basis
@@ -162,7 +181,6 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
     if DiagonalOnly:
         return H.diagonal()
 
-    print('forming H...')
     # Now we loop through each V
     for i, B in enumerate(Basis):
         for W in mVHCI.Ws:
@@ -202,10 +220,9 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                     H[j, i] += Hji
                     if not OffDiagonal and i != j:
                         H[i, j] += Hji
+                    print(H[j, i], BConn[0], B)
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
-    print('...done')
-    print(H)
     return H
 
 '''
@@ -253,9 +270,9 @@ class VHCI:
         if isinstance(MaxQuanta, int):
             MaxQuanta = [MaxQuanta] * len(w)
         self.MaxTotalQuanta = MaxTotalQuanta
-        print('init basis...')
         self.Basis = self.InitTruncatedBasis(MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
-        print('...done')
+        print(MaxQuanta)
+        print(MaxTotalQuanta)
         self.eps1 = 0.1
         self.eps2 = 0.01
         self.tol = 0.01
@@ -284,8 +301,13 @@ if __name__ == "__main__":
     '''
 
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxQuantaTotal, Vs, eps1, eps2, NStates = Read('CLO2.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, NStates = Read('CLO2.inp')
     print(w)
-    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxQuantaTotal = MaxQuantaTotal, eps1 = eps1, eps2 = eps2, NStates = NStates)
-    mVHCI.HCI()
-    print(mVHCI.Es[:20])
+    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, NStates = NStates)
+    mVHCI.Diagonalize()
+    #mVHCI.HCI()
+    print(mVHCI.Es)
+    mVHCI.PT2()
+    print(mVHCI.Es)
+    #mVHCI.PT2()
+    print(mVHCI.dEs_PT2)
