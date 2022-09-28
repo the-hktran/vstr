@@ -40,6 +40,7 @@ def FormW(mVHCI, V):
         for k in QIndCount:
             DerivCoeff /= math.factorial(k)
         WFlat[iw] *= DerivCoeff
+        print(WFlat[iw])
     return WFlat.reshape(WShape)
 
 
@@ -79,7 +80,6 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.Ws
     if C is None:
         C = mVHCI.Cs[0]
-    print("CMax\n", C)
     NewBasis = []
     for W in Ws:
         WShape = W.shape
@@ -88,8 +88,9 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         WSortedIndex = np.flip(np.argsort(abs(WFlat)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
         for i in WSortedIndex:
-            if abs(WFlat[i] * C[CSortedIndex[0]] > eps):
+            #if abs(WFlat[i] * C[CSortedIndex[0]]) > eps:
                 for n in CSortedIndex:
+                    print(WFlat[i], C[n])
                     if abs(WFlat[i] * C[n]) > eps:
                         Qs = np.unravel_index(i, WShape)
                         AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Qs)
@@ -97,15 +98,12 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
                             NewBasis += [AddB[0]]
                     else:
                         break
-            else:
-                break
+            #else:
+            #    break
     UniqueBasis = []
     for B in NewBasis:
         if B not in UniqueBasis and B not in mVHCI.Basis:
             UniqueBasis.append(B)
-            print("hi")
-            print("%d %d %d" % (B[0], B[1], B[2]))
-    print(UniqueBasis)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -127,31 +125,13 @@ def HCI(mVHCI):
 
 def PT2(mVHCI):
     dEs_PT2 = [None] * mVHCI.NStates
-    '''
-    for i in range(mVHCI.NStates):
-        PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = mVHCI.Cs[i], eps = mVHCI.eps2)
-        print("Perturbative Space contains", NPert, "basis states.")
-        H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
-        E_M = mVHCI.HamV(Basis = PertBasis, DiagonalOnly = True)
-        Hc2 = H_MN @ mVHCI.Cs[i]
-        Hc2 = Hc2 * Hc2
-        Denom = (mVHCI.Es[i] - E_M)**(-1)
-        dEs_PT2[i] = np.einsum('m,m->', Hc2, Denom)
-    mVHCI.dEs_PT2 = dEs_PT2
-    '''
     PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
     print("Perturbative Space contains", NPert, "basis states.")
     H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
     E_M = np.diag(mVHCI.HamV(Basis = PertBasis))
     Hc = H_MN @ mVHCI.Cs[:, :mVHCI.NStates]
-    print(Hc)
-    #Hc =  Hc.sum(axis = 1)
-    print("Hc\n",Hc)
-    print("E_M\n", E_M)
-    print(mVHCI.Es[0] - E_M)
     for n in range(mVHCI.NStates):
         Denom = (mVHCI.Es[n] - E_M)**(-1)
-        print(Denom)
         dEs_PT2[n] = np.einsum('m,m->', Hc[:, n]**2., Denom)
     mVHCI.dEs_PT2 = dEs_PT2
 
@@ -178,8 +158,6 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
         for i in range(N):
             for j, n in enumerate(Basis[i]):
                 H[i, i] += (n + 0.5) * mVHCI.w[j] # HO diagonal elements
-    if DiagonalOnly:
-        return H.diagonal()
 
     # Now we loop through each V
     for i, B in enumerate(Basis):
@@ -214,13 +192,15 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                         j = BasisBrasDict[str(BConn[0])] #BasisBras.index(BConn)
                     except:
                         continue
+                    if DiagonalOnly:
+                        if j != i:
+                            continue
                     if not OffDiagonal and j > i:
                         continue
                     Hji = (BConn[1] * WElement)
                     H[j, i] += Hji
                     if not OffDiagonal and i != j:
                         H[i, j] += Hji
-                    print(H[j, i], BConn[0], B)
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
     return H
@@ -243,7 +223,7 @@ def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
             if sum(B) < MaxTotalQuanta + 1:
                 NewBasis.append(B)
         Basis = NewBasis
-    print(Basis)
+    print("Initial basis functions are:\n", Basis)
     return Basis
 
             
@@ -263,7 +243,7 @@ class VHCI:
 
     def __init__(self, w, Vs, MaxQuanta = 2, MaxTotalQuanta = 2, NStates = 10, **kwargs):
         self.w = w # Harmonic Frequencies
-        self.Vs = Vs # Derivatives of the PES
+        self.Vs = Vs # Derivatives of the PES: Format: List of lists, the first index is the order and each inner list is a list of indices
         self.Ws = [] # Scaled derivatives to be filled later
         for V in self.Vs:
             self.Ws.append(self.FormW(V))
@@ -271,8 +251,6 @@ class VHCI:
             MaxQuanta = [MaxQuanta] * len(w)
         self.MaxTotalQuanta = MaxTotalQuanta
         self.Basis = self.InitTruncatedBasis(MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
-        print(MaxQuanta)
-        print(MaxTotalQuanta)
         self.eps1 = 0.1
         self.eps2 = 0.01
         self.tol = 0.01
@@ -304,10 +282,9 @@ if __name__ == "__main__":
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, NStates = Read('CLO2.inp')
     print(w)
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, NStates = NStates)
-    mVHCI.Diagonalize()
-    #mVHCI.HCI()
-    print(mVHCI.Es)
+    #mVHCI.Diagonalize()
+    mVHCI.HCI()
+    print(mVHCI.Es[:NStates])
     mVHCI.PT2()
-    print(mVHCI.Es)
-    #mVHCI.PT2()
-    print(mVHCI.dEs_PT2)
+    print(mVHCI.Es[:NStates])
+    #print(mVHCI.dEs_PT2)
