@@ -28,8 +28,39 @@ def FormW(mVHCI, V):
             DerivCoeff /= math.factorial(k)
         WElement *= DerivCoeff
         W.append((WElement, v[1]))
-    print(W)
     return W
+
+def FormWSD(mVHCI):
+    WSD = [[], []]
+    for W in mVHCI.Ws:
+        if len(W[0][1]) == 3:
+            for i in range(len(mVHCI.w)):
+                Wi = 0.0
+                for w in W:
+                    # Two cases, Wiii and Wijj
+                    if w[1].count(i) == 1:
+                        Wi += 2.0 * w[0]
+                    elif w[1].count(i) == 3:
+                        Wi += 3.0 * w[0]
+                if abs(Wi) > 1e-12:
+                    WSD[0].append((Wi, [i]))
+        elif len(W[0][1]) == 4:
+            for i in range(len(mVHCI.w)):
+                for j in range(i, len(mVHCI.w)):
+                    Wij = 0.0
+                    for w in W:
+                    # Four cases, Wiiii, Wiikk, Wijjj, Wijkk
+                        if w[1].count(i) == 1 and w[1].count(j) == 1 and i != j:
+                            Wij += 2.0 * w[0]
+                        elif w[1].count(i) == 2 and len(list(set(w[1]))) == 2 and i == j:
+                            Wij += 2.0 * w[0]
+                        elif (w[1].count(i) == 1 and w[1].count(j) == 3) or (w[1].count(i) == 3 and w[1].count(j) == 1):
+                            Wij += 3.0 * w[0]
+                        elif w[1].count(i) == 4 and i == j:
+                            Wij += 4.0 * w[0]
+                    if abs(Wij) > 1e-12:
+                        WSD[1].append((Wij, [i, j]))
+    mVHCI.WSD = WSD
 
 '''
 Determines all possible basis funtions connected to the given coupling element
@@ -64,7 +95,7 @@ def ConnectedBasis(mVHCI, B, Qs):
 
 def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
     if Ws is None:
-        Ws = mVHCI.Ws
+        Ws = mVHCI.Ws + mVHCI.WSD
     if C is None:
         C = mVHCI.Cs[0]
     NewBasis = []
@@ -76,7 +107,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         WSortedIndex = np.flip(np.argsort(abs(WElement)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
         for i in WSortedIndex:
-            #if abs(WFlat[i] * C[CSortedIndex[0]]) > eps:
+            #if abs(WElement[i] * C[CSortedIndex[0]]) > eps:
                 for n in CSortedIndex:
                     if abs(WElement[i] * C[n]) > eps:
                         AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], W[i][1])
@@ -94,7 +125,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
 
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
-    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
+    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
     mVHCI.Basis += NewBasis
     return NAdded
 
@@ -111,7 +142,7 @@ def HCI(mVHCI):
 
 def PT2(mVHCI):
     dEs_PT2 = [None] * mVHCI.NStates
-    PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
+    PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
     print("Perturbative Space contains", NPert, "basis states.")
     H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
     E_M = np.diag(mVHCI.HamV(Basis = PertBasis))
@@ -204,6 +235,7 @@ Class that handles VHCI
 '''
 class VHCI:
     FormW = FormW
+    FormWSD = FormWSD
     HamV = HamV
     HCI = HCI
     Diagonalize = Diagonalize
@@ -219,6 +251,7 @@ class VHCI:
         self.Ws = [] # Scaled derivatives to be filled later
         for V in self.Vs:
             self.Ws.append(self.FormW(V))
+        self.FormWSD()
         if isinstance(MaxQuanta, int):
             MaxQuanta = [MaxQuanta] * len(w)
         self.MaxTotalQuanta = MaxTotalQuanta
@@ -252,7 +285,6 @@ if __name__ == "__main__":
 
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, NStates = Read('CLO2.inp')
-    print(Vs)
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, NStates = NStates)
     #mVHCI.Diagonalize()
     mVHCI.HCI()
