@@ -3,6 +3,7 @@ from vstr import utils
 from functools import reduce
 import itertools
 import math
+from scipy import sparse
 
 def FormW(mVHCI, V):
     # This part is for when the frequency appears in the denominator, but I guess that is usually included
@@ -70,7 +71,7 @@ the given basis function. The inner list is the basis function and the float
 is the associated raising and lowering coefficient.
 '''
 def ConnectedBasis(mVHCI, B, Qs):
-    Conn0 = [(B.copy(), 1.0)]
+    Conn0 = [[B.copy(), 1.0]]
     Conn1 = []
     # Loop through each derivative and generate the raised and lowered basis function for each.
     # After each derivative, recursively replace the list of basis functions
@@ -80,18 +81,31 @@ def ConnectedBasis(mVHCI, B, Qs):
             tmpC[q] += 1
             tmpCoeff = Coeff
             tmpCoeff *= np.sqrt(tmpC[q])
-            Conn1.append((tmpC, tmpCoeff))
+            Conn1.append([tmpC, tmpCoeff])
             tmpC = Con0.copy()
             tmpCoeff = Coeff
             tmpCoeff *= np.sqrt(tmpC[q])
             tmpC[q] -= 1
             if tmpC[q] < 0:
                 continue
-            Conn1.append((tmpC, tmpCoeff))
+            Conn1.append([tmpC, tmpCoeff])
         Conn0 = Conn1.copy()
         Conn1 = []
     
     return Conn0
+
+def FormBasisConnections(mVHCI, Basis):
+    BasisConnections = []
+    for B in Basis:
+        ConnB = []
+        for p in range(len(mVHCI.Ws)):
+            for W in mVHCI.Ws[p]:
+                ConnBByW = mVHCI.ConnectedBasis(B, W[1])
+                for i, conn in enumerate(ConnBByW):
+                    ConnBByW[i][1] = conn[1] * W[0]
+                ConnB += ConnBByW
+        BasisConnections.append(ConnB)
+    return BasisConnections
 
 def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
     if Ws is None:
@@ -126,7 +140,9 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
+    NewBasisConn = mVHCI.FormBasisConnections(NewBasis)
     mVHCI.Basis += NewBasis
+    mVHCI.BasisConn += NewBasisConn
     return NAdded
 
 def HCI(mVHCI):
@@ -143,9 +159,10 @@ def HCI(mVHCI):
 def PT2(mVHCI):
     dEs_PT2 = [None] * mVHCI.NStates
     PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
+    PertBasisConn = mVHCI.FormBasisConnections(PertBasis)
     print("Perturbative Space contains", NPert, "basis states.")
-    H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
-    E_M = np.diag(mVHCI.HamV(Basis = PertBasis))
+    H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisConn = mVHCI.BasisConn, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
+    E_M = np.diag(mVHCI.HamV(Basis = PertBasis, BasisConn = PertBasisConn))
     Hc = H_MN @ mVHCI.Cs[:, :mVHCI.NStates]
     for n in range(mVHCI.NStates):
         Denom = (mVHCI.Es[n] - E_M)**(-1)
@@ -159,9 +176,11 @@ def Diagonalize(mVHCI):
 '''
 Forms the explicit vibrational Hamiltonian in the basis given by self.Basis
 '''
-def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
+def HamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, DiagonalOnly = False):
     if Basis is None:
         Basis = mVHCI.Basis
+    if BasisConn is None:
+        BasisConn = mVHCI.BasisConn
     OffDiagonal = True 
     if BasisBras is None:
         # BasisBras is the Bras, if off diagonal elements are desired.
@@ -178,6 +197,20 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
 
     # Now we loop through each V
     for i, B in enumerate(Basis):
+        for BConn in BasisConn[i]:
+            try:
+                j = BasisBrasDict[str(BConn[0])]
+            except:
+                continue
+            if DiagonalOnly:
+                if j != i:
+                    continue
+            if not OffDiagonal and j > i:
+                continue
+            H[j, i] += BConn[1]
+            if not OffDiagonal and i != j:
+                H[i, j] += BConn[1]
+        '''
         for W in mVHCI.Ws:
             # Go through each derivative
             for w in W:
@@ -204,6 +237,7 @@ def HamV(mVHCI, Basis = None, BasisBras = None, DiagonalOnly = False):
                     H[j, i] += Hji
                     if not OffDiagonal and i != j:
                         H[i, j] += Hji
+        '''
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
     return H
@@ -241,6 +275,7 @@ class VHCI:
     Diagonalize = Diagonalize
     HCIStep = HCIStep
     ConnectedBasis = ConnectedBasis
+    FormBasisConnections = FormBasisConnections
     ScreenBasis = ScreenBasis
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
@@ -256,6 +291,7 @@ class VHCI:
             MaxQuanta = [MaxQuanta] * len(w)
         self.MaxTotalQuanta = MaxTotalQuanta
         self.Basis = self.InitTruncatedBasis(MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
+        self.BasisConn = self.FormBasisConnections(self.Basis)
         self.eps1 = 0.1
         self.eps2 = 0.01
         self.tol = 0.01

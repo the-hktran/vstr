@@ -25,8 +25,8 @@ def Read(FilePath):
     ws = np.asarray(ws)
 
     NFC = int(f.readline().split()[1])
-    Vs = [None] * 6 # will need to remove unused orders later
-    for i in range(6):
+    Vs = [None] * 10 # will need to remove unused orders later
+    for i in range(10):
         #shape = [NModes] * (i + 1)
         Vs[i] = []
     for i in range(NFC):
@@ -41,7 +41,7 @@ def Read(FilePath):
             I.append(int(FCLine[j + 1]))
         Vs[order].append((float(FCLine[-1]), I))
     VsFinal = []
-    for i in range(6):
+    for i in range(10):
         #shape = [NModes] * (i + 1)
         #if not np.allclose(np.zeros(shape), Vs[i]):
         #    VsFinal.append(Vs[i])
