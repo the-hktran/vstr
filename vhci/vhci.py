@@ -1,5 +1,6 @@
 import numpy as np
 from vstr import utils
+from vstr.vhci.vci_headers import VDeriv 
 from functools import reduce
 import itertools
 import math
@@ -16,7 +17,7 @@ def FormW(mVHCI, V):
     wProd *= 2**Order
     wProd = wProd**-0.5
     '''
-    W = []
+    Ws = []
     Order = len(V[0][1])
     for v in V:
         WElement = v[0] / np.sqrt(2**Order)
@@ -29,7 +30,7 @@ def FormW(mVHCI, V):
             DerivCoeff /= math.factorial(k)
         WElement *= DerivCoeff
         W.append((WElement, v[1]))
-    return W
+    return Ws
 
 def FormWSD(mVHCI):
     WSD = [[], []]
@@ -121,7 +122,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         WSortedIndex = np.flip(np.argsort(abs(WElement)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
         for i in WSortedIndex:
-            #if abs(WElement[i] * C[CSortedIndex[0]]) > eps:
+            if abs(WElement[i] * C[CSortedIndex[0]]) > eps:
                 for n in CSortedIndex:
                     if abs(WElement[i] * C[n]) > eps:
                         AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], W[i][1])
@@ -129,8 +130,8 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
                             NewBasis += [AddB[0]]
                     else:
                         break
-            #else:
-            #    break
+            else:
+                break
     UniqueBasis = []
     for B in NewBasis:
         if B not in UniqueBasis and B not in mVHCI.Basis:
@@ -139,7 +140,9 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
 
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
+    print('screen')
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
+    print('conn')
     NewBasisConn = mVHCI.FormBasisConnections(NewBasis)
     mVHCI.Basis += NewBasis
     mVHCI.BasisConn += NewBasisConn
@@ -150,7 +153,8 @@ def HCI(mVHCI):
     it = 1
     while float(NAdded) / float(len(mVHCI.Basis)) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
-        mVHCI.Diagonalize()
+        print('ham')
+        mVHCI.SparseDiagonalize()
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
         it += 1
         if it > mVHCI.MaxIter:
@@ -158,9 +162,12 @@ def HCI(mVHCI):
 
 def PT2(mVHCI):
     dEs_PT2 = [None] * mVHCI.NStates
+    print('screen pt2')
     PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
+    print('conn pt2')
     PertBasisConn = mVHCI.FormBasisConnections(PertBasis)
     print("Perturbative Space contains", NPert, "basis states.")
+    print('ham pt2')
     H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisConn = mVHCI.BasisConn, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
     E_M = np.diag(mVHCI.HamV(Basis = PertBasis, BasisConn = PertBasisConn))
     Hc = H_MN @ mVHCI.Cs[:, :mVHCI.NStates]
@@ -172,6 +179,10 @@ def PT2(mVHCI):
 def Diagonalize(mVHCI):
     mVHCI.H = mVHCI.HamV()
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
+
+def SparseDiagonalize(mVHCI):
+    mVHCI.H = mVHCI.SparseHamV()
+    mVHCI.Es, mVHCI.Cs = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')
 
 '''
 Forms the explicit vibrational Hamiltonian in the basis given by self.Basis
@@ -210,36 +221,67 @@ def HamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, DiagonalOnly =
             H[j, i] += BConn[1]
             if not OffDiagonal and i != j:
                 H[i, j] += BConn[1]
-        '''
-        for W in mVHCI.Ws:
-            # Go through each derivative
-            for w in W:
-                WElement = w[0]
-                if abs(WElement) < 1e-12:
-                    continue # If there are zeros, skip them
-                QIndices = w[1]
-
-                # Determine the connected determinants for this derivative
-                Conn0 = mVHCI.ConnectedBasis(B, QIndices)
-
-                # Loop through the connected determinants and add in matrix elements
-                for BConn in Conn0:
-                    try:
-                        j = BasisBrasDict[str(BConn[0])] #BasisBras.index(BConn)
-                    except:
-                        continue
-                    if DiagonalOnly:
-                        if j != i:
-                            continue
-                    if not OffDiagonal and j > i:
-                        continue
-                    Hji = (BConn[1] * WElement)
-                    H[j, i] += Hji
-                    if not OffDiagonal and i != j:
-                        H[i, j] += Hji
-        '''
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
+    return H
+
+def SparseHamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, DiagonalOnly = False):
+    if Basis is None:
+        Basis = mVHCI.Basis
+    if BasisConn is None:
+        BasisConn = mVHCI.BasisConn
+    OffDiagonal = True 
+    if BasisBras is None:
+        # BasisBras is the Bras, if off diagonal elements are desired.
+        OffDiagonal = False
+        BasisBras = Basis
+    N = len(Basis)
+    NL = len(BasisBras)
+    HijDict = {}
+
+    def AddElement(i, j, Hij, Dict):
+        Key = str(i) + ',' + str(j)
+        try:
+            Dict[Key] += Hij
+        except:
+            Dict.update({Key : Hij})
+
+    BasisBrasDict = {str(B): i for i, B in enumerate(BasisBras)}
+    if not OffDiagonal:
+        for i in range(N):
+            for j, n in enumerate(Basis[i]):
+                AddElement(i, i, (n + 0.5) * mVHCI.w[j], HijDict) # HO diagonal elements
+
+    # Now we loop through each V
+    for i, B in enumerate(Basis):
+        for BConn in BasisConn[i]:
+            try:
+                j = BasisBrasDict[str(BConn[0])]
+            except:
+                continue
+            if DiagonalOnly:
+                if j != i:
+                    continue
+            if not OffDiagonal and j > i:
+                continue
+            AddElement(j, i, BConn[1], HijDict)
+            if not OffDiagonal and i != j:
+                AddElement(i, j, BConn[1], HijDict)
+
+    # Turn dictionary into lists of indices and values
+    HElem = []
+    I = []
+    J = []
+    for i in range(len(Basis)):
+        for j in range(len(BasisBras)):
+            try:
+                Hij = HijDict[str(i) + ',' + str(j)]
+                I.append(i)
+                J.append(j)
+                HElem.append(Hij)
+            except:
+                continue
+    H = sparse.csr_matrix((HElem, (I, J)), shape = (NL, N))
     return H
 
 '''
@@ -271,8 +313,10 @@ class VHCI:
     FormW = FormW
     FormWSD = FormWSD
     HamV = HamV
+    SparseHamV = SparseHamV
     HCI = HCI
     Diagonalize = Diagonalize
+    SparseDiagonalize = SparseDiagonalize
     HCIStep = HCIStep
     ConnectedBasis = ConnectedBasis
     FormBasisConnections = FormBasisConnections
@@ -322,7 +366,7 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, NStates = Read('CLO2.inp')
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, NStates = NStates)
-    #mVHCI.Diagonalize()
+    mVHCI.Diagonalize()
     mVHCI.HCI()
     print(mVHCI.Es[:NStates])
     mVHCI.PT2()
