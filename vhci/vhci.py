@@ -8,60 +8,54 @@ from scipy import sparse
 
 def FormW(mVHCI, V):
     # This part is for when the frequency appears in the denominator, but I guess that is usually included
-    '''
-    Modes = mVHCI.w.shape[0]
-    ws = []
-    for i in range(Order):
-        ws.append(mVHCI.w)
-    wProd = reduce(np.multiply, np.ix_(*ws))
-    wProd *= 2**Order
-    wProd = wProd**-0.5
-    '''
     Ws = []
-    Order = len(V[0][1])
+    #Order = len(V[0][1])
     for v in V:
-        WElement = v[0] / np.sqrt(2**Order)
-        QIndUniq = list(set(list(v[1])))
-        QIndCount = []
-        for k in QIndUniq:
-            QIndCount.append(v[1].count(k))
-        DerivCoeff = 1.0
-        for k in QIndCount:
-            DerivCoeff /= math.factorial(k)
-        WElement *= DerivCoeff
-        W.append((WElement, v[1]))
+        #WElement = v[0] / np.sqrt(2**Order)
+        #QIndUniq = list(set(list(v[1])))
+        #QIndCount = []
+        #for k in QIndUniq:
+        #    QIndCount.append(v[1].count(k))
+        #DerivCoeff = 1.0
+        #for k in QIndCount:
+        #    DerivCoeff /= math.factorial(k)
+        #WElement *= DerivCoeff
+        W = VDeriv(v[0], v[1])
+        Ws.append(W)
     return Ws
 
 def FormWSD(mVHCI):
     WSD = [[], []]
-    for W in mVHCI.Ws:
-        if len(W[0][1]) == 3:
+    for Wp in mVHCI.Ws:
+        if Wp[0].Order == 3:
             for i in range(len(mVHCI.w)):
                 Wi = 0.0
-                for w in W:
+                for W in Wp:
                     # Two cases, Wiii and Wijj
-                    if w[1].count(i) == 1:
-                        Wi += 2.0 * w[0]
-                    elif w[1].count(i) == 3:
-                        Wi += 3.0 * w[0]
+                    if W.QIndices.count(i) == 1:
+                        Wi += 2.0 * W.W
+                    elif W.QIndices.count(i) == 3:
+                        Wi += 3.0 * W.W
                 if abs(Wi) > 1e-12:
-                    WSD[0].append((Wi, [i]))
-        elif len(W[0][1]) == 4:
+                    mW = VDeriv(Wi, [i], doScaleW = False)
+                    WSD[0].append(mW)
+        elif Wp[0].Order == 4:
             for i in range(len(mVHCI.w)):
                 for j in range(i, len(mVHCI.w)):
                     Wij = 0.0
-                    for w in W:
+                    for W in Wp:
                     # Four cases, Wiiii, Wiikk, Wijjj, Wijkk
-                        if w[1].count(i) == 1 and w[1].count(j) == 1 and i != j:
-                            Wij += 2.0 * w[0]
-                        elif w[1].count(i) == 2 and len(list(set(w[1]))) == 2 and i == j:
-                            Wij += 2.0 * w[0]
-                        elif (w[1].count(i) == 1 and w[1].count(j) == 3) or (w[1].count(i) == 3 and w[1].count(j) == 1):
-                            Wij += 3.0 * w[0]
-                        elif w[1].count(i) == 4 and i == j:
-                            Wij += 4.0 * w[0]
+                        if W.QIndices.count(i) == 1 and W.QIndices.count(j) == 1 and i != j:
+                            Wij += 2.0 * W.W
+                        elif W.QIndices.count(i) == 2 and len(W.QUnique) == 2 and i == j:
+                            Wij += 2.0 * W.W
+                        elif (W.QIndices.count(i) == 1 and W.QIndices.count(j) == 3) or (W.QIndices.count(i) == 3 and W.QIndices.count(j) == 1):
+                            Wij += 3.0 * W.W
+                        elif W.QIndices.count(i) == 4 and i == j:
+                            Wij += 4.0 * W.W
                     if abs(Wij) > 1e-12:
-                        WSD[1].append((Wij, [i, j]))
+                        mW = VDeriv(Wij, [i, j], doScaleW = False)
+                        WSD[1].append(mW)
     mVHCI.WSD = WSD
 
 '''
@@ -101,9 +95,9 @@ def FormBasisConnections(mVHCI, Basis):
         ConnB = []
         for p in range(len(mVHCI.Ws)):
             for W in mVHCI.Ws[p]:
-                ConnBByW = mVHCI.ConnectedBasis(B, W[1])
+                ConnBByW = mVHCI.ConnectedBasis(B, W.QIndices)
                 for i, conn in enumerate(ConnBByW):
-                    ConnBByW[i][1] = conn[1] * W[0]
+                    ConnBByW[i][1] = conn[1] * W.W
                 ConnB += ConnBByW
         BasisConnections.append(ConnB)
     return BasisConnections
@@ -114,10 +108,10 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
     if C is None:
         C = mVHCI.Cs[0]
     NewBasis = []
-    for W in Ws:
+    for Wp in Ws:
         WElement = []
-        for w in W:
-            WElement.append(w[0])
+        for W in Wp:
+            WElement.append(W.W)
         WElement = np.asarray(WElement)
         WSortedIndex = np.flip(np.argsort(abs(WElement)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
@@ -125,7 +119,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
             if abs(WElement[i] * C[CSortedIndex[0]]) > eps:
                 for n in CSortedIndex:
                     if abs(WElement[i] * C[n]) > eps:
-                        AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], W[i][1])
+                        AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Wp[i].QIndices)
                         for AddB in AddedB:
                             NewBasis += [AddB[0]]
                     else:
