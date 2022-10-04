@@ -1,6 +1,6 @@
 import numpy as np
 from vstr import utils
-#from vstr.vhci.vci_headers import VDeriv 
+#from vstr.vhci.vci_headers import VDeriv
 from vstr.cpp_wrappers.vhci_functions import VDerivCPP as VDeriv
 from vstr.cpp_wrappers.vhci_functions import FormBasisConnectionsCPP, HamVCPP
 from functools import reduce
@@ -136,8 +136,8 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
 
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
-    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
-    NewBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, NewBasis) #mVHCI.FormBasisConnections(NewBasis)
+    mVHCI.NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
+    NewBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, NewBasis) # mVHCI.FormBasisConnections(NewBasis)
     mVHCI.Basis += NewBasis
     mVHCI.BasisConn += NewBasisConn
     return NAdded
@@ -156,7 +156,7 @@ def HCI(mVHCI):
 def PT2(mVHCI):
     dEs_PT2 = [None] * mVHCI.NStates
     PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
-    PertBasisConn = mVHCI.FormBasisConnections(PertBasis)
+    PertBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, PertBasis) #mVHCI.FormBasisConnections(PertBasis)
     print("Perturbative Space contains", NPert, "basis states.")
     H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisConn = mVHCI.BasisConn, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
     E_M = np.diag(mVHCI.HamV(Basis = PertBasis, BasisConn = PertBasisConn))

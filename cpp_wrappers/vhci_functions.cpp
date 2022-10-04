@@ -7,6 +7,7 @@
 #include <cmath>
 #include <unordered_map>
 #include "vhci_functions.hpp"
+#include <iostream>
 
 VDeriv::VDeriv (double dV, std::vector<int> Qs, bool doScale)
 {
@@ -23,6 +24,7 @@ VDeriv::VDeriv (double dV, std::vector<int> Qs, bool doScale)
     {
         QPowers.push_back(std::count(QIndices.begin(), QIndices.end(), i));
     }
+    if (doScaleW) ScaleW();
 }
 
 double Factorial(int n)
@@ -44,6 +46,15 @@ void VDeriv::ScaleW()
     }
 }
 
+void PrintVec(std::vector<int> V)
+{
+    for (int i = 0; i < V.size(); i++)
+    {
+        std::cout << V[i] << " ";
+    }
+    std::cout << std::endl;
+}
+
 std::vector<std::tuple<std::vector<int>, double>> BasisConnectionsCPP(std::vector<int> BasisFunction, std::vector<int> Qs)
 {
     std::vector<std::tuple<std::vector<int>, double>> Conn;
@@ -55,21 +66,25 @@ std::vector<std::tuple<std::vector<int>, double>> BasisConnectionsCPP(std::vecto
         {
             std::vector<int> tmpQR = std::get<0>(C);
             double tmpCoeffR = std::get<1>(C);
-            tmpQR[i] += 1;
-            tmpCoeffR *= sqrt(tmpQR[i]);
+            tmpQR[Qs[i]] += 1;
+            tmpCoeffR *= sqrt(tmpQR[Qs[i]]);
             std::tuple<std::vector<int>, double> tmpCR = std::make_tuple(tmpQR, tmpCoeffR);
             Conn2.push_back(tmpCR);
 
             std::vector<int> tmpQL = std::get<0>(C);
             double tmpCoeffL = std::get<1>(C);
-            tmpCoeffL *= sqrt(tmpQL[i]);
-            tmpQL[i] -= 1;
-            if (tmpQL[i] < 0) continue;
+            tmpCoeffL *= sqrt(tmpQL[Qs[i]]);
+            tmpQL[Qs[i]] -= 1;
+            if (tmpQL[Qs[i]] < 0) continue;
             std::tuple<std::vector<int>, double> tmpCL = std::make_tuple(tmpQL, tmpCoeffL);
             Conn2.push_back(tmpCL);
         }
-        std::vector<std::tuple<std::vector<int>, double>> Conn = Conn2;
-        std::vector<std::tuple<std::vector<int>, double>> Conn2;
+        Conn.clear();
+        for (std::tuple<std::vector<int>, double> C2 : Conn2)
+        {
+            Conn.push_back(C2);
+        }
+        Conn2.clear();
     }
     return Conn;
 }
