@@ -1,10 +1,11 @@
 import numpy as np
 from vstr import utils
-from vstr.vhci.vci_headers import VDeriv 
+from vstr.vhci.vci_headers import VDeriv, BasisState
 from functools import reduce
 import itertools
 import math
 from scipy import sparse
+import copy
 
 def FormW(mVHCI, V):
     # This part is for when the frequency appears in the denominator, but I guess that is usually included
@@ -66,27 +67,23 @@ the given basis function. The inner list is the basis function and the float
 is the associated raising and lowering coefficient.
 '''
 def ConnectedBasis(mVHCI, B, Qs):
-    Conn0 = [[B.copy(), 1.0]]
+    Conn0 = [copy.deepcopy(B)]
     Conn1 = []
     # Loop through each derivative and generate the raised and lowered basis function for each.
     # After each derivative, recursively replace the list of basis functions
     for q in Qs:
-        for Con0, Coeff in Conn0:
-            tmpC = Con0.copy()
-            tmpC[q] += 1
-            tmpCoeff = Coeff
-            tmpCoeff *= np.sqrt(tmpC[q])
-            Conn1.append([tmpC, tmpCoeff])
-            tmpC = Con0.copy()
-            tmpCoeff = Coeff
-            tmpCoeff *= np.sqrt(tmpC[q])
-            tmpC[q] -= 1
-            if tmpC[q] < 0:
+        for C in Conn0:
+            tmpC = copy.deepcopy(C)
+            tmpC.Raise(q)
+            Conn1.append(tmpC)
+            tmpC = copy.deepcopy(C)
+            tmpC.Lower(q)
+            if tmpC.Annihilated():
                 continue
-            Conn1.append([tmpC, tmpCoeff])
+            Conn1.append(tmpC)
         Conn0 = Conn1.copy()
         Conn1 = []
-    
+ 
     return Conn0
 
 def FormBasisConnections(mVHCI, Basis):
@@ -96,8 +93,8 @@ def FormBasisConnections(mVHCI, Basis):
         for p in range(len(mVHCI.Ws)):
             for W in mVHCI.Ws[p]:
                 ConnBByW = mVHCI.ConnectedBasis(B, W.QIndices)
-                for i, conn in enumerate(ConnBByW):
-                    ConnBByW[i][1] = conn[1] * W.W
+                for C in ConnBByW:
+                    C.Coeff *=  W.W
                 ConnB += ConnBByW
         BasisConnections.append(ConnB)
     return BasisConnections
@@ -121,7 +118,8 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
                     if abs(WElement[i] * C[n]) > eps:
                         AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Wp[i].QIndices)
                         for AddB in AddedB:
-                            NewBasis += [AddB[0]]
+                            AddB.Coeff = 1.0
+                            NewBasis += [AddB]
                     else:
                         break
             else:
@@ -148,7 +146,7 @@ def HCI(mVHCI):
     while float(NAdded) / float(len(mVHCI.Basis)) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
         print('ham')
-        mVHCI.SparseDiagonalize()
+        mVHCI.Diagonalize()
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
         it += 1
         if it > mVHCI.MaxIter:
@@ -194,17 +192,17 @@ def HamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, DiagonalOnly =
     N = len(Basis)
     NL = len(BasisBras)
     H = np.zeros((NL, N))
-    BasisBrasDict = {str(B): i for i, B in enumerate(BasisBras)}
+    BasisBrasDict = {str(B.QuantaList): i for i, B in enumerate(BasisBras)}
     if not OffDiagonal:
         for i in range(N):
-            for j, n in enumerate(Basis[i]):
+            for j, n in enumerate(Basis[i].QuantaList):
                 H[i, i] += (n + 0.5) * mVHCI.w[j] # HO diagonal elements
 
     # Now we loop through each V
     for i, B in enumerate(Basis):
         for BConn in BasisConn[i]:
             try:
-                j = BasisBrasDict[str(BConn[0])]
+                j = BasisBrasDict[str(BConn.QuantaList)]
             except:
                 continue
             if DiagonalOnly:
@@ -212,9 +210,9 @@ def HamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, DiagonalOnly =
                     continue
             if not OffDiagonal and j > i:
                 continue
-            H[j, i] += BConn[1]
+            H[j, i] += BConn.Coeff
             if not OffDiagonal and i != j:
-                H[i, j] += BConn[1]
+                H[i, j] += BConn.Coeff
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
     return H
@@ -240,17 +238,17 @@ def SparseHamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, Diagonal
         except:
             Dict.update({Key : Hij})
 
-    BasisBrasDict = {str(B): i for i, B in enumerate(BasisBras)}
+    BasisBrasDict = {str(B.QuantaList): i for i, B in enumerate(BasisBras)}
     if not OffDiagonal:
         for i in range(N):
-            for j, n in enumerate(Basis[i]):
+            for j, n in enumerate(Basis[i].QuantaList):
                 AddElement(i, i, (n + 0.5) * mVHCI.w[j], HijDict) # HO diagonal elements
 
     # Now we loop through each V
     for i, B in enumerate(Basis):
         for BConn in BasisConn[i]:
             try:
-                j = BasisBrasDict[str(BConn[0])]
+                j = BasisBrasDict[str(BConn.QuantaList)]
             except:
                 continue
             if DiagonalOnly:
@@ -258,9 +256,9 @@ def SparseHamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, Diagonal
                     continue
             if not OffDiagonal and j > i:
                 continue
-            AddElement(j, i, BConn[1], HijDict)
+            AddElement(j, i, BConn.Coeff, HijDict)
             if not OffDiagonal and i != j:
-                AddElement(i, j, BConn[1], HijDict)
+                AddElement(i, j, BConn.Coeff, HijDict)
 
     # Turn dictionary into lists of indices and values
     HElem = []
@@ -294,9 +292,10 @@ def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
         NewBasis = []
         for B in Basis:
             if sum(B) < MaxTotalQuanta + 1:
-                NewBasis.append(B)
+                mB = BasisState(B)
+                NewBasis.append(mB)
         Basis = NewBasis
-    print("Initial basis functions are:\n", Basis)
+    #print("Initial basis functions are:\n", Basis)
     return Basis
 
             
