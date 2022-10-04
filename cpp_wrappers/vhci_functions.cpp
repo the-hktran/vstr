@@ -6,19 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
-
-// Class that holds values for 
-class VDeriv
-{
-    public:
-        double W; // Value of force constant
-        std::vector<int> QIndices; // Index of derivatives
-        int Order;
-        std::vector<int> QUnique;
-        std::vector<int> QPowers;
-
-        VDeriv(double, std::vector<int>);
-};
+#include "vhci_functions.hpp"
 
 VDeriv::VDeriv (double dV, std::vector<int> Qs)
 {
@@ -143,9 +131,4 @@ Eigen::MatrixXd HamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::ve
         }
     }
     return H;
-}
-
-int main()
-{
-    return 0;
 }

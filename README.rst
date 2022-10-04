@@ -22,6 +22,12 @@ Vibrational structure theory methods based on heat bath CI
 * Free software: MIT license
 * Documentation: https://vhci.readthedocs.io.
 
+Dependencies
+--------
+* NumPy
+* SciPy
+* Pybind11
+* Eigen
 
 Features
 --------
