@@ -4,7 +4,9 @@
 #include <string>
 #include <tuple>
 #include <algorithm>
+#include <cmath>
 
+// Class that holds values for 
 class VDeriv
 {
     public:
@@ -33,16 +35,55 @@ VDeriv::VDeriv (double dV, std::vector<int> Qs)
     }
 }
 
-std::vector<std::tuple<std::vector<int>, double>> BasisConnection(std::vector<std::vector<double, std::vector<int>>>> Ws, std::vector<int> BasisFunction)
+std::vector<std::tuple<std::vector<int>, double>> BasisConnectionCPP(std::vector<int> BasisFunction, std::vector<int> Qs)
 {
     std::vector<std::tuple<std::vector<int>, double>> Conn
     Conn.push_back(std::tuple<std::vector<int>, double>(BasisFunction, 1.0))
-    std::vector<std::tuple<std::vector<int>, double>> tmpC
+    std::vector<std::tuple<std::vector<int>, double>> Conn2
+    for (int i = 0; i < Qs.size(); i++)
+    {
+        for (std::tuple<std::vector<int>, double> C : Conn)
+        {
+            std::vector<int> tmpQ = std::get<0>(C);
+            double tmpCoeff = std::get<1>(C);
+            tmpQ[i] += 1;
+            tmpCoeff *= sqrt(tmpQ[i]);
+            std::tuple<std::vector<int>, double> tmpC = std::make_tuple(tmpQ, tmpCoeff);
+            Conn2.push_back(tmpC);
 
-
-    
-
+            std::vector<int> tmpQ = std::get<0>(C);
+            double tmpCoeff = std::get<1>(C);
+            tmpCoeff *= sqrt(tmpQ[i]);
+            tmpQ[i] -= 1;
+            if (tmpQ[i] < 0) continue;
+            std::tuple<std::vector<int>, double> tmpC = std::make_tuple(tmpQ, tmpCoeff);
+            Conn2.push_back(tmpC);
+        }
+        std::vector<std::tuple<std::vector<int>, double> Conn = Conn2;
+        std::vector<std::tuple<std::vector<int>, double> Conn2;
+    }
+    return Conn;
 }
-std::vector<std::vector<std::tuple<std::vector<int>, double>>> FormBasisConnections(std::vector<std::vector<std::vector<double, std::vector<int>>>> Ws, std::vector<std::vector<int>> Basis)
+
+std::vector<std::vector<std::tuple<std::vector<int>, double>>> FormBasisConnectionsCPP(std::vector<std::vector<std::vector<VDeriv>>> Ws, std::vector<std::vector<int>> Basis)
 {
+    std::vector<std::vector<std::tuple<std::vector<int>, double>>> BasisConnections;
+    for (std::vector<int> B : Basis)
+    {
+        std::vector<std::tuple<std::vector<int>, double>> ConnB;
+        for (int p = 0; p < Ws.size(); p++)
+        {
+            for (VDeriv W : Ws[p])
+            {
+                std::vector<std::tuple<std::vector<int>, double> ConnByW = BasisConnectionsCPP(B, W.QIndices);
+                for (std::tuple<std::vector<int>, double>> C : ConnByW)
+                {
+                    std::get<0>(C) *= W.W;
+                }
+                ConnB.insert(ConnB.end(), C.begin(), C.end());
+            }
+        }
+        BasisConnections.push_back(ConnB);
+    }
+    return BasisConnections; 
 }

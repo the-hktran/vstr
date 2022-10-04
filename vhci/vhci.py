@@ -1,11 +1,10 @@
 import numpy as np
 from vstr import utils
-from vstr.vhci.vci_headers import VDeriv, BasisState
+from vstr.vhci.vci_headers import VDeriv 
 from functools import reduce
 import itertools
 import math
 from scipy import sparse
-import copy
 
 def FormW(mVHCI, V):
     # This part is for when the frequency appears in the denominator, but I guess that is usually included
@@ -67,23 +66,27 @@ the given basis function. The inner list is the basis function and the float
 is the associated raising and lowering coefficient.
 '''
 def ConnectedBasis(mVHCI, B, Qs):
-    Conn0 = [copy.deepcopy(B)]
+    Conn0 = [[B.copy(), 1.0]]
     Conn1 = []
     # Loop through each derivative and generate the raised and lowered basis function for each.
     # After each derivative, recursively replace the list of basis functions
     for q in Qs:
-        for C in Conn0:
-            tmpC = copy.deepcopy(C)
-            tmpC.Raise(q)
-            Conn1.append(tmpC)
-            tmpC = copy.deepcopy(C)
-            tmpC.Lower(q)
-            if tmpC.Annihilated():
+        for Con0, Coeff in Conn0:
+            tmpC = Con0.copy()
+            tmpC[q] += 1
+            tmpCoeff = Coeff
+            tmpCoeff *= np.sqrt(tmpC[q])
+            Conn1.append([tmpC, tmpCoeff])
+            tmpC = Con0.copy()
+            tmpCoeff = Coeff
+            tmpCoeff *= np.sqrt(tmpC[q])
+            tmpC[q] -= 1
+            if tmpC[q] < 0:
                 continue
-            Conn1.append(tmpC)
+            Conn1.append([tmpC, tmpCoeff])
         Conn0 = Conn1.copy()
         Conn1 = []
- 
+    
     return Conn0
 
 def FormBasisConnections(mVHCI, Basis):
@@ -93,8 +96,8 @@ def FormBasisConnections(mVHCI, Basis):
         for p in range(len(mVHCI.Ws)):
             for W in mVHCI.Ws[p]:
                 ConnBByW = mVHCI.ConnectedBasis(B, W.QIndices)
-                for C in ConnBByW:
-                    C.Coeff *=  W.W
+                for i, conn in enumerate(ConnBByW):
+                    ConnBByW[i][1] = conn[1] * W.W
                 ConnB += ConnBByW
         BasisConnections.append(ConnB)
     return BasisConnections
@@ -118,8 +121,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
                     if abs(WElement[i] * C[n]) > eps:
                         AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Wp[i].QIndices)
                         for AddB in AddedB:
-                            AddB.Coeff = 1.0
-                            NewBasis += [AddB]
+                            NewBasis += [AddB[0]]
                     else:
                         break
             else:
@@ -132,9 +134,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
 
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
-    print('screen')
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
-    print('conn')
     NewBasisConn = mVHCI.FormBasisConnections(NewBasis)
     mVHCI.Basis += NewBasis
     mVHCI.BasisConn += NewBasisConn
@@ -145,8 +145,7 @@ def HCI(mVHCI):
     it = 1
     while float(NAdded) / float(len(mVHCI.Basis)) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
-        print('ham')
-        mVHCI.Diagonalize()
+        mVHCI.SparseDiagonalize()
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
         it += 1
         if it > mVHCI.MaxIter:
@@ -154,12 +153,9 @@ def HCI(mVHCI):
 
 def PT2(mVHCI):
     dEs_PT2 = [None] * mVHCI.NStates
-    print('screen pt2')
     PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
-    print('conn pt2')
     PertBasisConn = mVHCI.FormBasisConnections(PertBasis)
     print("Perturbative Space contains", NPert, "basis states.")
-    print('ham pt2')
     H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisConn = mVHCI.BasisConn, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
     E_M = np.diag(mVHCI.HamV(Basis = PertBasis, BasisConn = PertBasisConn))
     Hc = H_MN @ mVHCI.Cs[:, :mVHCI.NStates]
@@ -192,17 +188,17 @@ def HamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, DiagonalOnly =
     N = len(Basis)
     NL = len(BasisBras)
     H = np.zeros((NL, N))
-    BasisBrasDict = {str(B.QuantaList): i for i, B in enumerate(BasisBras)}
+    BasisBrasDict = {str(B): i for i, B in enumerate(BasisBras)}
     if not OffDiagonal:
         for i in range(N):
-            for j, n in enumerate(Basis[i].QuantaList):
+            for j, n in enumerate(Basis[i]):
                 H[i, i] += (n + 0.5) * mVHCI.w[j] # HO diagonal elements
 
     # Now we loop through each V
     for i, B in enumerate(Basis):
         for BConn in BasisConn[i]:
             try:
-                j = BasisBrasDict[str(BConn.QuantaList)]
+                j = BasisBrasDict[str(BConn[0])]
             except:
                 continue
             if DiagonalOnly:
@@ -210,9 +206,9 @@ def HamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, DiagonalOnly =
                     continue
             if not OffDiagonal and j > i:
                 continue
-            H[j, i] += BConn.Coeff
+            H[j, i] += BConn[1]
             if not OffDiagonal and i != j:
-                H[i, j] += BConn.Coeff
+                H[i, j] += BConn[1]
     if not OffDiagonal:
         assert(np.allclose(H, H.T))
     return H
@@ -238,17 +234,17 @@ def SparseHamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, Diagonal
         except:
             Dict.update({Key : Hij})
 
-    BasisBrasDict = {str(B.QuantaList): i for i, B in enumerate(BasisBras)}
+    BasisBrasDict = {str(B): i for i, B in enumerate(BasisBras)}
     if not OffDiagonal:
         for i in range(N):
-            for j, n in enumerate(Basis[i].QuantaList):
+            for j, n in enumerate(Basis[i]):
                 AddElement(i, i, (n + 0.5) * mVHCI.w[j], HijDict) # HO diagonal elements
 
     # Now we loop through each V
     for i, B in enumerate(Basis):
         for BConn in BasisConn[i]:
             try:
-                j = BasisBrasDict[str(BConn.QuantaList)]
+                j = BasisBrasDict[str(BConn[0])]
             except:
                 continue
             if DiagonalOnly:
@@ -256,9 +252,9 @@ def SparseHamV(mVHCI, Basis = None, BasisConn = None, BasisBras = None, Diagonal
                     continue
             if not OffDiagonal and j > i:
                 continue
-            AddElement(j, i, BConn.Coeff, HijDict)
+            AddElement(j, i, BConn[1], HijDict)
             if not OffDiagonal and i != j:
-                AddElement(i, j, BConn.Coeff, HijDict)
+                AddElement(i, j, BConn[1], HijDict)
 
     # Turn dictionary into lists of indices and values
     HElem = []
@@ -292,10 +288,9 @@ def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
         NewBasis = []
         for B in Basis:
             if sum(B) < MaxTotalQuanta + 1:
-                mB = BasisState(B)
-                NewBasis.append(mB)
+                NewBasis.append(B)
         Basis = NewBasis
-    #print("Initial basis functions are:\n", Basis)
+    print("Initial basis functions are:\n", Basis)
     return Basis
 
             
