@@ -1,6 +1,8 @@
 import numpy as np
 from vstr import utils
-from vstr.vhci.vci_headers import VDeriv 
+#from vstr.vhci.vci_headers import VDeriv 
+from vstr.cpp_wrappers.vhci_functions import VDerivCPP as VDeriv
+from vstr.cpp_wrappers.vhci_functions import FormBasisConnectionsCPP, HamVCPP
 from functools import reduce
 import itertools
 import math
@@ -20,7 +22,7 @@ def FormW(mVHCI, V):
         #for k in QIndCount:
         #    DerivCoeff /= math.factorial(k)
         #WElement *= DerivCoeff
-        W = VDeriv(v[0], v[1])
+        W = VDeriv(v[0], v[1], True)
         Ws.append(W)
     return Ws
 
@@ -37,7 +39,7 @@ def FormWSD(mVHCI):
                     elif W.QIndices.count(i) == 3:
                         Wi += 3.0 * W.W
                 if abs(Wi) > 1e-12:
-                    mW = VDeriv(Wi, [i], doScaleW = False)
+                    mW = VDeriv(Wi, [i], False)
                     WSD[0].append(mW)
         elif Wp[0].Order == 4:
             for i in range(len(mVHCI.w)):
@@ -54,7 +56,7 @@ def FormWSD(mVHCI):
                         elif W.QIndices.count(i) == 4 and i == j:
                             Wij += 4.0 * W.W
                     if abs(Wij) > 1e-12:
-                        mW = VDeriv(Wij, [i, j], doScaleW = False)
+                        mW = VDeriv(Wij, [i, j], False)
                         WSD[1].append(mW)
     mVHCI.WSD = WSD
 
@@ -135,7 +137,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
-    NewBasisConn = mVHCI.FormBasisConnections(NewBasis)
+    NewBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, NewBasis) #mVHCI.FormBasisConnections(NewBasis)
     mVHCI.Basis += NewBasis
     mVHCI.BasisConn += NewBasisConn
     return NAdded
@@ -145,7 +147,7 @@ def HCI(mVHCI):
     it = 1
     while float(NAdded) / float(len(mVHCI.Basis)) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
-        mVHCI.SparseDiagonalize()
+        mVHCI.Diagonalize()
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
         it += 1
         if it > mVHCI.MaxIter:
@@ -165,7 +167,7 @@ def PT2(mVHCI):
     mVHCI.dEs_PT2 = dEs_PT2
 
 def Diagonalize(mVHCI):
-    mVHCI.H = mVHCI.HamV()
+    mVHCI.H = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False) #mVHCI.HamV()
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
 
 def SparseDiagonalize(mVHCI):
@@ -323,7 +325,7 @@ class VHCI:
             MaxQuanta = [MaxQuanta] * len(w)
         self.MaxTotalQuanta = MaxTotalQuanta
         self.Basis = self.InitTruncatedBasis(MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
-        self.BasisConn = self.FormBasisConnections(self.Basis)
+        self.BasisConn = FormBasisConnectionsCPP(self.Ws, self.Basis) #self.FormBasisConnections(self.Basis)
         self.eps1 = 0.1
         self.eps2 = 0.01
         self.tol = 0.01

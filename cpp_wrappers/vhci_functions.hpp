@@ -15,8 +15,10 @@ class VDeriv
         int Order;
         std::vector<int> QUnique;
         std::vector<int> QPowers;
+        bool doScaleW;
 
-        VDeriv(double, std::vector<int>);
+        VDeriv(double, std::vector<int>, bool);
+        void ScaleW();
 };
 
 

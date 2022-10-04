@@ -8,11 +8,12 @@
 #include <unordered_map>
 #include "vhci_functions.hpp"
 
-VDeriv::VDeriv (double dV, std::vector<int> Qs)
+VDeriv::VDeriv (double dV, std::vector<int> Qs, bool doScale)
 {
     W = dV;
     QIndices = Qs;
     Order = QIndices.size();
+    doScaleW = doScale;
     
     QUnique = QIndices;
     std::sort(QUnique.begin(), QUnique.end());
@@ -21,6 +22,25 @@ VDeriv::VDeriv (double dV, std::vector<int> Qs)
     for (int i : QUnique)
     {
         QPowers.push_back(std::count(QIndices.begin(), QIndices.end(), i));
+    }
+}
+
+double Factorial(int n)
+{
+    double nFac = 1.0;
+    for (int i = 0; i < n; i++)
+    {
+        nFac *= (double)(i + 1);
+    }
+    return nFac;
+}
+
+void VDeriv::ScaleW()
+{
+    W = W / sqrt(pow(2.0, Order));
+    for (int i = 0; i < QPowers.size(); i++)
+    {
+        W /= Factorial(QPowers[i]);
     }
 }
 
