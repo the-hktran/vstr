@@ -136,8 +136,14 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
 
 def HCIStep(mVHCI, eps = 0.01):
     # We use the maximum Cn from the first NStates states as our C vector
-    mVHCI.NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
+    mVHCI.OldBasis = mVHCI.Basis.copy()
+    mVHCI.OldBasisConn = mVHCI.BasisConn.copy()
+    
+    NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
+    mVHCI.NewBasis = NewBasis.copy()
     NewBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, NewBasis) # mVHCI.FormBasisConnections(NewBasis)
+    mVHCI.NewBasisConn = NewBasisConn.copy()
+    
     mVHCI.Basis += NewBasis
     mVHCI.BasisConn += NewBasisConn
     return NAdded
@@ -158,8 +164,10 @@ def PT2(mVHCI):
     PertBasis, NPert = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = mVHCI.eps2)
     PertBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, PertBasis) #mVHCI.FormBasisConnections(PertBasis)
     print("Perturbative Space contains", NPert, "basis states.")
-    H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisConn = mVHCI.BasisConn, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
-    E_M = np.diag(mVHCI.HamV(Basis = PertBasis, BasisConn = PertBasisConn))
+    #H_MN = mVHCI.HamV(Basis = mVHCI.Basis, BasisConn = mVHCI.BasisConn, BasisBras = PertBasis) # OD Hamiltonian between original and perturbative space
+    H_MN = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, PertBasis, mVHCI.w, mVHCI.Ws, False, True) # OD Hamiltonian between original and perturbative space
+    #E_M = np.diag(mVHCI.HamV(Basis = PertBasis, BasisConn = PertBasisConn))
+    E_M = np.diag(HamVCPP(PertBasis, PertBasisConn, PertBasis, mVHCI.w, mVHCI.Ws, True, False))
     Hc = H_MN @ mVHCI.Cs[:, :mVHCI.NStates]
     for n in range(mVHCI.NStates):
         Denom = (mVHCI.Es[n] - E_M)**(-1)
@@ -167,7 +175,22 @@ def PT2(mVHCI):
     mVHCI.dEs_PT2 = dEs_PT2
 
 def Diagonalize(mVHCI):
+    '''
     mVHCI.H = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False) #mVHCI.HamV()
+    mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
+    '''
+    if mVHCI.NewBasis is None:
+        mVHCI.H = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False) #mVHCI.HamV()
+    else:
+        HOld = mVHCI.H
+        DimOld = HOld.shape[0]
+        mVHCI.H = np.zeros((len(mVHCI.Basis), len(mVHCI.Basis)))
+        HON = HamVCPP(mVHCI.OldBasis, mVHCI.OldBasisConn, mVHCI.NewBasis, mVHCI.w, mVHCI.Ws, False, True)
+        HNN = HamVCPP(mVHCI.NewBasis, mVHCI.NewBasisConn, mVHCI.NewBasis, mVHCI.w, mVHCI.Ws, False, False)
+        mVHCI.H[:DimOld, :DimOld] = HOld
+        mVHCI.H[DimOld:, :DimOld] = HON
+        mVHCI.H[:DimOld, DimOld:] = HON.T
+        mVHCI.H[DimOld:, DimOld:] = HNN
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
 
 def SparseDiagonalize(mVHCI):
@@ -326,6 +349,7 @@ class VHCI:
         self.MaxTotalQuanta = MaxTotalQuanta
         self.Basis = self.InitTruncatedBasis(MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
         self.BasisConn = FormBasisConnectionsCPP(self.Ws, self.Basis) #self.FormBasisConnections(self.Basis)
+        self.NewBasis = None
         self.eps1 = 0.1
         self.eps2 = 0.01
         self.tol = 0.01
