@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <map>
 #include "vhci_functions.hpp"
 #include <iostream>
 
@@ -165,5 +166,73 @@ Eigen::MatrixXd HamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::ve
             }
         }
     }
+    return H;
+}
+
+typedef Eigen::Triplet<double> T;
+
+Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>> BasisConn, std::vector<std::vector<int>> BasisBras, std::vector<double> Freq, std::vector<std::vector<VDeriv>> Ws, bool DiagonalOnly = false, bool OffDiagonal = false)
+{
+    int N = Basis.size();
+    int NL = BasisBras.size();
+    // Make a map of the basis vectors and their positions
+    std::unordered_map<std::string, int> BasisBrasDict;
+    for (int i = 0; i < BasisBras.size(); i++)
+    {
+        std::string BBString = VectorToString(BasisBras[i]);
+        BasisBrasDict.insert({BBString, i});
+    }
+
+    std::map<std::tuple<int, int>, double> HijDict;
+    
+    Eigen::SparseMatrix<double> H(NL, N);
+    if (!OffDiagonal)
+    {
+        for (int i = 0; i < N; i++)
+        {
+            double Val = 0.0;
+            for (int j = 0; j < Basis[i].size(); j++)
+            {
+                Val += (Basis[i][j] + 0.5) * Freq[j];
+            }
+            HijDict.insert({std::make_tuple(i, i), Val});
+        }
+    }
+    
+    for (int i = 0; i < Basis.size(); i++)
+    {
+        for (int ic = 0; ic < BasisConn[i].size(); ic++)
+        {
+            std::string CStr = VectorToString(std::get<0>(BasisConn[i][ic]));
+            if (BasisBrasDict.find(CStr) != BasisBrasDict.end())
+            {
+                double Val = std::get<1>(BasisConn[i][ic]);
+                int j = BasisBrasDict[CStr];
+                if (DiagonalOnly && j != i) continue;
+                if (!OffDiagonal && j > i) continue;
+                
+                std::tuple<int, int> jiTuple = std::make_tuple(j, i);
+                std::tuple<int, int> ijTuple = std::make_tuple(i, j);
+                if (HijDict.count(jiTuple))
+                {
+                    HijDict[jiTuple] += Val;
+                    if (!OffDiagonal && i != j) HijDict[ijTuple] += Val;
+                }
+                else
+                {
+                    HijDict.insert({jiTuple, Val});
+                    if (!OffDiagonal && i != j) HijDict.insert({ijTuple, Val});
+                }
+            }
+        }
+    }
+    
+    
+    std::vector<T> TripletList;
+    for (const auto& it : HijDict)
+    {
+        TripletList.push_back(T(std::get<0>(it.first), std::get<1>(it.first), it.second));
+    }
+    H.setFromTriplets(TripletList.begin(), TripletList.end());
     return H;
 }

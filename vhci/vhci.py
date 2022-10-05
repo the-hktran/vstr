@@ -2,7 +2,7 @@ import numpy as np
 from vstr import utils
 #from vstr.vhci.vci_headers import VDeriv
 from vstr.cpp_wrappers.vhci_functions import VDerivCPP as VDeriv
-from vstr.cpp_wrappers.vhci_functions import FormBasisConnectionsCPP, HamVCPP
+from vstr.cpp_wrappers.vhci_functions import FormBasisConnectionsCPP, HamVCPP, SpHamVCPP
 from functools import reduce
 import itertools
 import math
@@ -154,7 +154,7 @@ def HCI(mVHCI):
     it = 1
     while float(NAdded) / float(len(mVHCI.Basis)) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
-        mVHCI.Diagonalize()
+        mVHCI.SparseDiagonalize()
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
         it += 1
         if it > mVHCI.MaxIter:
@@ -193,7 +193,8 @@ def Diagonalize(mVHCI):
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
 
 def SparseDiagonalize(mVHCI):
-    mVHCI.H = mVHCI.SparseHamV()
+    mVHCI.H = SpHamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False)
+    #mVHCI.H = mVHCI.SparseHamV()
     mVHCI.Es, mVHCI.Cs = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')
 
 '''

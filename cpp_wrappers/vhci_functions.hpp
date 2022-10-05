@@ -26,3 +26,4 @@ std::vector<std::tuple<std::vector<int>, double>> BasisConnectionsCPP(std::vecto
 std::vector<std::vector<std::tuple<std::vector<int>, double>>> FormBasisConnectionsCPP(std::vector<std::vector<VDeriv>> Ws, std::vector<std::vector<int>> Basis);
 std::string VectorToString(std::vector<int> V);
 Eigen::MatrixXd HamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>> BasisConn, std::vector<std::vector<int>> BasisBras, std::vector<double> Freq, std::vector<std::vector<VDeriv>> Ws, bool DiagonalOnly, bool OffDiagonal);
+Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>> BasisConn, std::vector<std::vector<int>> BasisBras, std::vector<double> Freq, std::vector<std::vector<VDeriv>> Ws, bool DiagonalOnly, bool OffDiagonal);

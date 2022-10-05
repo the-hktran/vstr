@@ -16,4 +16,5 @@ PYBIND11_MODULE(vhci_functions, m)
         .def_readwrite("QPowers", &VDeriv::QPowers);
     m.def("FormBasisConnectionsCPP", FormBasisConnectionsCPP, "Generates the connections between basis sets given the anharmonic potential");
     m.def("HamVCPP", HamVCPP, "Generates the vibrational Hamiltonian, dense.");
+    m.def("SpHamVCPP", SpHamVCPP, "Generates the vibrational Hamiltonian, sparse.");
 }
