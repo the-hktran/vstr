@@ -141,7 +141,8 @@ def HCIStep(mVHCI, eps = 0.01):
     
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.Ws + mVHCI.WSD, C = abs(mVHCI.Cs[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
     mVHCI.NewBasis = NewBasis.copy()
-    NewBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, NewBasis) # mVHCI.FormBasisConnections(NewBasis)
+    NewBasisConn = FormBasisConnectionsCPP(mVHCI.Ws, NewBasis)
+    #NewBasisConn = mVHCI.FormBasisConnections(NewBasis)
     mVHCI.NewBasisConn = NewBasisConn.copy()
     
     mVHCI.Basis += NewBasis
@@ -175,12 +176,9 @@ def PT2(mVHCI):
     mVHCI.dEs_PT2 = dEs_PT2
 
 def Diagonalize(mVHCI):
-    '''
+    #if mVHCI.NewBasis is None:
     mVHCI.H = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False) #mVHCI.HamV()
-    mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
     '''
-    if mVHCI.NewBasis is None:
-        mVHCI.H = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False) #mVHCI.HamV()
     else:
         HOld = mVHCI.H
         DimOld = HOld.shape[0]
@@ -191,6 +189,7 @@ def Diagonalize(mVHCI):
         mVHCI.H[DimOld:, :DimOld] = HON
         mVHCI.H[:DimOld, DimOld:] = HON.T
         mVHCI.H[DimOld:, DimOld:] = HNN
+    '''
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
 
 def SparseDiagonalize(mVHCI):
