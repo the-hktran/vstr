@@ -193,6 +193,7 @@ def Diagonalize(mVHCI):
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
 
 def SparseDiagonalize(mVHCI):
+    print("CALL SPMAT")
     mVHCI.H = SpHamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False)
     #mVHCI.H = mVHCI.SparseHamV()
     mVHCI.Es, mVHCI.Cs = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')

@@ -7,7 +7,7 @@
 #include <cmath>
 #include <unordered_map>
 #include <map>
-#include "vhci_functions.hpp"
+#include "vhci.hpp"
 #include <iostream>
 
 VDeriv::VDeriv (double dV, std::vector<int> Qs, bool doScale)
@@ -45,6 +45,24 @@ void VDeriv::ScaleW()
     {
         W /= Factorial(QPowers[i]);
     }
+}
+
+BasisState::BasisState (std::vector<int> Q)
+{
+    Quanta = Q;
+    Coeff = 1.0;
+}
+
+void BasisState::Raise(int i)
+{
+    Quanta[i]++;
+    Coeff *= sqrt(Quanta[i]);
+}
+
+void BasisState::Lower(int i)
+{
+    Coeff *= sqrt(Quanta[i]);
+    Quanta[i]--;
 }
 
 void PrintVec(std::vector<int> V)
@@ -176,7 +194,6 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
     int N = Basis.size();
     int NL = BasisBras.size();
     // Make a map of the basis vectors and their positions
-    std::cout << "Makes basis dict" << std::endl;
     std::unordered_map<std::string, int> BasisBrasDict;
     for (int i = 0; i < BasisBras.size(); i++)
     {
@@ -186,7 +203,6 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
 
     std::map<std::tuple<int, int>, double> HijDict;
     
-    std::cout << "Make Hij Dict" << std::endl;
     Eigen::SparseMatrix<double> H(NL, N);
     if (!OffDiagonal)
     {
@@ -201,7 +217,6 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
         }
     }
     
-    std::cout << "Fill Matrix" << std::endl;
     for (int i = 0; i < Basis.size(); i++)
     {
         for (int ic = 0; ic < BasisConn[i].size(); ic++)
@@ -230,7 +245,6 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
         }
     }
     
-    std::cout << "Make sparse matrix" << std::endl;
     std::vector<T> TripletList;
     for (const auto& it : HijDict)
     {
@@ -238,4 +252,87 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
     }
     H.setFromTriplets(TripletList.begin(), TripletList.end());
     return H;
+}
+
+void VHCI::InitTruncatedBasis()
+{
+    std::vector<std::vector<int>> Bs;
+    std::vector<int> B0(NModes, 0);
+    Bs.push_back(B0);
+    Basis.push_back(B0);
+    for (unsigned int m = 0; m < MaxTotalQuanta; m++)
+    {
+        std::vector<std::vector<int>> BNext;
+        for (std::vector<int> B : Bs)
+        {
+            for (unsigned int i = 0; i < B.size(); i++)
+            {
+                NewB = B;
+                NewB[i]++;
+                if (NewB[i] < MaxQuanta[i]) BNext.push_back(NewB);
+            }
+        }
+        Basis.insert(Basis.end(); BNext.begin(); BNext.end());
+        Bs = BNext;
+        BNext.clear();
+    }
+}
+
+void VHCI::FormWSD()
+{
+    std::vector<VDeriv> VSingles;
+    std::vector<VDeriv> VDoubles;
+
+    for (std::vector<VDeriv> Wp : Potential)
+    {
+        if (Wp[0].Order == 3)
+        {
+            for (unsigned int i = 0; i < NModes; i++)
+            {
+                double Wi = 0.0;
+                for (VDeriv W : Wp)
+                {
+                    // Two cases, Wiii and Wijj
+                    if (std::count(W.QIndices.begin(), W.QIndices.end(), i) == 1) Wi += 2.0 * W.W;
+                    else if (std::count(W.QIndices.begin(), W.QIndices.end(), i) == 3) Wi += 3.0 * W.W;
+                }
+                if (abs(Wi) > 1e-12)
+                {
+                    std::vector<int> tmpQ;
+                    tmpQ.push_back(i);
+                    mW = VDeriv(Wi, tmpQ, false);
+                    VSingles.push_back(mW);
+                }
+            }
+        }
+        if (Wp[0].Order == 4)
+        {
+            for (unsigned int i = 0; i < NModes; i++)
+            {
+                for (unsigned int j = i; j < NModes, j++)
+                {
+                    double Wij = 0.0;
+                    for (VDeriv W : Wp)
+                    {
+                        // Four cases, Wiiii, Wiikk, Wijjj, Wijkk
+                        if (std::count(W.QIndices.begin(), W.QIndices.end(), i) == 1 && std::count(W.QIndices.begin(), W.QIndices.end(), j) == 1 && i != j) Wij += 2.0 * W.W;
+                        else if (std::count(W.QIndices.begin(), W.QIndices.end(), i) == 2 && W.QUnique.size() == 2 && i == j) Wij += 2.0 * W.W;
+                        else if ((std::count(W.QIndices.begin(), W.QIndices.end(), i) == 1 && std::count(W.QIndices.begin(), W.QIndices.end(), j) == 3) || (std::count(W.QIndices.begin(), W.QIndices.end(), i) == 3 && std::count(W.QIndices.begin(), W.QIndices.end(), j) == 1)) Wij += 3.0 * W.W;
+                        else if (std::count(W.QIndices.begin(), W.QIndices.end(), i) == 4 && i == j) Wij += 4.0 * W.W;
+                    }
+                    if (abs(Wij) > 1e-12)
+                    {
+                        std::vector<int> tmpQ;
+                        tmpQ.push_back(i);
+                        tmpQ.push_back(j);
+                        mW = VDeriv(Wi, tmpQ, false);
+                        VDoubles.push_back(mW);
+                    }
+                }
+            }
+        }
+    }
+    PotentialSD.clear()
+    PotentialSD.push_back(VSingles);
+    PotentialSD.push_back(VDoubles);
 }
