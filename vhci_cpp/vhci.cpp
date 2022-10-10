@@ -9,6 +9,27 @@
 #include <map>
 #include "vhci.hpp"
 #include <iostream>
+#include <numeric>
+
+template <typename T>
+std::vector<size_t> SortIndices(const std::vector<T>& V)
+{
+    std::vector<size_t> Indices(V.size());
+    std::iota(Indices.begin(), Indices.end(), 0);
+
+    // This sorts smallest to largest
+    std::stable_sort(Indices.begin(), Indices.end(),
+        [&V](size_t, i1, size_t i2) {return v[i2] > v[i1];});
+
+    return Indices;
+}
+
+bool VectorContains(std::vector<T> V, const T& Elem)
+{
+    bool Result = false;
+    if (std::find(V.begin(), V.end(), Elem) != V.end()) Result = true;
+    return Result;
+}
 
 VDeriv::VDeriv (double dV, std::vector<int> Qs, bool doScale)
 {
@@ -73,6 +94,35 @@ void PrintVec(std::vector<int> V)
     }
     std::cout << std::endl;
 }
+
+std::vector<std::vector<int>> BasisConnectionsQuanta(std::vector<int>& BasisFunction, std::vector<int>& Qs)
+{
+    std::vector<std::vector<int>> Conn;
+    Conn.push_back(BasisFunction);
+    std::vector<std::vector<int>> Conn2;
+    for (int i = 0; i < Qs.size(); i++)
+    {
+        for (std::vector<int> C : Conn)
+        {
+            std::vector<int> tmpQR = C;
+            tmpQR[Qs[i]] += 1;
+            Conn2.push_back(tmpQR);
+
+            std::vector<int> tmpQL = C;
+            tmpQL[Qs[i]] -= 1;
+            if (tmpQL[Qs[i]] < 0) continue;
+            Conn2.push_back(tmpQL);
+        }
+        Conn.clear();
+        for (std::vector<int> C2 : Conn2)
+        {
+            Conn.push_back(C2);
+        }
+        Conn2.clear();
+    }
+    return Conn;
+}
+
 
 std::vector<std::tuple<std::vector<int>, double>> BasisConnectionsCPP(std::vector<int>& BasisFunction, std::vector<int>& Qs)
 {
@@ -335,4 +385,44 @@ void VHCI::FormWSD()
     PotentialSD.clear()
     PotentialSD.push_back(VSingles);
     PotentialSD.push_back(VDoubles);
+}
+
+std::vector<std::tuple<std::vector<int>, double>> VHCI::ScreenBasis(std::vector<std::vector<VDeriv>>& Potential, Eigen::VectorXd& C, double Epsilon)
+{
+    std::vector<double> CVec;
+    for (unsigned int n = 0; n < CVec.rows(); n++) CVec.push_back(abs(C[n]));
+    std::vector<int> CSortedInd = SortIndices(CVec);
+    std::vector<std::vector<int>> NewBasis;
+    for (std::vector<VDeriv> Wp : VDeriv)
+    {
+        std::vector<double> WVec;
+        for (VDeriv W : Wp) WVec.push_back(abs(W.W));
+        std::vector<int> WSortedInd = SortIndices(WVec);
+        for (unsigned int i = WSortedInd.size() - 1; i >= 0, i++)
+        {
+            if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[CSortedInd.size() - 1]]) > Epsilon)
+            {
+                for (unsigned int n = CSortedInd.size() - 1; n >= 0; n++)
+                {
+                    if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[n]]) > Epsilon)
+                    {
+                        std::vector<std::vector<int>> AddedBasis = BasisConnectionsQuanta(Basis[n], Wp[i].QIndices)
+                        NewBasis.insert(NewBasis.end(), AddedBasis.begin(), AddedBasis.end());
+                    }
+                    else break;
+                }
+            }
+            else break;
+        }
+    }
+        
+    std::vector<std::vector<int>> UniqueBasis;
+    for (std::vector<int> B : NewBasis)
+    {
+        if (!VectorContains(Basis, B) && !VectorContains(UniqueBasis, B))
+        {
+            UniqueBasis.push_back(B);
+        }
+    }
+    return UniqueBasis;
 }

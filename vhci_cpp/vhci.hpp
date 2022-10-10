@@ -42,6 +42,8 @@ class VHCI
         std::vector<std::vector<Vderiv>> PotentialWithSD;
         std::vector<double> Frequencies; // Harmonic frequencies
         int NModes;
+        Eigen::MatrixXd C;
+        Eigen::VectorXd E;
 
         std::vector<int> MaxQuanta;
         int MaxTotalQuanta;
