@@ -298,7 +298,7 @@ void VHCI::InitTruncatedBasis()
             for (unsigned int i = 0; i < B.size(); i++)
             {
                 std::vector<int> NewB = B;
-                NewB[i]++;
+                NewB[i] = NewB[i] + 1;
                 if (NewB[i] < MaxQuanta[i]) BNext.push_back(NewB);
             }
         }
@@ -381,11 +381,11 @@ std::vector<std::vector<int>> VHCI::ScreenBasis(std::vector<std::vector<VDeriv>>
         std::vector<double> WVec;
         for (VDeriv W : Wp) WVec.push_back(abs(W.W));
         std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
-        for (unsigned int i = WSortedInd.size() - 1; i >= 0; i++)
+        for (int i = WSortedInd.size() - 1; i >= 0; i--)
         {
             if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[CSortedInd.size() - 1]]) > Epsilon)
             {
-                for (unsigned int n = CSortedInd.size() - 1; n >= 0; n++)
+                for (int n = CSortedInd.size() - 1; n >= 0; n--)
                 {
                     if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[n]]) > Epsilon)
                     {
@@ -422,7 +422,7 @@ int VHCI::HCIStep(double Epsilon)
             if (abs(C(i, n)) > abs(CMax[i])) CMax[i] = C(i, n);
         }
     }
-
+    
     std::vector<std::vector<int>> NewBasis = ScreenBasis(PotentialWithSD, CMax, Epsilon);
     int NAdded = NewBasis.size();
     std::vector<std::vector<std::tuple<std::vector<int>, double>>> NewBasisConn = FormBasisConnectionsCPP(Potential, NewBasis);
@@ -457,8 +457,20 @@ void VHCI::Diagonalize()
 
 void VHCI::RunVHCI()
 {
+    // Initialize the Basis and calculate initial basis connections
     InitTruncatedBasis();
+    BasisConn = FormBasisConnectionsCPP(Potential, Basis);
+    int N0 = Basis.size();
+    if (NStates > N0) // Initial basis is too small for desired states
+    {
+        NStates = N0;
+        std::cout << "WARNING: Number of states changed to " << NStates << " because initial basis is too small" << std::endl;
+    }
+
+    // Use this to form the singles and doubles
     FormWSD();
+    
+    // Diagonlize once and begin HCI
     Diagonalize();
     HCI();
 }

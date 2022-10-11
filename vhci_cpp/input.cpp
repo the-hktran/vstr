@@ -153,8 +153,6 @@ void VHCI::ReadInput(fstream& vcidata)
     //Function to read the input files
     string dummy; //Generic sting
     //Count basis functions and read modes
-    int Nmodes = 0; //Number of different modes
-    int Ntot = 0; //Maximum quanta in a single product state
     int Nfc = 0; //Number of force constants
     int perturb = 2;
     //Heat bath parameters 
@@ -189,7 +187,7 @@ void VHCI::ReadInput(fstream& vcidata)
     //Read active modes
     vcidata >> dummy; //Clear junk
     vcidata >> NModes; //Read modes
-    for (int i=0;i<Nmodes;i++)
+    for (int i=0;i<NModes;i++)
     {
         //Actual vibrational modes
         double Freq;
