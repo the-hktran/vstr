@@ -11,26 +11,6 @@
 #include <iostream>
 #include <numeric>
 
-template <typename T>
-std::vector<size_t> SortIndices(const std::vector<T>& V)
-{
-    std::vector<size_t> Indices(V.size());
-    std::iota(Indices.begin(), Indices.end(), 0);
-
-    // This sorts smallest to largest
-    std::stable_sort(Indices.begin(), Indices.end(),
-        [&V](size_t, i1, size_t i2) {return v[i2] > v[i1];});
-
-    return Indices;
-}
-
-bool VectorContains(std::vector<T> V, const T& Elem)
-{
-    bool Result = false;
-    if (std::find(V.begin(), V.end(), Elem) != V.end()) Result = true;
-    return Result;
-}
-
 VDeriv::VDeriv (double dV, std::vector<int> Qs, bool doScale)
 {
     W = dV;
@@ -237,7 +217,7 @@ Eigen::MatrixXd HamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::ve
     return H;
 }
 
-typedef Eigen::Triplet<double> T;
+typedef Eigen::Triplet<double> Tr;
 
 Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>>& BasisConn, std::vector<std::vector<int>>& BasisBras, std::vector<double>& Freq, std::vector<std::vector<VDeriv>>& Ws, bool DiagonalOnly = false, bool OffDiagonal = false)
 {
@@ -295,10 +275,10 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
         }
     }
     
-    std::vector<T> TripletList;
+    std::vector<Tr> TripletList;
     for (const auto& it : HijDict)
     {
-        TripletList.push_back(T(std::get<0>(it.first), std::get<1>(it.first), it.second));
+        TripletList.push_back(Tr(std::get<0>(it.first), std::get<1>(it.first), it.second));
     }
     H.setFromTriplets(TripletList.begin(), TripletList.end());
     return H;
@@ -317,12 +297,12 @@ void VHCI::InitTruncatedBasis()
         {
             for (unsigned int i = 0; i < B.size(); i++)
             {
-                NewB = B;
+                std::vector<int> NewB = B;
                 NewB[i]++;
                 if (NewB[i] < MaxQuanta[i]) BNext.push_back(NewB);
             }
         }
-        Basis.insert(Basis.end(); BNext.begin(); BNext.end());
+        Basis.insert(Basis.end(), BNext.begin(), BNext.end());
         Bs = BNext;
         BNext.clear();
     }
@@ -333,7 +313,7 @@ void VHCI::FormWSD()
     std::vector<VDeriv> VSingles;
     std::vector<VDeriv> VDoubles;
 
-    for (std::vector<VDeriv> Wp : Potential)
+    for (std::vector<VDeriv>& Wp : Potential)
     {
         if (Wp[0].Order == 3)
         {
@@ -350,7 +330,7 @@ void VHCI::FormWSD()
                 {
                     std::vector<int> tmpQ;
                     tmpQ.push_back(i);
-                    mW = VDeriv(Wi, tmpQ, false);
+                    VDeriv mW(Wi, tmpQ, false);
                     VSingles.push_back(mW);
                 }
             }
@@ -359,7 +339,7 @@ void VHCI::FormWSD()
         {
             for (unsigned int i = 0; i < NModes; i++)
             {
-                for (unsigned int j = i; j < NModes, j++)
+                for (unsigned int j = i; j < NModes; j++)
                 {
                     double Wij = 0.0;
                     for (VDeriv W : Wp)
@@ -375,30 +355,33 @@ void VHCI::FormWSD()
                         std::vector<int> tmpQ;
                         tmpQ.push_back(i);
                         tmpQ.push_back(j);
-                        mW = VDeriv(Wi, tmpQ, false);
+                        VDeriv mW(Wij, tmpQ, false);
                         VDoubles.push_back(mW);
                     }
                 }
             }
         }
     }
-    PotentialSD.clear()
+    PotentialSD.clear();
     PotentialSD.push_back(VSingles);
     PotentialSD.push_back(VDoubles);
+
+    PotentialWithSD = Potential;
+    PotentialWithSD.insert(PotentialWithSD.end(), PotentialSD.begin(), PotentialSD.end());
 }
 
-std::vector<std::tuple<std::vector<int>, double>> VHCI::ScreenBasis(std::vector<std::vector<VDeriv>>& Potential, Eigen::VectorXd& C, double Epsilon)
+std::vector<std::vector<int>> VHCI::ScreenBasis(std::vector<std::vector<VDeriv>>& Potential, Eigen::VectorXd& C, double Epsilon)
 {
     std::vector<double> CVec;
-    for (unsigned int n = 0; n < CVec.rows(); n++) CVec.push_back(abs(C[n]));
-    std::vector<int> CSortedInd = SortIndices(CVec);
+    for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
+    std::vector<long unsigned int> CSortedInd = SortIndices(CVec);
     std::vector<std::vector<int>> NewBasis;
-    for (std::vector<VDeriv> Wp : VDeriv)
+    for (std::vector<VDeriv>& Wp : Potential)
     {
         std::vector<double> WVec;
         for (VDeriv W : Wp) WVec.push_back(abs(W.W));
-        std::vector<int> WSortedInd = SortIndices(WVec);
-        for (unsigned int i = WSortedInd.size() - 1; i >= 0, i++)
+        std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
+        for (unsigned int i = WSortedInd.size() - 1; i >= 0; i++)
         {
             if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[CSortedInd.size() - 1]]) > Epsilon)
             {
@@ -406,7 +389,7 @@ std::vector<std::tuple<std::vector<int>, double>> VHCI::ScreenBasis(std::vector<
                 {
                     if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[n]]) > Epsilon)
                     {
-                        std::vector<std::vector<int>> AddedBasis = BasisConnectionsQuanta(Basis[n], Wp[i].QIndices)
+                        std::vector<std::vector<int>> AddedBasis = BasisConnectionsQuanta(Basis[n], Wp[i].QIndices);
                         NewBasis.insert(NewBasis.end(), AddedBasis.begin(), AddedBasis.end());
                     }
                     else break;
@@ -425,4 +408,70 @@ std::vector<std::tuple<std::vector<int>, double>> VHCI::ScreenBasis(std::vector<
         }
     }
     return UniqueBasis;
+}
+
+
+int VHCI::HCIStep(double Epsilon)
+{
+    Eigen::VectorXd CMax(C.rows());
+    for (unsigned int i = 0; i < C.rows(); i++)
+    {
+        CMax[i] = C(i, 0);
+        for (unsigned int n = 1; n < NStates; n++)
+        {
+            if (abs(C(i, n)) > abs(CMax[i])) CMax[i] = C(i, n);
+        }
+    }
+
+    std::vector<std::vector<int>> NewBasis = ScreenBasis(PotentialWithSD, CMax, Epsilon);
+    int NAdded = NewBasis.size();
+    std::vector<std::vector<std::tuple<std::vector<int>, double>>> NewBasisConn = FormBasisConnectionsCPP(Potential, NewBasis);
+    Basis.insert(Basis.end(), NewBasis.begin(), NewBasis.end());
+    BasisConn.insert(BasisConn.end(), NewBasisConn.begin(), NewBasisConn.end());
+
+    return NAdded;
+}
+
+void VHCI::HCI()
+{
+    int NAdded = Basis.size();
+    int Iter = 1;
+    while ((double) NAdded / (double) Basis.size() > Tolerance)
+    {
+        NAdded = HCIStep(Epsilon1);
+        Diagonalize();
+        std::cout << "VHCI Iteration " << Iter << " complete with " << NAdded << " new configurations for a total of " << Basis.size() << std::endl;
+        Iter++;
+        if (Iter > MaxIteration) throw "VHCI did not converge";
+    }
+}
+
+void VHCI::Diagonalize()
+{
+    Eigen::MatrixXd H = HamVCPP(Basis, BasisConn, Basis, Frequencies, Potential, false, false);
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> ES(H);
+    C = ES.eigenvectors();
+    E = ES.eigenvalues();
+    return;
+}
+
+void VHCI::RunVHCI()
+{
+    InitTruncatedBasis();
+    FormWSD();
+    Diagonalize();
+    HCI();
+}
+
+VHCI::VHCI(int argc, char* argv[])
+{
+    ReadArgs(argc, argv);
+    ReadInput(InputFile);
+}
+
+int main(int argc, char* argv[])
+{
+    VHCI mVHCI(argc, argv);
+    mVHCI.RunVHCI();
+    return 0;
 }

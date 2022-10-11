@@ -39,7 +39,7 @@ class VHCI
     public:
         std::vector<std::vector<VDeriv>> Potential; // The scaled anharmonic potential terms
         std::vector<std::vector<VDeriv>> PotentialSD;
-        std::vector<std::vector<Vderiv>> PotentialWithSD;
+        std::vector<std::vector<VDeriv>> PotentialWithSD;
         std::vector<double> Frequencies; // Harmonic frequencies
         int NModes;
         Eigen::MatrixXd C;
@@ -48,7 +48,7 @@ class VHCI
         std::vector<int> MaxQuanta;
         int MaxTotalQuanta;
         std::vector<std::vector<int>> Basis;
-        std::vector<std::vector<std::vector<int>>> BasisConn;
+        std::vector<std::vector<std::tuple<std::vector<int>, double>>> BasisConn;
         
         double Tolerance = 0.01; // Threshold for HCI termination condition
         double Epsilon1 = 0.01; // Threshold for basis screening
@@ -63,7 +63,7 @@ class VHCI
         std::fstream OutputFile;
 
         std::vector<std::vector<VDeriv>> FormW(std::vector<std::vector<VDeriv>>& V);
-        std::vector<std::vector<VDeriv>> FormWSD();
+        void FormWSD();
         std::vector<std::vector<int>> ScreenBasis(std::vector<std::vector<VDeriv>>& Potential, Eigen::VectorXd& C, double Epsilon); 
         int HCIStep(double Tolerance);
         void HCI();
@@ -71,9 +71,10 @@ class VHCI
         void Diagonalize();
         void InitTruncatedBasis();
         void ReadInput();
-        VHCI(std::string);
+        void RunVHCI();
+        VHCI(int, char**);
 
-        void ReadArgs(int, char*, std::fstream&, std::fstream&, std::string&);
+        void ReadArgs(int, char**);
         void ReadInput(std::fstream&);
 };
 
@@ -83,3 +84,26 @@ std::vector<std::vector<std::tuple<std::vector<int>, double>>> FormBasisConnecti
 std::string VectorToString(std::vector<int> V);
 Eigen::MatrixXd HamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>> BasisConn, std::vector<std::vector<int>> BasisBras, std::vector<double> Freq, std::vector<std::vector<VDeriv>> Ws, bool DiagonalOnly, bool OffDiagonal);
 Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>>& BasisConn, std::vector<std::vector<int>>& BasisBras, std::vector<double>& Freq, std::vector<std::vector<VDeriv>>& Ws, bool DiagonalOnly, bool OffDiagonal);
+
+template <typename T>
+std::vector<size_t> SortIndices(const std::vector<T>& V)
+{
+    std::vector<size_t> Indices(V.size());
+    std::iota(Indices.begin(), Indices.end(), 0);
+
+    // This sorts smallest to largest
+    std::stable_sort(Indices.begin(), Indices.end(),
+        [&V](size_t i1, size_t i2) {return V[i2] > V[i1];});
+
+    return Indices;
+}
+
+template <typename T>
+bool VectorContains(std::vector<T> V, const T& Elem)
+{
+    bool Result = false;
+    if (std::find(V.begin(), V.end(), Elem) != V.end()) Result = true;
+    return Result;
+}
+
+#include "input.cpp"

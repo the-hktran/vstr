@@ -1,10 +1,20 @@
-#include "vhci.hpp"
 using namespace std;
 
-void VHCI::ReadArgs(int argc, char* argv[], fstream& vcidata, fstream& freqfile, string& cpfilename)
+int FindMaxThreads()
+{
+    //Function to count the number of allowed threads
+    int ct = 0; //Generic counter
+    #pragma omp parallel reduction(+:ct)
+    ct += 1; //Add one for each thread
+    #pragma omp barrier
+    //Return total count
+    return ct;
+}
+
+
+void VHCI::ReadArgs(int argc, char* argv[])
 {
     //Function to read the command line arguments
-    cpfilename = "none";
     bool DoQuit = 0; //Exit if an error is detected
     string dummy; //Generic string
     stringstream call; //Stream for system calls and reading/writing files
@@ -15,7 +25,7 @@ void VHCI::ReadArgs(int argc, char* argv[], fstream& vcidata, fstream& freqfile,
         cout << '\n';
         cout << "Missing arguments...";
         cout << '\n' << '\n';
-        cout << "Usage: vhci -n Ncpus -i Modes.inp -o Freqs.dat -c Checkpoint.txt";
+        cout << "Usage: vhci -n NCPUs -i Modes.inp -o Freqs.dat -c Checkpoint.txt";
         cout << '\n' << '\n';
         cout << "Use -h or --help for detailed instructions.";
         cout << '\n' << '\n';
@@ -31,7 +41,7 @@ void VHCI::ReadArgs(int argc, char* argv[], fstream& vcidata, fstream& freqfile,
             cout << '\n';
             cout << "Wrong number of arguments...";
             cout << '\n' << '\n';
-            cout << "Usage: vhci -n Ncpus -i Modes.inp -o Freqs.dat -c Checkpoint.txt";
+            cout << "Usage: vhci -n NCPUs -i Modes.inp -o Freqs.dat -c Checkpoint.txt";
             cout << '\n' << '\n';
             cout << "Use -h or --help for detailed instructions.";
             cout << '\n' << '\n';
@@ -47,7 +57,7 @@ void VHCI::ReadArgs(int argc, char* argv[], fstream& vcidata, fstream& freqfile,
         {
             //Print helpful information and exit
             cout << '\n';
-            cout << "Usage: vhci -n Ncpus -i Modes.inp -o Freqs.txt";
+            cout << "Usage: vhci -n NCPUs -i Modes.inp -o Freqs.txt";
             cout << '\n' << '\n';
             cout << "Command line arguments:";
             cout << '\n' << '\n';
@@ -64,7 +74,7 @@ void VHCI::ReadArgs(int argc, char* argv[], fstream& vcidata, fstream& freqfile,
         }
         if (dummy == "-n")
         {
-            Ncpus = atoi(argv[i+1]);
+            NCPUs = atoi(argv[i+1]);
         }
         if (dummy == "-i")
         {
@@ -74,33 +84,30 @@ void VHCI::ReadArgs(int argc, char* argv[], fstream& vcidata, fstream& freqfile,
         {
             OutputFile.open(argv[i+1],ios_base::out);
         }
-        if (dummy == "-c"){
-            cpfilename = argv[i+1];
-        }
     }
     //Check for argument errors
-    if (Ncpus < 1)
+    if (NCPUs < 1)
     {
         //Checks the number of threads and continue
         cout << " Warning: Calculations cannot run with ";
-        cout << Ncpus << " CPUs.";
+        cout << NCPUs << " CPUs.";
         cout << '\n';
         cout << "  Do you know how computers work?";
-        cout << " Ncpus set to 1";
+        cout << " NCPUs set to 1";
         cout << '\n';
-        Ncpus = 1;
+        NCPUs = 1;
         cout.flush(); //Print warning
     }
-    if (Ncpus > FindMaxThreads())
+    if (NCPUs > FindMaxThreads())
     {
         cout << " Warning: Too many threads requested.";
         cout << '\n';
-        cout << "  Requested: " << Ncpus << ",";
+        cout << "  Requested: " << NCPUs << ",";
         cout << " Available: " << FindMaxThreads();
         cout << '\n';
-        cout << "  Ncpus set to " << FindMaxThreads();
+        cout << "  NCPUs set to " << FindMaxThreads();
         cout << '\n';
-        Ncpus = FindMaxThreads();
+        NCPUs = FindMaxThreads();
         cout.flush(); //Print warning
     }
     if (!InputFile.good())
@@ -135,22 +142,9 @@ void VHCI::ReadArgs(int argc, char* argv[], fstream& vcidata, fstream& freqfile,
         cout << '\n' << '\n';
         cout.flush();
     }
-    if(cpfilename=="none"){
-        cout << "No checkpoint filename specified. Checkpoints will not be saved." << '\n' << '\n'; 
-    }
-    else{
-        cout << "Locating checkpoint file..." << '\n';
-        IsRestart(cpfilename);
-        if(restart==1){
-            cout << "Checkpoint file found. Calculation will be resumed." << '\n' << '\n';
-        }else{
-            cout << "No checkpoint file found. Calculation will start from the beginning." << '\n' << '\n';
-        }
-        cout.flush();
-    }
     //Set threads
-    omp_set_num_threads(Ncpus);
-    Eigen::setNbThreads(Ncpus);
+    omp_set_num_threads(NCPUs);
+    Eigen::setNbThreads(NCPUs);
     return;
 };
 
@@ -161,8 +155,8 @@ void VHCI::ReadInput(fstream& vcidata)
     //Count basis functions and read modes
     int Nmodes = 0; //Number of different modes
     int Ntot = 0; //Maximum quanta in a single product state
-    vector<HOFunc> BasisCount; //Temp. storage of modes
     int Nfc = 0; //Number of force constants
+    int perturb = 2;
     //Heat bath parameters 
     getline(vcidata,dummy); //Junk (String with comment for input file)
     vcidata >> dummy; //Junk
@@ -220,7 +214,6 @@ void VHCI::ReadInput(fstream& vcidata)
     }
     //Read anharmonic force constants
     vcidata >> dummy; //Clear junk
-    int Nfc;
     vcidata >> Nfc; //Read number of anharmonic force constants
     int oldfcpower = 0;
     std::vector<VDeriv> PotentialByOrder;
@@ -239,7 +232,7 @@ void VHCI::ReadInput(fstream& vcidata)
         }
         double fc;
         vcidata >> fc; //Read force constant value
-        VTerm = VDeriv(fc, Qs, true);
+        VDeriv VTerm(fc, Qs, true);
         if (oldfcpower != fcpower)
         {
             Potential.push_back(PotentialByOrder);
