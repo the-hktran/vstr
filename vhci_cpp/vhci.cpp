@@ -217,9 +217,9 @@ Eigen::MatrixXd HamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::ve
     return H;
 }
 
-typedef Eigen::Triplet<double> Tr;
+typedef Eigen::Triplet<double, ptrdiff_t> Tr;
 
-Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>>& BasisConn, std::vector<std::vector<int>>& BasisBras, std::vector<double>& Freq, std::vector<std::vector<VDeriv>>& Ws, bool DiagonalOnly = false, bool OffDiagonal = false)
+Eigen::SparseMatrix<double, 0, ptrdiff_t> SpHamVCPP(std::vector<std::vector<int>>& Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>>& BasisConn, std::vector<std::vector<int>>& BasisBras, std::vector<double>& Freq, std::vector<std::vector<VDeriv>>& Ws, bool DiagonalOnly = false, bool OffDiagonal = false)
 {
     int N = Basis.size();
     int NL = BasisBras.size();
@@ -233,7 +233,7 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
 
     std::map<std::tuple<int, int>, double> HijDict;
     
-    Eigen::SparseMatrix<double> H(NL, N);
+    Eigen::SparseMatrix<double, 0, ptrdiff_t> H(NL, N);
     if (!OffDiagonal)
     {
         for (int i = 0; i < N; i++)
@@ -281,6 +281,7 @@ Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std:
         TripletList.push_back(Tr(std::get<0>(it.first), std::get<1>(it.first), it.second));
     }
     H.setFromTriplets(TripletList.begin(), TripletList.end());
+    H.makeCompressed();
     return H;
 }
 
@@ -299,7 +300,10 @@ void VHCI::InitTruncatedBasis()
             {
                 std::vector<int> NewB = B;
                 NewB[i] = NewB[i] + 1;
-                if (NewB[i] < MaxQuanta[i]) BNext.push_back(NewB);
+                if (NewB[i] < MaxQuanta[i])
+                {
+                    if (!VectorContains(BNext, NewB) && !VectorContains(Basis, NewB)) BNext.push_back(NewB);
+                }
             }
         }
         Basis.insert(Basis.end(), BNext.begin(), BNext.end());
@@ -383,13 +387,15 @@ std::vector<std::vector<int>> VHCI::ScreenBasis(std::vector<std::vector<VDeriv>>
         std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
         for (int i = WSortedInd.size() - 1; i >= 0; i--)
         {
+            //std::cout << "W " << WVec[WSortedInd[i]] << std::endl;
             if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[CSortedInd.size() - 1]]) > Epsilon)
             {
                 for (int n = CSortedInd.size() - 1; n >= 0; n--)
                 {
+                    //std::cout << CVec[CSortedInd[n]] << std::endl;
                     if (abs(WVec[WSortedInd[i]] * CVec[CSortedInd[n]]) > Epsilon)
                     {
-                        std::vector<std::vector<int>> AddedBasis = BasisConnectionsQuanta(Basis[n], Wp[i].QIndices);
+                        std::vector<std::vector<int>> AddedBasis = BasisConnectionsQuanta(Basis[CSortedInd[n]], Wp[WSortedInd[i]].QIndices);
                         NewBasis.insert(NewBasis.end(), AddedBasis.begin(), AddedBasis.end());
                     }
                     else break;
@@ -439,7 +445,8 @@ void VHCI::HCI()
     while ((double) NAdded / (double) Basis.size() > Tolerance)
     {
         NAdded = HCIStep(Epsilon1);
-        Diagonalize();
+        if (Iter == 1 && NStatesOriginal != 0) NStates = NStatesOriginal;
+        SparseDiagonalize();
         std::cout << "VHCI Iteration " << Iter << " complete with " << NAdded << " new configurations for a total of " << Basis.size() << std::endl;
         Iter++;
         if (Iter > MaxIteration) throw "VHCI did not converge";
@@ -455,14 +462,41 @@ void VHCI::Diagonalize()
     return;
 }
 
+void VHCI::SparseDiagonalize()
+{
+    Eigen::SparseMatrix<double, 0, ptrdiff_t> H = SpHamVCPP(Basis, BasisConn, Basis, Frequencies, Potential, false, false);
+    typedef Spectra::SparseSymMatProd<double, Eigen::Lower, 0, ptrdiff_t> SparseMVProd;
+    SparseMVProd op(H);
+    int NCV = 0;
+    NCV = max(2 * NStates + 1, 20);
+    Spectra::SymEigsSolver<double, Spectra::SMALLEST_ALGE, SparseMVProd> ES(&op, NStates, NCV);
+    ES.init();
+    int NConv = ES.compute(1000, 1e-10, Spectra::SMALLEST_ALGE);
+    if (ES.info() == Spectra::SUCCESSFUL)
+    {
+        C = ES.eigenvectors();
+        E = ES.eigenvalues();
+    }
+    else throw "ERROR: Eigenvalues did not converge.";
+    return;
+}
+
 void VHCI::RunVHCI()
 {
     // Initialize the Basis and calculate initial basis connections
     InitTruncatedBasis();
+    /*
+    std::cout << "Initial basis states are listed below." << std::endl;
+    for (std::vector<int> B : Basis)
+    {
+        PrintVec(B);
+    }
+    */
     BasisConn = FormBasisConnectionsCPP(Potential, Basis);
     int N0 = Basis.size();
     if (NStates > N0) // Initial basis is too small for desired states
     {
+        NStatesOriginal = NStates;
         NStates = N0;
         std::cout << "WARNING: Number of states changed to " << NStates << " because initial basis is too small" << std::endl;
     }

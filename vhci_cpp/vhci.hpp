@@ -8,6 +8,8 @@
 #include <unordered_map>
 #include <fstream>
 #include <iostream>
+#include <Spectra/SymEigsSolver.h>
+#include <Spectra/MatOp/SparseSymMatProd.h>
 
 class VDeriv
 {
@@ -56,6 +58,7 @@ class VHCI
         double Epsilon3 = 0.000001; // Threshold for Stochastic PT2
         int MaxIteration = 1000;
         int NStates;
+        int NStatesOriginal = 0;
         int NWalkers;
 
         int NCPUs;
@@ -69,6 +72,7 @@ class VHCI
         void HCI();
         void PT2();
         void Diagonalize();
+        void SparseDiagonalize();
         void InitTruncatedBasis();
         void ReadInput();
         void RunVHCI();
@@ -83,7 +87,7 @@ std::vector<std::tuple<std::vector<int>, double>> BasisConnectionsCPP(std::vecto
 std::vector<std::vector<std::tuple<std::vector<int>, double>>> FormBasisConnectionsCPP(std::vector<std::vector<VDeriv>>& Ws, std::vector<std::vector<int>>& Basis);
 std::string VectorToString(std::vector<int> V);
 Eigen::MatrixXd HamVCPP(std::vector<std::vector<int>> Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>> BasisConn, std::vector<std::vector<int>> BasisBras, std::vector<double> Freq, std::vector<std::vector<VDeriv>> Ws, bool DiagonalOnly, bool OffDiagonal);
-Eigen::SparseMatrix<double> SpHamVCPP(std::vector<std::vector<int>>& Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>>& BasisConn, std::vector<std::vector<int>>& BasisBras, std::vector<double>& Freq, std::vector<std::vector<VDeriv>>& Ws, bool DiagonalOnly, bool OffDiagonal);
+Eigen::SparseMatrix<double, 0, ptrdiff_t> SpHamVCPP(std::vector<std::vector<int>>& Basis, std::vector<std::vector<std::tuple<std::vector<int>, double>>>& BasisConn, std::vector<std::vector<int>>& BasisBras, std::vector<double>& Freq, std::vector<std::vector<VDeriv>>& Ws, bool DiagonalOnly, bool OffDiagonal);
 
 template <typename T>
 std::vector<size_t> SortIndices(const std::vector<T>& V)

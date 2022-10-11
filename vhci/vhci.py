@@ -118,8 +118,10 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         WSortedIndex = np.flip(np.argsort(abs(WElement)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
         for i in WSortedIndex:
+            #print("W", WElement[i])
             if abs(WElement[i] * C[CSortedIndex[0]]) > eps:
                 for n in CSortedIndex:
+                    #print("C", C[n])
                     if abs(WElement[i] * C[n]) > eps:
                         AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Wp[i].QIndices)
                         for AddB in AddedB:
