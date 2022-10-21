@@ -104,7 +104,7 @@ double AnharmPot(int n, int m, const FConst& fc)
 };
 
 //Hamiltonian operators
-Eigen::MatrixXd ZerothHam(std::vector<WaveFunction> BasisSet, std::vector<double> Frequencies, std::vector<FConst> AnharmPot)
+void ZerothHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet)
 {
     //Calculate the harmonic Hamiltonian matrix elements
     //Harmonic matrix elements
@@ -126,11 +126,12 @@ Eigen::MatrixXd ZerothHam(std::vector<WaveFunction> BasisSet, std::vector<double
         //Update Hamiltonian
         H(i,i) += Ei;
     }
-    return H;
+    return;
 };
 
-Eigen::MatrixXd AnharmHam(std::vector<WaveFunction> BasisSet, std::vector<double> Frequencies, std::vector<FConst> AnharmPot)
+void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
     //Add anharmonic terms to the Hamiltonian
     int fcmax=0;
     for (unsigned int k=0;k<AnharmFC.size();k++){ //Order of maximum anharmonic term
@@ -201,7 +202,9 @@ Eigen::MatrixXd AnharmHam(std::vector<WaveFunction> BasisSet, std::vector<double
 };
 
 //Hamiltonian operators
-void ZerothHamSparse(vector<Trip>& HTrip)
+void ZerothHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies)
+{
+
 {
     //Calculate the harmonic Hamiltonian matrix elements in sparse form of Eigen::Triplet
     //Harmonic matrix elements
@@ -226,7 +229,7 @@ void ZerothHamSparse(vector<Trip>& HTrip)
     return;
 };
 
-void AnharmHamSparse(vector<Trip>& HTrip)
+void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
     //Add anharmonic terms to the Sparse Hamiltonian in sparse form of Eigen::Triplet
     int fcmax=0;
@@ -326,11 +329,12 @@ void AnharmHamSparse(vector<Trip>& HTrip)
     return;
 };
 
-inline void MakeHamSparse(SpMat& HSp){
+inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
     //Build the sparse CI Hamiltonian
     vector< Trip > HTrip;
-    ZerothHamSparse(HTrip);
-    AnharmHamSparse(HTrip);
+    ZerothHamSparse(HTrip, BasisSet, Frequencies);
+    AnharmHamSparse(HTrip, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
     HSp.setFromTriplets(HTrip.begin(),HTrip.end());
     HSp.makeCompressed();
     HTrip = vector< Trip >(); // Free memory
@@ -344,9 +348,19 @@ inline void MakeHamSparse(SpMat& HSp){
     return; 
 }
 
-//Utility functions
-inline void SparseDiagonalize(SpMat& H, MatrixXd& Psi, VectorXd& E)
+inline void MakeHamDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
+    ZerothHam(H, BasisSet);
+    AnharmHam(H, BasisSet, Frequencies, AnharmPot, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    return;
+}
+
+
+//Utility functions
+std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    SpMat H(BasisSet.size(), BasisSet.size());
+    MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
     typedef SparseSymMatProd<double,Eigen::Lower,0,ptrdiff_t> SparseMVProd;
     SparseMVProd op(H);
     // Construct eigen solver object, requesting the largest three eigenvalues
@@ -367,17 +381,21 @@ inline void SparseDiagonalize(SpMat& H, MatrixXd& Psi, VectorXd& E)
         Psi = eigs.eigenvectors().real();
     }else{
         cout << "Error: Eigenvalues did not converge." << endl; exit(0);}
-    return;
-};
+    return std::make_tuple<Eigen::VectorXd, Eigen::MatrixXd>(E, Psi);
 
-inline void DenseDiagonalize(MatrixXd& H, MatrixXd& Psi, VectorXd& E){
+}
+
+std::tuple<Eigen::VectorXd, Eigen::MatrixXd> DenseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
     //Wrapper for the Eigen diagonalization
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
+    MakeHamDense(H, BasisSet, Frequencies, AnharmPot, CubicFC, QuarticFC, QuinticFC, SexticFC);
     SelfAdjointEigenSolver<MatrixXd> SE; //Schrodinger equation
     SE.compute(H); //Diagonalize the matrix
     E = SE.eigenvalues().real(); //Extract frequencies
     Psi = SE.eigenvectors().real(); //Extract CI vectors
-    return;
-};
+    return std::make_tuple<Eigen::VectorXd, Eigen::MatrixXd>(E, Psi);
+}
 
 inline void QDiffVec(int n, int m, int& qtot, int& mchange, vector<int>& DiffVec)
 {
