@@ -12,6 +12,7 @@
  Implementation of Epstein-Nesbet PT2 with Heat Bath sorting
 
 */
+#include "VCI_headers.h"
 
 std::vector<double> StateProbability(std::vector<double>& CMax)
 {
@@ -63,14 +64,9 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
         }
     }
     
-    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
-    for(const WaveFunction& wfn : BasisSet){
-        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
-    }
-    
     for (unsigned int n = 0; n < N_opt; n++)
     {
-        std::vector<WaveFunction> PTBasisSet = AddStatesHB(HashedBasisInit, AnharmHB, Evecs.col(n), PT2_Eps);
+        std::vector<WaveFunction> PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
 
         #pragma omp parallel for
         for (unsigned int a = 0; a < PTBasisSet.size(); a++)
@@ -183,6 +179,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
  
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     std::vector<std::vector<double>> DeltaESample;
+    std::vector<double> DeltaEDet(N_opt, 0.0);
     int fcmax=0;
     for (unsigned int k=0;k<AnharmFC.size();k++){ //Order of maximum anharmonic term
         if(AnharmFC[k].fcpow.size()>fcmax){
@@ -190,23 +187,15 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         }
     }
 
-    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
-    for(const WaveFunction& wfn : BasisSet){
-        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
-    }
-    
-
     for (unsigned int n = 0; n < N_opt; n++)
     {
         // For each state, we determine the perturbative basis and populate the state with walkers.
-        HashedStates PTBasisSet;
         if (SemiStochastic)
         {
-            HashedStates VarDetBasisSet;
-            std::vector<WaveFunction> DetPTBasisSet = AddStatesHB(HashedBasisInit, AnharmHB, Evecs.col(n), PT2_Eps);
-            std::vector<double> DeltaEDet(N_opt, 0.0);
-            for (const WaveFunction &WF : HashedBasisInit) VarDetBasisSet.insert(WF);
-            for (const WaveFunction &WF : DetPTBasisSet) VarDetBasisSet.insert(WF);
+            std::vector<WaveFunction> VarDetBasisSet;
+            std::vector<WaveFunction> DetPTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
+            for (const WaveFunction &WF : BasisSet) VarDetBasisSet.push_back(WF);
+            for (const WaveFunction &WF : DetPTBasisSet) VarDetBasisSet.push_back(WF);
             std::vector<WaveFunction> PTBasisSet = AddStatesHB(DetPTBasisSet, AnharmHB, Evecs.col(n), PT2_Eps2);
             VarDetBasisSet = HashedStates(); // Clear memory, this entity doesn't really need to exist if we are careful with slicing, but I don't feel like doing that now.
             // If I were feeling like it, I would store the original basis set size and just use the variational and deterministic parts together, like how JF used to do it, 
@@ -214,8 +203,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         }
         else
         {
-            HashedStates PTBasisSet;
-            AddStatesHB(HashedBasisInit, PTBasisSet, Evecs.col(n), PT2_Eps);
+            std::vector<WaveFunction> PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
         }
 
         std::vector<double> Cn;

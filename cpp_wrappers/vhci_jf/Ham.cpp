@@ -12,98 +12,9 @@
 Functions for building and diagonalizing the Hamiltonian matrix
 
 */
+#include "VCI_headers.h"
 
-inline void CreationLO(double& ci, int& ni)
-{
-    //Creation ladder operator
-    ci *= sqrt(ni+1); //Update coefficient
-    ni += 1; //Update state
-    return;
-};
-
-inline void AnnihilationLO(double& ci, int& ni)
-{
-    //Annihilation ladder operator
-    ci *= sqrt(ni); //Update coefficient
-    ni -= 1; //Update state
-    //Check for impossible states
-    if (ni < 0)
-    {
-        ni = -1; //Used later to remove the state
-        ci = 0; //Delete state
-    }
-    return;
-};
-
-double AnharmPot(int n, int m, const FConst& fc)
-{
-    //Calculate anharmonic matrix elements for <m|H|n>
-    double Vnm = 0;
-    // Initialize new states
-    vector<vector<int> > NewStates(fc.QPowers.size());
-    vector<vector<double> > StateCoeffs(fc.QPowers.size());
-    //Create new states
-    for (unsigned int i=0;i<fc.QPowers.size();i++)
-    {
-        //Apply operators
-        NewStates[i].push_back(BasisSet[n].Modes[fc.QPowers[i]].Quanta);
-        StateCoeffs[i].push_back(1.0);
-        for (int j=0;j<fc.ModePowers[i];j++)
-        {
-            //Create new state for mode i
-            vector<int> stateupdate;
-            vector<double> coeffupdate;
-            for (unsigned int k=0;k<NewStates[i].size();k++)
-            {
-                int quant;
-                double coeff;
-                //Creation
-                quant = NewStates[i][k];
-                coeff = StateCoeffs[i][k];
-                CreationLO(coeff,quant);
-                stateupdate.push_back(quant);
-                coeffupdate.push_back(coeff);
-                //Annihilation
-                quant = NewStates[i][k];
-                coeff = StateCoeffs[i][k];
-                AnnihilationLO(coeff,quant);
-                if (quant >= 0)
-                {
-                    stateupdate.push_back(quant);
-                    coeffupdate.push_back(coeff);
-                }
-            }
-            //Save states
-            NewStates[i] = stateupdate;
-            StateCoeffs[i] = coeffupdate; // Accounting for permutations
-        }
-    }
-    //Sum energies
-    vector<double> CoeffSum;
-    for (unsigned int i=0;i<fc.QPowers.size();i++)
-    {
-        CoeffSum.push_back(0.0);
-        for (unsigned int j=0;j<NewStates[i].size();j++)
-        {
-            int quantn = NewStates[i][j];
-            int quantm = BasisSet[m].Modes[fc.QPowers[i]].Quanta;
-            if (quantn == quantm)
-            {
-                CoeffSum[i] += StateCoeffs[i][j];
-            }
-        }
-    }
-    //Scale by the force constant
-    Vnm = fc.fc;
-    //Combine coeffcients
-    for (unsigned int i=0;i<CoeffSum.size();i++)
-    {
-        Vnm *= CoeffSum[i];
-    }
-    return Vnm;
-};
-
-double AnharmPot(WaveFunction Bn, WaveFunction Bm, const FConst& fc)
+double AnharmPot(WaveFunction &Bn, WaveFunction &Bm, const FConst& fc)
 {
     //Calculate anharmonic matrix elements for <m|H|n>
     double Vnm = 0;
@@ -116,7 +27,7 @@ double AnharmPot(WaveFunction Bn, WaveFunction Bm, const FConst& fc)
         //Apply operators
         NewStates[i].push_back(Bn.Modes[fc.QPowers[i]].Quanta);
         StateCoeffs[i].push_back(1.0);
-        for (int j=0;j<fc.ModePowers[i];j++)
+        for (int j=0;j<fc.QPowers[i];j++)
         {
             //Create new state for mode i
             vector<int> stateupdate;
@@ -177,7 +88,6 @@ void ZerothHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet)
 {
     //Calculate the harmonic Hamiltonian matrix elements
     //Harmonic matrix elements
-    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
     #pragma omp parallel for
     for (unsigned int i=0;i<BasisSet.size();i++)
     {
@@ -200,7 +110,6 @@ void ZerothHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet)
 
 void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
-    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
     //Add anharmonic terms to the Hamiltonian
     int fcmax=0;
     for (unsigned int k=0;k<AnharmFC.size();k++){ //Order of maximum anharmonic term
@@ -217,7 +126,7 @@ void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vec
             double Vij = 0;
             int qdiff = 0; // total number of quanta difference between states
             int mchange = 0; // number of modes with nonzero change in quanta
-            QDiffVec(i,j,qdiff,mchange,qdiffvec);
+            QDiffVec(BasisSet[i], BasisSet[j], qdiff,mchange,qdiffvec);
             if(qdiff <= fcmax && mchange <= fcmax && qdiff%2==0){ 
                 // States cannot differ by more than fcmax quanta 
                 for (unsigned int k=0;k<QuarticFC.size();k++)
@@ -225,7 +134,7 @@ void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vec
                     if (ScreenState(qdiff,mchange,qdiffvec,QuarticFC[k]))
                     {// Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
-                        Vij += AnharmPot(i,j,QuarticFC[k]);
+                        Vij += AnharmPot(BasisSet[i], BasisSet[j], QuarticFC[k]);
                     }
                 }
                 for (unsigned int k=0;k<SexticFC.size();k++)
@@ -233,7 +142,7 @@ void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vec
                     if (ScreenState(qdiff,mchange,qdiffvec,SexticFC[k]))
                     {// Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
-                        Vij += AnharmPot(i,j,SexticFC[k]);
+                        Vij += AnharmPot(BasisSet[i], BasisSet[j], SexticFC[k]);
                     }
                 }
                 H(i,j) += Vij;
@@ -249,7 +158,7 @@ void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vec
                     if (ScreenState(qdiff,mchange,qdiffvec,CubicFC[k]))
                     {// Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
-                        Vij += AnharmPot(i,j,CubicFC[k]);
+                        Vij += AnharmPot(BasisSet[i], BasisSet[j], CubicFC[k]);
                     }
                 }
                 for (unsigned int k=0;k<QuinticFC.size();k++)
@@ -257,7 +166,7 @@ void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vec
                     if (ScreenState(qdiff,mchange,qdiffvec,QuinticFC[k]))
                     {// Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
-                        Vij += AnharmPot(i,j,QuinticFC[k]);
+                        Vij += AnharmPot(BasisSet[i], BasisSet[j], QuinticFC[k]);
                     }
                 }
                 H(i,j) += Vij;
@@ -272,8 +181,6 @@ void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vec
 
 //Hamiltonian operators
 void ZerothHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies)
-{
-
 {
     //Calculate the harmonic Hamiltonian matrix elements in sparse form of Eigen::Triplet
     //Harmonic matrix elements
@@ -302,8 +209,10 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
 {
     //Add anharmonic terms to the Sparse Hamiltonian in sparse form of Eigen::Triplet
     int fcmax=0;
-    for (unsigned int k=0;k<AnharmFC.size();k++){ //Order of maximum anharmonic term
-        if(AnharmFC[k].QPowers.size()>fcmax){
+    for (unsigned int k=0;k<AnharmFC.size();k++)
+    { //Order of maximum anharmonic term
+        if(AnharmFC[k].QPowers.size()>fcmax)
+        {
             fcmax = AnharmFC[k].QPowers.size();
         }
     }
@@ -316,7 +225,7 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
             double Vij = 0;
             int mchange = 0; // number of modes with nonzero change in quanta
             int qdiff = 0; // total number of quanta difference between states
-            QDiffVec(i,j,qdiff,mchange,qdiffvec);
+            QDiffVec(BasisSet[i], BasisSet[j],qdiff,mchange,qdiffvec);
             if(qdiff <= fcmax && mchange <= fcmax && qdiff%2==0){ 
                 // States cannot differ by more than fcmax quanta
                 double W = 0.;
@@ -325,7 +234,7 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
                     if (ScreenState(qdiff,mchange,qdiffvec,QuarticFC[k])){
                         // Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
-                        double val = AnharmPot(i,j,QuarticFC[k]);
+                        double val = AnharmPot(BasisSet[i], BasisSet[j], QuarticFC[k]);
                         Vij += val; 
                         if(abs(val) > abs(W)){
                             W = val;
@@ -337,7 +246,7 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
                     if (ScreenState(qdiff,mchange,qdiffvec,SexticFC[k])){
                         // Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
-                        double val = AnharmPot(i,j,SexticFC[k]); 
+                        double val = AnharmPot(BasisSet[i], BasisSet[j], SexticFC[k]); 
                         Vij += val;
                         if(abs(val) > abs(W)){
                             W = val;
@@ -363,7 +272,7 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
                         // Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
                         
-                        double val = AnharmPot(i,j,CubicFC[k]);
+                        double val = AnharmPot(BasisSet[i], BasisSet[j], CubicFC[k]);
                         Vij += val; 
                         if(abs(val) > abs(W)){
                             W = val;
@@ -376,7 +285,7 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
                     if (ScreenState(qdiff,mchange,qdiffvec,QuinticFC[k])){
                         // Screen force constants that cannot connect basis states i and j
                         //Add anharmonic matrix elements
-                        double val = AnharmPot(i,j,QuinticFC[k]);
+                        double val = AnharmPot(BasisSet[i], BasisSet[j], QuinticFC[k]);
                         Vij += val; 
                         if(abs(val) > abs(W)){
                             W = val;
@@ -417,16 +326,16 @@ inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::
     return; 
 }
 
-inline void MakeHamDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+inline void MakeHamDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
     ZerothHam(H, BasisSet);
-    AnharmHam(H, BasisSet, Frequencies, AnharmPot, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    AnharmHam(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
     return;
 }
 
 
 //Utility functions
-std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, int NEig)
 {
     SpMat H(BasisSet.size(), BasisSet.size());
     MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
@@ -445,6 +354,8 @@ std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<Wa
     // Initialize and compute
     eigs.init();
     int nconv = eigs.compute(1000,1e-10,SMALLEST_ALGE);
+    Eigen::VectorXd E;
+    Eigen::MatrixXd Psi;
     if(eigs.info() == SUCCESSFUL){
         E = eigs.eigenvalues().real();
         Psi = eigs.eigenvectors().real();
@@ -454,151 +365,14 @@ std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<Wa
 
 }
 
-std::tuple<Eigen::VectorXd, Eigen::MatrixXd> DenseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+std::tuple<Eigen::VectorXd, Eigen::MatrixXd> DenseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
     //Wrapper for the Eigen diagonalization
     Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
-    MakeHamDense(H, BasisSet, Frequencies, AnharmPot, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    MakeHamDense(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
     SelfAdjointEigenSolver<MatrixXd> SE; //Schrodinger equation
     SE.compute(H); //Diagonalize the matrix
-    E = SE.eigenvalues().real(); //Extract frequencies
-    Psi = SE.eigenvectors().real(); //Extract CI vectors
+    Eigen::VectorXd E = SE.eigenvalues().real(); //Extract frequencies
+    Eigen::MatrixXd Psi = SE.eigenvectors().real(); //Extract CI vectors
     return std::make_tuple<Eigen::VectorXd, Eigen::MatrixXd>(E, Psi);
 }
-
-inline void QDiffVec(int n, int m, int& qtot, int& mchange, vector<int>& DiffVec)
-{
-    //Function that calculates ifference in quanta between basis states 
-    // Pre-computing this saves time on inner loop over AnharmFC
-    //qtot is the total number of changed quanta, mchange is number modes with changed quanta, DiffVec is a vector with number of changed quanta per mode
-    for (unsigned int i=0;i<BasisSet[0].M;i++)
-    {
-        int qdiff = 0; //Number of quanta between states
-        qdiff += BasisSet[n].Modes[i].Quanta;
-        qdiff -= BasisSet[m].Modes[i].Quanta;
-        DiffVec[i] = abs(qdiff);
-//        DiffVec.push_back(abs(qdiff));
-        qtot += abs(qdiff);
-        if(qdiff!=0){
-            mchange += 1;
-        }
-    }
-    return;
-};
-
-inline void QDiffVec(WaveFunction &Bn, WaveFunction &Bm, int &qtot, int &mchange, vector<int> &DiffVec)
-{
-    for (unsigned int i = 0; i < Bn.M; i++)
-    {
-        int qdiff = 0;
-        qdiff += Bn.Modes[i].Quanta;
-        qdiff -= Bm.Modes[i].Quanta;
-        DiffVec[i] = abs(qdiff);
-        qtot += abs(qdiff);
-        if (qdiff != 0) mchange += 1;
-    }
-    return;
-}
-
-inline bool ScreenState(int qdiff, int mchange, const vector<int>& QDiffVec, const FConst& fc)
-{
-    //Function for ignoring states that have no overlap
-    //qdiff is the number of changed quanta, mchange is number modes with changed quanta, QDiffVec is a vector with number of changed quanta per mode, fc is force constant
-    bool keepstate = 1; //Assume the state is good
-    if(qdiff > fc.QPowers.size() || 
-            mchange > fc.QPowers.size()
-            || qdiff%2 != fc.QPowers.size()%2
-            ){
-        return 0;
-    }
-    //Check based on force constant powers (check that raising and lowering results in quanta match)
-    for (unsigned int i=0;i<fc.QPowers.size();i++)
-    {
-        if ( QDiffVec[fc.QPowers[i]] > fc.ModePowers[i] || 
-                QDiffVec[fc.QPowers[i]] % 2 != fc.ModePowers[i] % 2){
-            //Impossible for the states to overlap if mode power is too small or wrong even/odd parity
-            //Skip the rest of the checks
-            return 0;
-        }
-    }
-    //Check overlap of all other modes (modes not involved in FC)
-    for (int i=0;i<QDiffVec.size();i++)
-    {
-        bool cont = 1; //Continue the check
-        for (unsigned int j=0;j<fc.QPowers.size();j++)
-        {
-            if (fc.QPowers[j] == i)
-            {
-                //Ignore this mode since it is in the FC
-                cont = 0;
-                break; // No need to continue checking mode against fc.QPowers
-            }
-        }
-        if (cont)
-        {
-            if ( QDiffVec[i] != 0)
-            {
-                //Remove state due to zero overlap in mode i
-                return 0; // No need to check if the other modes match 
-            }
-        }
-    }
-    //Return decision
-    return keepstate;
-};
-
-void PrintFreqs(VectorXd& Freqs, MatrixXd& Vecs, fstream& outfile)
-{
-    //Function to print the first NEig eigenvalues
-    //And their modes assignments
-    int NFreqs = NEig; // set maximum number of printed eigenvalues
-    if (Freqs.size() < NEig){ NFreqs = Freqs.size();} // set to number of eigenvalues if < 100
-    outfile << fixed << setprecision(10) << Freqs(0) << "   "; // Print ZPE
-    double maxcoeff = max(abs(Vecs.col(0).maxCoeff()),abs(Vecs.col(0).minCoeff()));
-    for( unsigned int m=0; m<Vecs.rows(); m++ ){ // Looping over elements of eigenvector
-        if(abs(Vecs(m,0))>=maxcoeff/2){ // Output the mode identities of the largest element(s)
-            outfile << fixed << setprecision(2) << abs(Vecs(m,0)) << " (";
-            int nmode = 0;
-            for( unsigned int l=0; l<BasisSet[m].M; l++){
-                if(BasisSet[m].Modes[l].Quanta>0){
-                    if(nmode>0){
-                    outfile << "+";
-                    }
-                    outfile << BasisSet[m].Modes[l].Quanta << "w" << l;
-                    nmode += 1;
-                }
-            }
-            outfile << ")";
-        }
-    }
-    outfile << '\n';
-    for( unsigned int n=1; n<NFreqs; ++n){
-        outfile << fixed << setprecision(12) << Freqs(n)-Freqs(0) << "   "; // Print eigenvalue minus ZPE
-        double maxcoeff = max(abs(Vecs.col(n).maxCoeff()),abs(Vecs.col(n).minCoeff()));
-        int state = 0;
-        for( unsigned int m=0; m<Vecs.rows(); m++ ){
-            if(abs(Vecs(m,n))>=maxcoeff/2){
-                if(state>0){
-                    outfile << "  ";
-                }
-                outfile << fixed << setprecision(2) << abs(Vecs(m,n)) << " (";
-                state += 1;
-                int nmode = 0;
-                for( unsigned int l=0; l<BasisSet[m].M; l++){
-                    if(BasisSet[m].Modes[l].Quanta>0){
-                        if(nmode>0){
-                        outfile << "+";
-                        }
-                        outfile << BasisSet[m].Modes[l].Quanta << "w" << l;
-                        nmode += 1;
-                    }
-                }
-                outfile << ")";
-            }
-        }
-        outfile << '\n';
-    }
-    //Print and return
-    outfile.flush();
-    return;
-};
