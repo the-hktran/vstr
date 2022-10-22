@@ -103,6 +103,75 @@ double AnharmPot(int n, int m, const FConst& fc)
     return Vnm;
 };
 
+double AnharmPot(WaveFunction Bn, WaveFunction Bm, const FConst& fc)
+{
+    //Calculate anharmonic matrix elements for <m|H|n>
+    double Vnm = 0;
+    // Initialize new states
+    vector<vector<int> > NewStates(fc.QPowers.size());
+    vector<vector<double> > StateCoeffs(fc.QPowers.size());
+    //Create new states
+    for (unsigned int i=0;i<fc.QPowers.size();i++)
+    {
+        //Apply operators
+        NewStates[i].push_back(Bn.Modes[fc.QPowers[i]].Quanta);
+        StateCoeffs[i].push_back(1.0);
+        for (int j=0;j<fc.ModePowers[i];j++)
+        {
+            //Create new state for mode i
+            vector<int> stateupdate;
+            vector<double> coeffupdate;
+            for (unsigned int k=0;k<NewStates[i].size();k++)
+            {
+                int quant;
+                double coeff;
+                //Creation
+                quant = NewStates[i][k];
+                coeff = StateCoeffs[i][k];
+                CreationLO(coeff,quant);
+                stateupdate.push_back(quant);
+                coeffupdate.push_back(coeff);
+                //Annihilation
+                quant = NewStates[i][k];
+                coeff = StateCoeffs[i][k];
+                AnnihilationLO(coeff,quant);
+                if (quant >= 0)
+                {
+                    stateupdate.push_back(quant);
+                    coeffupdate.push_back(coeff);
+                }
+            }
+            //Save states
+            NewStates[i] = stateupdate;
+            StateCoeffs[i] = coeffupdate; // Accounting for permutations
+        }
+    }
+    //Sum energies
+    vector<double> CoeffSum;
+    for (unsigned int i=0;i<fc.QPowers.size();i++)
+    {
+        CoeffSum.push_back(0.0);
+        for (unsigned int j=0;j<NewStates[i].size();j++)
+        {
+            int quantn = NewStates[i][j];
+            int quantm = Bm.Modes[fc.QPowers[i]].Quanta;
+            if (quantn == quantm)
+            {
+                CoeffSum[i] += StateCoeffs[i][j];
+            }
+        }
+    }
+    //Scale by the force constant
+    Vnm = fc.fc;
+    //Combine coeffcients
+    for (unsigned int i=0;i<CoeffSum.size();i++)
+    {
+        Vnm *= CoeffSum[i];
+    }
+    return Vnm;
+};
+
+
 //Hamiltonian operators
 void ZerothHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet)
 {
