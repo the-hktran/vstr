@@ -161,7 +161,7 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
     return DeltaE;    
 }
 
-std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &PTBasisSet, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
+std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &PTBasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
 {
     cout << " Starting Stocastic PT2 corrections." << endl;
     int N_opt;
@@ -190,14 +190,16 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
     for (unsigned int n = 0; n < N_opt; n++)
     {
         // For each state, we determine the perturbative basis and populate the state with walkers.
+        std::vector<WaveFunction> DetPTBasisSet;
         if (SemiStochastic)
         {
-            std::vector<WaveFunction> VarDetBasisSet;
-            std::vector<WaveFunction> DetPTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
+            std::vector<WaveFunction> VarDetBasisSet; // Actually I think this destructs outside of this if statement.
+            DetPTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
             for (const WaveFunction &WF : BasisSet) VarDetBasisSet.push_back(WF);
             for (const WaveFunction &WF : DetPTBasisSet) VarDetBasisSet.push_back(WF);
-            std::vector<WaveFunction> PTBasisSet = AddStatesHB(DetPTBasisSet, AnharmHB, Evecs.col(n), PT2_Eps2);
-            VarDetBasisSet = HashedStates(); // Clear memory, this entity doesn't really need to exist if we are careful with slicing, but I don't feel like doing that now.
+            std::vector<WaveFunction> PTBasisSet = AddStatesHB(VarDetBasisSet, AnharmHB, Evecs.col(n), PT2_Eps2);
+            // VarDetBasisSet.clear();
+            // VarDetBasisSet.shrink_to_fit(); // Clear memory, this entity doesn't really need to exist if we are careful with slicing, but I don't feel like doing that now.
             // If I were feeling like it, I would store the original basis set size and just use the variational and deterministic parts together, like how JF used to do it, 
             // and reset after each iteration.
         }
@@ -423,5 +425,5 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         cout << DeltaE[n] << " " << SigmaDeltaE[n] << std::endl;
     }
 
-    return std::make_tuple<std::vector<double, std::vector<double>>(DeltaE, SigmaDeltaE);
+    return std::make_tuple(DeltaE, SigmaDeltaE);
 }

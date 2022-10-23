@@ -1,11 +1,11 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
-#include <pybind11/spectra.h>
+//#include <pybind11/spectra.h>
 #include <pybind11/stl.h>
 #include "VCI_headers.h"
 #include <vector>
 
-PYBIND11_MODULE(vhci_functions, m)
+PYBIND11_MODULE(vhci_jf_functions, m)
 {
     m.doc() = "Module for C++ implementations for VHCI based on JF's code.";
     pybind11::class_<FConst>(m, "FConst")
@@ -16,7 +16,7 @@ PYBIND11_MODULE(vhci_functions, m)
         .def_readwrite("QUnique", &FConst::QUnique)
         .def_readwrite("QPowers", &FConst::QPowers);
     pybind11::class_<WaveFunction>(m, "WaveFunction")
-        .def(pybind11::init<std::vector<int> std::vector<double>>())
+        .def(pybind11::init<std::vector<int>, std::vector<double>>())
         .def_readwrite("M", &WaveFunction::M)
         .def_readwrite("Modes", &WaveFunction::Modes);
 

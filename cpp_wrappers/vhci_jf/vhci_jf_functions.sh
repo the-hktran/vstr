@@ -4,5 +4,5 @@ g++ -fPIC --shared -std=c++11 -Wall -O3 -fopenmp Ham.cpp HB.cpp PT2.cpp vhci_jf_
     -I${CONDA_PREFIX}/include \
     -I${CONDA_PREFIX}/include/python3.10 \
     -I${CONDA_PREFIX}/include/eigen3 \
-    -I/home/henry/include/spectra-0.6.2/include
+    -I/home/henry/include/spectra-0.6.2/include \
     -o vhci_jf_functions.so

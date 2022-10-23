@@ -361,7 +361,7 @@ std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<Wa
         Psi = eigs.eigenvectors().real();
     }else{
         cout << "Error: Eigenvalues did not converge." << endl; exit(0);}
-    return std::make_tuple<Eigen::VectorXd, Eigen::MatrixXd>(E, Psi);
+    return std::make_tuple(E, Psi);
 
 }
 
@@ -374,5 +374,5 @@ std::tuple<Eigen::VectorXd, Eigen::MatrixXd> DenseDiagonalizeCPP(std::vector<Wav
     SE.compute(H); //Diagonalize the matrix
     Eigen::VectorXd E = SE.eigenvalues().real(); //Extract frequencies
     Eigen::MatrixXd Psi = SE.eigenvectors().real(); //Extract CI vectors
-    return std::make_tuple<Eigen::VectorXd, Eigen::MatrixXd>(E, Psi);
+    return std::make_tuple(E, Psi);
 }

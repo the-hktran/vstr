@@ -13,10 +13,6 @@ Headers, libraries, and data structures for VHCI
 
 */
 
-//Make including safe
-#ifndef VCI_HEADERS
-#define VCI_HEADERS
-
 //Header Files
 #include <omp.h>
 #include <cstdlib>
@@ -54,18 +50,6 @@ using namespace Eigen;
 using namespace std;
 using namespace Spectra;
 using namespace boost;
-
-
-//Global exact constants
-const double pi = 4*atan(1); //Pi
-const double rt2pi = sqrt(2*pi); //Needed for Gaussian broadening
-
-//Global measured constants (NIST, CODATA 2010)
-const double cs = 2.99792458e-10; //Speed of light (cm)
-const double k = 0.69503476; //Boltzmann constant (cm^-1)
-
-//Global derived constants
-const double h = 2*pi; //Planck constant (cm^-1)
 
 //Custom data structures
 struct HOFunc
@@ -118,6 +102,7 @@ class WaveFunction
 
 };
 
+/*
 WaveFunction::WaveFunction(std::vector<int> Quantas, std::vector<double> Frequencies)
 {
     for (unsigned int i = 0; i < Quantas.size(); i++)
@@ -128,6 +113,7 @@ WaveFunction::WaveFunction(std::vector<int> Quantas, std::vector<double> Frequen
         Modes.push_back(myHO);
     }
 }
+*/
 
 class FConst
 {
@@ -145,6 +131,7 @@ class FConst
     void ScaleW();
 };
 
+/*
 FConst::FConst(double dV, std::vector<int> Qs, bool doScale)
 {
     fc = dV;
@@ -177,7 +164,7 @@ void FConst::ScaleW()
         fc /= Factorial(QPowers[i]);
     }
 }
-
+*/
 
 struct WfnHasher
 {
@@ -194,9 +181,12 @@ struct WfnHasher
 };
 
 typedef unordered_set<WaveFunction, WfnHasher> HashedStates;
-typedef SparseMatrix<double, 0, ptrdiff_t> SpMat;
-typedef Triplet<double, ptrdiff_t> Trip;
+//typedef SparseMatrix<double, 0, ptrdiff_t> SpMat;
+//typedef Triplet<double, ptrdiff_t> Trip;
+typedef Eigen::SparseMatrix<double> SpMat;
+typedef Eigen::Triplet<double> Trip;
 
+/*
 inline void CreationLO(double& ci, int& ni)
 {
     //Creation ladder operator
@@ -279,20 +269,26 @@ inline bool ScreenState(int qdiff, int mchange, const vector<int>& QDiffVec, con
     //Return decision
     return keepstate;
 };
+*/
+
+double Factorial(int);
+inline void CreationLO(double&, int&);
+inline void AnnihilationLO(double&, int&);
+inline void QDiffVec(WaveFunction&, WaveFunction&, int&, int&, std::vector<int>&);
+inline bool ScreenState(int, int, const std::vector<int>&, const FConst&);
 
 //Function declarations
+double AnharmPot(WaveFunction &Bn, WaveFunction &Bm, const FConst& fc);
 std::tuple<Eigen::VectorXd, Eigen::MatrixXd> DenseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC);
 std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmPot, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, int NEig);
 
-std::vector<WaveFunction> AddStatesHB(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::VectorXd &C, double eps);
+std::vector<WaveFunction> AddStatesHB(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps);
 void HeatBath_Sort_FC(std::vector<FConst> &AnharmHB);
 
 std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig);
-std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &PTBasisSet, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic, double PT2_Eps2);
+std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &PTBasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic, double PT2_Eps2);
 
 //Function definitions 
-#include "Ham.cpp"
-#include "HB.cpp"
-#include "PT2.cpp"
-
-#endif
+//#include "Ham.cpp"
+//#include "HB.cpp"
+//#include "PT2.cpp"
