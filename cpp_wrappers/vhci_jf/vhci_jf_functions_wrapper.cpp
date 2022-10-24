@@ -12,9 +12,13 @@ PYBIND11_MODULE(vhci_jf_functions, m)
         .def(pybind11::init<double, std::vector<int>, bool>())
         .def_readwrite("QIndices", &FConst::QIndices)
         .def_readwrite("fc", &FConst::fc)
+        .def_readwrite("fcpow", &FConst::fcpow)
         .def_readwrite("Order", &FConst::Order)
         .def_readwrite("QUnique", &FConst::QUnique)
         .def_readwrite("QPowers", &FConst::QPowers);
+    pybind11::class_<HOFunc>(m, "HOFunc")
+        .def_readwrite("Freq", &HOFunc::Freq)
+        .def_readwrite("Quanta", &HOFunc::Quanta);
     pybind11::class_<WaveFunction>(m, "WaveFunction")
         .def(pybind11::init<std::vector<int>, std::vector<double>>())
         .def_readwrite("M", &WaveFunction::M)

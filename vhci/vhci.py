@@ -120,6 +120,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         for i in WSortedIndex:
             #print("W", WElement[i])
             if abs(WElement[i] * C[CSortedIndex[0]]) > eps:
+                print(WElement[i], C[CSortedIndex[0]])
                 for n in CSortedIndex:
                     #print("C", C[n])
                     if abs(WElement[i] * C[n]) > eps:
@@ -180,6 +181,7 @@ def PT2(mVHCI):
 def Diagonalize(mVHCI):
     #if mVHCI.NewBasis is None:
     mVHCI.H = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False) #mVHCI.HamV()
+    print(mVHCI.H)
     '''
     else:
         HOld = mVHCI.H

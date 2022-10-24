@@ -1,6 +1,6 @@
 #!/bin/bash
 
-g++ -fPIC --shared -std=c++11 -Wall -O3 -fopenmp Ham.cpp HB.cpp PT2.cpp vhci_jf_functions_wrapper.cpp \
+g++ -fPIC --shared -std=c++11 -Wall -O3 -fopenmp vhci_jf_functions.cpp vhci_jf_functions_wrapper.cpp \
     -I${CONDA_PREFIX}/include \
     -I${CONDA_PREFIX}/include/python3.10 \
     -I${CONDA_PREFIX}/include/eigen3 \
