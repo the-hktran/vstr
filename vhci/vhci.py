@@ -118,11 +118,8 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         WSortedIndex = np.flip(np.argsort(abs(WElement)))
         CSortedIndex = np.flip(np.argsort(abs(C)))
         for i in WSortedIndex:
-            #print("W", WElement[i])
             if abs(WElement[i] * C[CSortedIndex[0]]) > eps:
-                print(WElement[i], C[CSortedIndex[0]])
                 for n in CSortedIndex:
-                    #print("C", C[n])
                     if abs(WElement[i] * C[n]) > eps:
                         AddedB = mVHCI.ConnectedBasis(mVHCI.Basis[n], Wp[i].QIndices)
                         for AddB in AddedB:
@@ -181,7 +178,6 @@ def PT2(mVHCI):
 def Diagonalize(mVHCI):
     #if mVHCI.NewBasis is None:
     mVHCI.H = HamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False) #mVHCI.HamV()
-    print(mVHCI.H)
     '''
     else:
         HOld = mVHCI.H
@@ -197,7 +193,6 @@ def Diagonalize(mVHCI):
     mVHCI.Es, mVHCI.Cs = np.linalg.eigh(mVHCI.H)
 
 def SparseDiagonalize(mVHCI):
-    print("CALL SPMAT")
     mVHCI.H = SpHamVCPP(mVHCI.Basis, mVHCI.BasisConn, mVHCI.Basis, mVHCI.w, mVHCI.Ws, False, False)
     #mVHCI.H = mVHCI.SparseHamV()
     mVHCI.Es, mVHCI.Cs = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')

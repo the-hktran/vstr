@@ -657,18 +657,13 @@ inline void MakeHamDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet
     return;
 }
 
-
 //Utility functions
 std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, int NEig)
 {
     SpMat H(BasisSet.size(), BasisSet.size());
-    std::cout <<"start mat" << std::endl;
     MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
-    std::cout << "done mat" << std::endl;
     typedef SparseSymMatProd<double,Eigen::Lower,0,ptrdiff_t> SparseMVProd;
-    std::cout << "done mat" << std::endl;
     SparseMVProd op(H);
-    std::cout << "done mat" << std::endl;
     // Construct eigen solver object, requesting the largest three eigenvalues
     int NCV = 0;
 //    int NState = 0;
@@ -678,24 +673,17 @@ std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<Wa
 //        NState = NEig;
 //    }
     NCV = max(2*NEig+1,20); // Default from Scipy's Lanczos/Arnoldi implementation
-    std::cout << "done mat" << std::endl;
-    SymEigsSolver< double, SMALLEST_ALGE, SparseMVProd > eigs(&op, NEig, NCV);
-    std::cout << "done mat" << std::endl;
+    Spectra::SymEigsSolver<double, Spectra::SMALLEST_ALGE, SparseMVProd> eigs(&op, NEig, NCV);
     // Initialize and compute
     eigs.init();
-    std::cout << "done mat" << std::endl;
-    int nconv = eigs.compute(1000,1e-10,SMALLEST_ALGE);
-    std::cout << "done mat" << std::endl;
+    int nconv = eigs.compute(1000,1e-10,Spectra::SMALLEST_ALGE);
     Eigen::VectorXd E;
-    std::cout << "done mat" << std::endl;
     Eigen::MatrixXd Psi;
-    std::cout << "done mat" << std::endl;
     if(eigs.info() == SUCCESSFUL){
         E = eigs.eigenvalues().real();
         Psi = eigs.eigenvectors().real();
     }else{
         cout << "Error: Eigenvalues did not converge." << endl; exit(0);}
-    std::cout << "DIAGED" << std::endl;
     return std::make_tuple(E, Psi);
 
 }
@@ -710,6 +698,21 @@ std::tuple<Eigen::VectorXd, Eigen::MatrixXd> DenseDiagonalizeCPP(std::vector<Wav
     Eigen::VectorXd E = SE.eigenvalues().real(); //Extract frequencies
     Eigen::MatrixXd Psi = SE.eigenvectors().real(); //Extract CI vectors
     return std::make_tuple(E, Psi);
+}
+
+Eigen::MatrixXd GenerateHamV(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
+    MakeHamDense(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    return H;
+}
+
+
+SpMat GenerateSparseHamV(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    SpMat H(BasisSet.size(), BasisSet.size());
+    MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    return H;
 }
 
 // PT2.cpp
