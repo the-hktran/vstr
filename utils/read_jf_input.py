@@ -10,8 +10,12 @@ def Read(FilePath):
     Comment = f.readline() # don't need this
     eps1 = float(f.readline().split()[1])
     NStates = int(f.readline().split()[1])
-    doPT2 = bool(f.readline().split()[1])
+    doPT2 = int(f.readline().split()[1])
     eps2 = float(f.readline().split()[1])
+    spt2line = f.readline()
+    eps3 = float(spt2line.split()[1])
+    nwalker = int(spt2line.split()[2])
+    nsample = int(spt2line.split()[3])
     MaxQuanta = int(f.readline().split()[1])
     NModes = int(f.readline().split()[1])
 
@@ -48,7 +52,7 @@ def Read(FilePath):
         if len(Vs[i]) != 0:
             VsFinal.append(Vs[i])
 
-    return ws, MaxNs, MaxQuanta, VsFinal, eps1, eps2, NStates
+    return ws, MaxNs, MaxQuanta, VsFinal, eps1, eps2, eps3, nwalker, nsample, NStates
 
 if __name__ == '__main__':
     Read('../../VHCI/input/C2H4.inp')

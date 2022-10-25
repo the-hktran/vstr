@@ -745,7 +745,6 @@ void FillWalkers(std::map<int, int>& WalkerPopulation, std::vector<double>& C, i
 
 std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig)
 {
-    cout << " Finding connected states..." << endl;
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
         N_opt = BasisSet.size();
@@ -753,12 +752,6 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
         N_opt = NEig;
     }
 
-    if(NEig==1){
-        cout << " Calculating the 2nd-order perturbative correction on the ground state energy" << endl;
-    }else{
-        cout << " Calculating the 2nd-order perturbative correction for on first " << N_opt << " eigenvalues." << endl;
-    }
- 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     int fcmax=0;
     for (unsigned int k=0;k<AnharmFC.size();k++){ //Order of maximum anharmonic term
@@ -766,10 +759,13 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
             fcmax = AnharmFC[k].fcpow.size();
         }
     }
+
+    std::cout << BasisSet.size() << std::endl;
     
     for (unsigned int n = 0; n < N_opt; n++)
     {
         std::vector<WaveFunction> PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
+        std::cout << " Perturbative space for state " << n << " contains " << PTBasisSet.size() << " basis states." << std::endl;
 
         #pragma omp parallel for
         for (unsigned int a = 0; a < PTBasisSet.size(); a++)
@@ -864,9 +860,8 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
     return DeltaE;    
 }
 
-std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &PTBasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
+std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
 {
-    cout << " Starting Stocastic PT2 corrections." << endl;
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
         N_opt = BasisSet.size();
@@ -874,12 +869,6 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         N_opt = NEig;
     }
 
-    if(NEig==1){
-        cout << " Calculating the 2nd-order perturbative correction on the ground state energy" << endl;
-    }else{
-        cout << " Calculating the 2nd-order perturbative correction for on first " << N_opt << " eigenvalues." << endl;
-    }
- 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     std::vector<std::vector<double>> DeltaESample;
     std::vector<double> DeltaEDet(N_opt, 0.0);
@@ -894,13 +883,15 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
     {
         // For each state, we determine the perturbative basis and populate the state with walkers.
         std::vector<WaveFunction> DetPTBasisSet;
+        std::vector<WaveFunction> PTBasisSet;
         if (SemiStochastic)
         {
             std::vector<WaveFunction> VarDetBasisSet; // Actually I think this destructs outside of this if statement.
             DetPTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
             for (const WaveFunction &WF : BasisSet) VarDetBasisSet.push_back(WF);
             for (const WaveFunction &WF : DetPTBasisSet) VarDetBasisSet.push_back(WF);
-            std::vector<WaveFunction> PTBasisSet = AddStatesHB(VarDetBasisSet, AnharmHB, Evecs.col(n), PT2_Eps2);
+            PTBasisSet = AddStatesHB(VarDetBasisSet, AnharmHB, Evecs.col(n), PT2_Eps2);
+            std::cout << " Perturbative space for state " << n << " contains " << DetPTBasisSet.size() << " deterministic basis states and " << PTBasisSet.size() << " stochastic basis states." << std::endl;
             // VarDetBasisSet.clear();
             // VarDetBasisSet.shrink_to_fit(); // Clear memory, this entity doesn't really need to exist if we are careful with slicing, but I don't feel like doing that now.
             // If I were feeling like it, I would store the original basis set size and just use the variational and deterministic parts together, like how JF used to do it, 
@@ -908,7 +899,8 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         }
         else
         {
-            std::vector<WaveFunction> PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
+            PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
+            std::cout << " Perturbative space for state " << n << " contains " << PTBasisSet.size() << " stochastic basis states." << std::endl;
         }
 
         std::vector<double> Cn;
