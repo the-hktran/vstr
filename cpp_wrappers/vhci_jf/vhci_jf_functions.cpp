@@ -336,6 +336,324 @@ std::vector<WaveFunction> AddStatesHB(std::vector<WaveFunction> &BasisSet, std::
     return NewBasis;
 }
 
+std::vector<WaveFunction> AddStatesHB(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, int n, double Cn, double eps){ // Expand basis via Heat Bath algorithm
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
+    for( WaveFunction& wfn : BasisSet){
+        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    }
+
+    for(unsigned int i=0; i<AnharmHB.size(); ++i){ // Loop over sorted force constants
+            if(abs(Cn*AnharmHB[i].fc) >= eps){ // States connected by fc will be added if |fc*Cn| >= eps
+                if(AnharmHB[i].QUnique.size()==1){ // Stupid way to enumerate new states from F_ij
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        if( a != 0){// Skip if no change
+                            WaveFunction tmp = BasisSet[n];
+                            tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                            if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                                HashedBasisInit.count(tmp) == 0
+                                    ){ //make sure a|0> = 0 and tmp does not exist in original basis
+                                HashedNewStates.insert(tmp); // add new state to set
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==2){ // Stupid way to enumerate new states from F_ij
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            if(abs(a)+abs(b) != 0){// Skip if no change
+                                WaveFunction tmp = BasisSet[n];
+                                tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                       tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0 && 
+                                                                       HashedBasisInit.count(tmp) == 0
+                                       ){ //make sure a|0> = 0
+                                    HashedNewStates.insert(tmp); // add new state to set
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==3){ // Stupid way to enumerate new states from F_ijk
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                if(abs(a)+abs(b)+abs(c) != 0){// Skip if no change
+                                    WaveFunction tmp = BasisSet[n];
+                                    tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                    tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                    tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                    if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                           tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                           tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                           HashedBasisInit.count(tmp) == 0
+                                           ){ //make sure a|0> = 0
+                                        HashedNewStates.insert(tmp); // add new state
+                                    }
+                                }      
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==4){ // Stupid way to enumerate new states from F_ijkl
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    if(abs(a)+abs(b)+abs(c)+abs(d) != 0){ // Skip if no change
+                                        WaveFunction tmp = BasisSet[n];
+                                        tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                        tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                        tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                        tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                        if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                               tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                               tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                               tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                               HashedBasisInit.count(tmp) == 0
+                                               ){ //make sure a|0> = 0
+                                            HashedNewStates.insert(tmp); // add new state
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }   
+                if(AnharmHB[i].QUnique.size()==5){ // Stupid way to enumerate new states from F_ijklm 
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    for( int f=-(AnharmHB[i].QPowers[4]); f<(AnharmHB[i].QPowers[4]+1); f+=2 ){
+                                        if(abs(a)+abs(b)+abs(c)+abs(d)+abs(f) != 0){ // Skip if no change
+                                            WaveFunction tmp = BasisSet[n];
+                                            tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                            tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                            tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                            tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                            tmp.Modes[AnharmHB[i].QUnique[4]].Quanta += f;
+                                            if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[4]].Quanta >=0 && 
+                                                   HashedBasisInit.count(tmp) == 0
+                                                   ){ //make sure a|0> = 0
+                                                HashedNewStates.insert(tmp); // add new state
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==6){ // Stupid way to enumerate new states from F_ijklmn 
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    for( int f=-(AnharmHB[i].QPowers[4]); f<(AnharmHB[i].QPowers[4]+1); f+=2 ){
+                                        for( int g=-(AnharmHB[i].QPowers[5]); g<(AnharmHB[i].QPowers[5]+1); g+=2 ){
+                                            if(abs(a)+abs(b)+abs(c)+abs(d)+abs(f)+abs(g) != 0){ // Skip if no change
+                                                WaveFunction tmp = BasisSet[n];
+                                                tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                                tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                                tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                                tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                                tmp.Modes[AnharmHB[i].QUnique[4]].Quanta += f;
+                                                tmp.Modes[AnharmHB[i].QUnique[5]].Quanta += g;
+                                                if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[4]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[5]].Quanta >=0 &&
+                                                                                                       HashedBasisInit.count(tmp) == 0
+                                                       ){ //make sure a|0> = 0
+                                                    HashedNewStates.insert(tmp); // add new state
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].fcpow.size() == 0 || AnharmHB[i].fcpow.size() > 6 ){
+                    //Print error message
+                    cout << "Error: HCI only works with force constants up to 6th order." << endl;
+                    cout.flush();
+                    exit(0);
+                }
+            }
+            else{break;}// break loop if you've reached element < eps, since all future elements will be smaller (HB sorting)
+        }
+    std::vector<WaveFunction> NewBasis;
+    for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
+    return NewBasis;
+}
+
+void InternalAddStatesHB(std::vector<WaveFunction> &BasisSet, HashedStates &HashedNewStates, std::vector<FConst> &AnharmHB, int n, double Cn, double eps){ // Expand basis via Heat Bath algorithm
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    for( WaveFunction& wfn : BasisSet){
+        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    }
+
+    for(unsigned int i=0; i<AnharmHB.size(); ++i){ // Loop over sorted force constants
+            if(abs(Cn*AnharmHB[i].fc) >= eps){ // States connected by fc will be added if |fc*Cn| >= eps
+                if(AnharmHB[i].QUnique.size()==1){ // Stupid way to enumerate new states from F_ij
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        if( a != 0){// Skip if no change
+                            WaveFunction tmp = BasisSet[n];
+                            tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                            if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                                HashedBasisInit.count(tmp) == 0
+                                    ){ //make sure a|0> = 0 and tmp does not exist in original basis
+                                HashedNewStates.insert(tmp); // add new state to set
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==2){ // Stupid way to enumerate new states from F_ij
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            if(abs(a)+abs(b) != 0){// Skip if no change
+                                WaveFunction tmp = BasisSet[n];
+                                tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                       tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0 && 
+                                                                       HashedBasisInit.count(tmp) == 0
+                                       ){ //make sure a|0> = 0
+                                    HashedNewStates.insert(tmp); // add new state to set
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==3){ // Stupid way to enumerate new states from F_ijk
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                if(abs(a)+abs(b)+abs(c) != 0){// Skip if no change
+                                    WaveFunction tmp = BasisSet[n];
+                                    tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                    tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                    tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                    if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                           tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                           tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                           HashedBasisInit.count(tmp) == 0
+                                           ){ //make sure a|0> = 0
+                                        HashedNewStates.insert(tmp); // add new state
+                                    }
+                                }      
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==4){ // Stupid way to enumerate new states from F_ijkl
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    if(abs(a)+abs(b)+abs(c)+abs(d) != 0){ // Skip if no change
+                                        WaveFunction tmp = BasisSet[n];
+                                        tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                        tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                        tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                        tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                        if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                               tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                               tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                               tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                               HashedBasisInit.count(tmp) == 0
+                                               ){ //make sure a|0> = 0
+                                            HashedNewStates.insert(tmp); // add new state
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }   
+                if(AnharmHB[i].QUnique.size()==5){ // Stupid way to enumerate new states from F_ijklm 
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    for( int f=-(AnharmHB[i].QPowers[4]); f<(AnharmHB[i].QPowers[4]+1); f+=2 ){
+                                        if(abs(a)+abs(b)+abs(c)+abs(d)+abs(f) != 0){ // Skip if no change
+                                            WaveFunction tmp = BasisSet[n];
+                                            tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                            tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                            tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                            tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                            tmp.Modes[AnharmHB[i].QUnique[4]].Quanta += f;
+                                            if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[4]].Quanta >=0 && 
+                                                   HashedBasisInit.count(tmp) == 0
+                                                   ){ //make sure a|0> = 0
+                                                HashedNewStates.insert(tmp); // add new state
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==6){ // Stupid way to enumerate new states from F_ijklmn 
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    for( int f=-(AnharmHB[i].QPowers[4]); f<(AnharmHB[i].QPowers[4]+1); f+=2 ){
+                                        for( int g=-(AnharmHB[i].QPowers[5]); g<(AnharmHB[i].QPowers[5]+1); g+=2 ){
+                                            if(abs(a)+abs(b)+abs(c)+abs(d)+abs(f)+abs(g) != 0){ // Skip if no change
+                                                WaveFunction tmp = BasisSet[n];
+                                                tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                                tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                                tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                                tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                                tmp.Modes[AnharmHB[i].QUnique[4]].Quanta += f;
+                                                tmp.Modes[AnharmHB[i].QUnique[5]].Quanta += g;
+                                                if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[4]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[5]].Quanta >=0 &&
+                                                                                                       HashedBasisInit.count(tmp) == 0
+                                                       ){ //make sure a|0> = 0
+                                                    HashedNewStates.insert(tmp); // add new state
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].fcpow.size() == 0 || AnharmHB[i].fcpow.size() > 6 ){
+                    //Print error message
+                    cout << "Error: HCI only works with force constants up to 6th order." << endl;
+                    cout.flush();
+                    exit(0);
+                }
+            }
+            else{break;}// break loop if you've reached element < eps, since all future elements will be smaller (HB sorting)
+        }
+}
+
 // Ham.cpp
 
 double AnharmPot(WaveFunction &Bn, WaveFunction &Bm, const FConst& fc)
@@ -760,8 +1078,6 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
         }
     }
 
-    std::cout << BasisSet.size() << std::endl;
-    
     for (unsigned int n = 0; n < N_opt; n++)
     {
         std::vector<WaveFunction> PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
@@ -883,24 +1199,10 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
     {
         // For each state, we determine the perturbative basis and populate the state with walkers.
         std::vector<WaveFunction> DetPTBasisSet;
-        std::vector<WaveFunction> PTBasisSet;
         if (SemiStochastic)
         {
-            std::vector<WaveFunction> VarDetBasisSet; // Actually I think this destructs outside of this if statement.
             DetPTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
-            for (const WaveFunction &WF : BasisSet) VarDetBasisSet.push_back(WF);
-            for (const WaveFunction &WF : DetPTBasisSet) VarDetBasisSet.push_back(WF);
-            PTBasisSet = AddStatesHB(VarDetBasisSet, AnharmHB, Evecs.col(n), PT2_Eps2);
-            std::cout << " Perturbative space for state " << n << " contains " << DetPTBasisSet.size() << " deterministic basis states and " << PTBasisSet.size() << " stochastic basis states." << std::endl;
-            // VarDetBasisSet.clear();
-            // VarDetBasisSet.shrink_to_fit(); // Clear memory, this entity doesn't really need to exist if we are careful with slicing, but I don't feel like doing that now.
-            // If I were feeling like it, I would store the original basis set size and just use the variational and deterministic parts together, like how JF used to do it, 
-            // and reset after each iteration.
-        }
-        else
-        {
-            PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
-            std::cout << " Perturbative space for state " << n << " contains " << PTBasisSet.size() << " stochastic basis states." << std::endl;
+            std::cout << "Perturbative space for state " << n << " contains " << DetPTBasisSet.size() << " deterministic basis states." << std::endl;
         }
 
         std::vector<double> Cn;
@@ -998,15 +1300,42 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
                 #pragma omp atomic // Will cause floating point error if blindly done in parallel
                 DeltaEDet[n] += pow(HaiCi, 2) / (Evals(n) - Ea);
             }
-        } // end variational calculation for semi-stochastic
+        } // end deterministic calculation for semi-stochastic
 
         std::vector<double> DeltaEs(Ns, 0.0);
+        int PTBasisSize = 0;
         #pragma omp parallel for
         for (unsigned int s = 0; s < Ns; s++)
         {
             std::vector<double> WalkerProbability = StateProbability(Cn);
             std::map<int, int> WalkerPopulation;
             FillWalkers(WalkerPopulation, WalkerProbability, Nd);
+
+            std::vector<WaveFunction> PTBasisSet;
+            HashedStates PTBasisSetHashed;
+            if (SemiStochastic)
+            {
+                std::vector<WaveFunction> VarDetBasisSet; // Actually I think this destructs outside of this if statement.
+                for (const WaveFunction &WF : BasisSet) VarDetBasisSet.push_back(WF);
+                for (const WaveFunction &WF : DetPTBasisSet) VarDetBasisSet.push_back(WF);
+                for (std::map<int, int>::iterator it = WalkerPopulation.begin(); it != WalkerPopulation.end(); ++it)
+                {
+                    int i = it->first;
+                    InternalAddStatesHB(VarDetBasisSet, PTBasisSetHashed, AnharmHB, i, Evecs(i, n), PT2_Eps2);
+                }
+            }
+            else
+            {
+                for (std::map<int, int>::iterator it = WalkerPopulation.begin(); it != WalkerPopulation.end(); ++it)
+                {
+                    int i = it->first;
+                    InternalAddStatesHB(BasisSet, PTBasisSetHashed, AnharmHB, i, Evecs(i, n), PT2_Eps);
+                }
+            }
+            for (const WaveFunction &WF : PTBasisSetHashed) PTBasisSet.push_back(WF);
+            PTBasisSetHashed = HashedStates();
+            PTBasisSize += PTBasisSet.size();
+            //std::cout << " Perturbative space for state " << n << " and sample " << s << " contains " << PTBasisSet.size() << " stochastic basis states." << std::endl;
 
             for (unsigned int a = 0; a < PTBasisSet.size(); a++)
             {
@@ -1102,6 +1431,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
             }
         }
         DeltaESample.push_back(DeltaEs);
+        std::cout << " Perturbative space for state " << n << " contains " << (float)PTBasisSize / (float)Ns << " stochastic basis states on average." << std::endl;
     }
 
     std::vector<double> SigmaDeltaE(N_opt, 0.0);
