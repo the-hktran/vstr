@@ -1447,7 +1447,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         if (SemiStochastic) DeltaE[n] += DeltaEDet[n];
         SigmaDeltaE[n] /= (Ns - 1);
         SigmaDeltaE[n] = sqrt(SigmaDeltaE[n]);
-        cout << DeltaE[n] << " " << SigmaDeltaE[n] << std::endl;
+        //cout << DeltaE[n] << " " << SigmaDeltaE[n] << std::endl;
     }
 
     return std::make_tuple(DeltaE, SigmaDeltaE);

@@ -1,6 +1,6 @@
 import numpy as np
 from vstr import utils
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst # classes from JF's code
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, HeatBath_Sort_FC, DoPT2, DoSPT2
 from functools import reduce
 import itertools
@@ -120,6 +120,28 @@ def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
         BasisWF.append(WF)
     return BasisWF
 
+def TranslateBasisToString(B):
+    BString = ""
+    for j, HO in enumerate(B.Modes):
+        if HO.Quanta == 1:
+            BString += 'w%d + ' % (j)
+        elif HO.Quanta > 1:
+            BString += '%dw%d + ' % (HO.Quanta, j)
+    return BString[:-3]
+
+def PrintResults(mVHCI):
+    if mVHCI.dE_PT2 is None:
+        FinalE = mVHCI.E_HCI
+    else:
+        FinalE = mVHCI.E_HCI_PT2
+    for n in range(FinalE.shape[0]):
+        MaxBasis = np.argmax(abs(mVHCI.C[:, n]))
+        BString = TranslateBasisToString(mVHCI.Basis[MaxBasis])
+        Outline = '{:.8f}\t'.format(FinalE[n])
+        if mVHCI.sE_PT2 is not None:
+            Outline += '+/- {:.8E}\t'.format(mVHCI.sE_PT2[n])
+        Outline += '\t%s' % (BString)
+        print(Outline)
             
 '''
 Class that handles VHCI
@@ -134,6 +156,7 @@ class VHCI:
     ScreenBasis = ScreenBasis
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
+    PrintResults = PrintResults
 
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, MaxTotalQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies # 1D array of all harmonic frequencies.
@@ -166,6 +189,8 @@ class VHCI:
         self.NStates = NStates
         self.NWalker = 200
         self.NSample = 50
+        self.dE_PT2 = None
+        self.sE_PT2 = None
 
         self.__dict__.update(kwargs)
 
@@ -192,9 +217,10 @@ if __name__ == "__main__":
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mVHCI.Diagonalize()
-    #mVHCI.HCI()
+    mVHCI.HCI()
     #print(mVHCI.E[:NStates])
     mVHCI.PT2(doStochastic = True)
     #print(mVHCI.E[:NStates])
-    print(mVHCI.dE_PT2)
-    print(mVHCI.E_HCI_PT2)
+    #print(mVHCI.dE_PT2)
+    #print(mVHCI.E_HCI_PT2)
+    mVHCI.PrintResults()
