@@ -949,12 +949,12 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
     return;
 };
 
-inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, bool MakeZeroth = true, bool MakeAnharm = true)
 {
     //Build the sparse CI Hamiltonian
     vector< Trip > HTrip;
-    ZerothHamSparse(HTrip, BasisSet, Frequencies);
-    AnharmHamSparse(HTrip, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    if (MakeZeroth) ZerothHamSparse(HTrip, BasisSet, Frequencies);
+    if (MakeAnharm) AnharmHamSparse(HTrip, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
     HSp.setFromTriplets(HTrip.begin(),HTrip.end());
     HSp.makeCompressed();
     HTrip = vector< Trip >(); // Free memory
