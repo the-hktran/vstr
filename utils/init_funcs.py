@@ -7,12 +7,14 @@ def FormW(V):
         Ws.append(W)
     return Ws
 
-def InitTruncatedBasis(NModes, MaxQuanta, MaxTotalQuanta = None):
+def InitTruncatedBasis(NModes, Frequencies, MaxQuanta, MaxTotalQuanta = None):
     Basis = []
     Bs = []
     B0 = [0] * NModes
     Bs.append(B0)
     Basis.append(B0)
+    if MaxTotalQuanta is None:
+        MaxTotalQuanta = max(MaxQuanta)
     for m in range(MaxTotalQuanta):
         BNext = []
         for B in Bs:
@@ -29,6 +31,6 @@ def InitTruncatedBasis(NModes, MaxQuanta, MaxTotalQuanta = None):
 
     BasisWF = []
     for B in Basis:
-        WF = WaveFunction(B, mVHCI.Frequencies)
+        WF = WaveFunction(B, Frequencies)
         BasisWF.append(WF)
     return BasisWF

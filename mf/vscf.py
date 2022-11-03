@@ -1,7 +1,6 @@
 import numpy as np
-from vstr.utils.init_functions import FormW, InitTruncatedBasis
-from vstr.cpp_wrappers.vstr_functions import GetVEff
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHam0V
+from vstr.utils.init_funcs import FormW, InitTruncatedBasis
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamV, GetVEffCPP
 
 def GetModalBasis(mVSCF, Mode, Quanta, MBasis = None):
     if MBasis is None:
@@ -21,7 +20,8 @@ def GetModalBasis(mVSCF, Mode, Quanta, MBasis = None):
             MB[N] = WF
     return MB
 
-def InitBasis(mVSCF)
+'''
+def InitBasis(mVSCF):
     B0 = [0] * mVSCF.NModes
     Basis = []
     Basis.append(B0)
@@ -29,25 +29,26 @@ def InitBasis(mVSCF)
         for n in range(mVSCF.MaxQuanta[N]):
             for B in Basis:
                 BC = B.copy()
-                B[N] = n
-                Basis.append(B)
+                BC[N] = n
+                Basis.append(BC)
     return Basis
+'''
 
-def InitModalBasis(mVSCF)
+def InitModalBasis(mVSCF):
     ModalBasis = []
     for N in range(mVSCF.NModes):
         MBasis = []
         for n in range(mVSCF.MaxQuanta[N]):
             B = [0] * mVSCF.NModes
             B[N] = n;
-            MBasis.append(B)
+            MBasis.append(WaveFunction(B, mVSCF.Frequencies))
         ModalBasis.append(MBasis)
     return ModalBasis
 
 def InitCs(mVSCF):
     Cs = []
     for Mode in range(mVSCF.NModes):
-        C = np.eye(mVSCF.MaxQuanta)
+        C = np.eye(mVSCF.MaxQuanta[Mode])
         Cs.append(C)
     return Cs
 
@@ -63,9 +64,9 @@ def GetModalSlices(mVSCF):
         BasisByMode = []
         for i in range(mVSCF.MaxQuanta[N]):
             BasisByModeByIndex = []
-            for B in mVSCF.Basis:
-                if B[N] == i
-                    BasisByModeByIndex.append(B)
+            for j, B in enumerate(mVSCF.Basis):
+                if B.Modes[N].Quanta == i:
+                    BasisByModeByIndex.append(j)
             BasisByMode.append(BasisByModeByIndex)
         ModalSlices.append(BasisByMode)
     return ModalSlices
@@ -73,7 +74,7 @@ def GetModalSlices(mVSCF):
 '''
 This function collects all the nonzero anharmonic terms, for each anharmonic force constant
 '''
-def MakeAnharmTensor(mVSCF)
+def MakeAnharmTensor(mVSCF):
     AnharmTensor = []
     for W in mVSCF.PotentialList:
         CubicFC = []
@@ -168,7 +169,7 @@ Takes stored anharmonic Hamiltonians and contracts it into the modal basis
 def GetVEff(mVSCF):
     return GetVEffCPP(mVSCF.AnharmTensor, mVSCF.Basis, mVSCF.Cs, mVSCF.ModalSlices, mVSCF.MaxQuanta, mVSCF.ModeOcc)
 
-def GetFock(mVSCF, hs = None, Cs = None)
+def GetFock(mVSCF, hs = None, Cs = None):
     if Cs is None:
         Cs = mVSCF.Cs
     if hs is None:
@@ -187,7 +188,7 @@ def StoreFock(mVSCF):
     # First, update the list of Fock and Error matrices
     mVSCF.AllFs.append(mVSCF.Fs)
     Errs = []
-    for Mode in mVSCF.NModes:
+    for Mode in range(mVSCF.NModes):
         Err = FockError(mVSCF.Fs[Mode], mVSCF.Cs[Mode])
         Errs.append(Err)
     mVSCF.AllErrs.append(Errs)
@@ -241,16 +242,23 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8):
     It = 1
     while(ConvErr > tol):
         ConvErr = mVSCF.SCFIteration(It, DoDIIS = DoDIIS)
-        print("VSCF Iteration %d complete with an SCF error of %f.6" % (It, ConvErr))
+        print("VSCF Iteration %d complete with an SCF error of %.10f" % (It, ConvErr))
         It += 1
 
 class VSCF:
-    InitBasis = InitBasis
     InitModalBasis = InitModalBasis
     InitCs = InitCs
     GetModalSlices = GetModalSlices
     MakeAnharmTensor = MakeAnharmTensor
     MakeHOHam = MakeHOHam
+   
+    GetHCore = GetHCore
+    GetVEff = GetVEff
+    GetFock = GetFock
+    StoreFock = StoreFock
+    DIISUpdate = DIISUpdate
+    SCF = SCF
+    SCFIteration = SCFIteration
 
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
@@ -265,9 +273,11 @@ class VSCF:
             self.PotentialList += Wp
 
         if isinstance(MaxQuanta, int):
-            MaxQuanta = [MaxQuanta] * self.NModes
+            self.MaxQuanta = [MaxQuanta] * self.NModes
+        else:
+            self.MaxQuanta = MaxQuanta
 
-        self.Basis = self.InitBasis()
+        self.Basis = InitTruncatedBasis(self.NModes, self.Frequencies, MaxQuanta)
         self.ModalBasis = self.InitModalBasis()
         self.ModalSlices = self.GetModalSlices()
         self.HamHO = self.MakeHOHam()
