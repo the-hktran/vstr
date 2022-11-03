@@ -1,43 +1,35 @@
 ====
-VHCI
+**V**ibrational **STR**ucture
 ====
 
-
-.. image:: https://img.shields.io/pypi/v/vhci.svg
-        :target: https://pypi.python.org/pypi/vhci
-
-.. image:: https://img.shields.io/travis/the-hktran/vhci.svg
-        :target: https://travis-ci.com/the-hktran/vhci
-
-.. image:: https://readthedocs.org/projects/vhci/badge/?version=latest
-        :target: https://vhci.readthedocs.io/en/latest/?version=latest
-        :alt: Documentation Status
-
-
-
-
-Vibrational structure theory methods based on heat bath CI
-
-
-* Free software: MIT license
-* Documentation: https://vhci.readthedocs.io.
+`vstr` is a Python-based package of vibrational structure methods based on advances in electronic structure theory.
 
 Dependencies
 --------
+# Python Dependencies
 * NumPy
 * SciPy
 * Pybind11
 * Eigen
 
+# C++ Dependencies
+* Eigen
+* Boost
+* Spectra
+
 Features
 --------
 
-* TODO
+* Vibrational Self-Consistent Field (VSCF)
+* Vibrational Heat-Bath Configuration Interaction (VHCI) in harmonic oscillator product bases and VSCF modal bases.
+* Epstein-Nesbet Pertubation Theory of Second Order on top of VHCI solutions (VHCI+PT2)
 
-Credits
+Author
 -------
 
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
+Written by Henry K. Tran (<hkt2112@columbia.edu>) based on code written by Jonathan H. Fetherolf at https://github.com/berkelbach-group/VHCI. 
 
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+Publications
+-------
+
+* VHCI and VHCI+PT2: Jonathan H. Fetherolf and Timothy C. Berkelbach, "Vibrational heat-bath configuration interaction", J. Chem. Phys. 154, 074104 (2021) https://doi.org/10.1063/5.0035454 
