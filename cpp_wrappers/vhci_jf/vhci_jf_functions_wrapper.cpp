@@ -27,9 +27,11 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     //m.def("DenseDiagonalizeCPP", DenseDiagonalizeCPP, "Forms and diagonalizes dense vibrational Hamiltonian");
     //m.def("SparseDiagonalizeCPP", SparseDiagonalizeCPP, "Forms and diagonalizes sparse virbational Hamiltonian");
     m.def("GenerateHamV", GenerateHamV, "Forms dense vibrational Hamiltonian");
+    m.def("GenerateHam0V", GenerateHam0V, "Forms dense zeroth order vibrational Hamiltonian");
     m.def("GenerateSparseHamV", GenerateSparseHamV, "Forms sparse vibrational Hamiltonian");
     m.def("AddStatesHB", AddStatesHB, "Screens for states above the HB threshold");
     m.def("HeatBath_Sort_FC", HeatBath_Sort_FC, "Sorts the force constants from highest to lowest");
     m.def("DoPT2", DoPT2, "Runs PT2 corrections");
     m.def("DoSPT2", DoSPT2, "Runs SPT2 corrections");
+    m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode.");
 }
