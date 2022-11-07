@@ -1,4 +1,5 @@
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
+import itertools
 
 def FormW(V):
     Ws = []
@@ -34,3 +35,15 @@ def InitTruncatedBasis(NModes, Frequencies, MaxQuanta, MaxTotalQuanta = None):
         WF = WaveFunction(B, Frequencies)
         BasisWF.append(WF)
     return BasisWF
+
+def InitGridBasis(Frequencies, MaxQuanta):
+    QuantaList = []
+    for n in MaxQuanta:
+        QuantaList.append(list(range(n)))
+    BasisList = list(itertools.product(*QuantaList))
+    Basis = []
+    print("Initial basis functions are:\n", BasisList)
+
+    for B in BasisList:
+        Basis.append(WaveFunction(B, Frequencies))
+    return Basis

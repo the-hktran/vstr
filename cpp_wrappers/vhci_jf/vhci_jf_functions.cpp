@@ -897,11 +897,14 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
                     }
                 }
                 #pragma omp critical
-                if(i==j){
-                    HTrip.push_back(Trip(i,j,Vij/2.)); // Dividing by 2 so I can do H=H+H*
+                if (abs(Vij) > 1e-12)
+                {
+                    if(i==j){
+                        HTrip.push_back(Trip(i,j,Vij/2.)); // Dividing by 2 so I can do H=H+H*
 
-                }else{
-                    HTrip.push_back(Trip(i,j,Vij)); // Exploiting Hermiticity (Hij=Hji)
+                    }else{
+                        HTrip.push_back(Trip(i,j,Vij)); // Exploiting Hermiticity (Hij=Hji)
+                    }
                 }
             }
             if(qdiff <= fcmax-1 && mchange <= fcmax-1 && qdiff%2==1){
@@ -937,11 +940,14 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
                     }
                 }
                 #pragma omp critical
-                if(i==j){
-                    HTrip.push_back(Trip(i,j,Vij/2.)); // Dividing by 2 so I can do H=H+H*
+                if (abs(Vij) > 1e-12)
+                {
+                    if(i==j){
+                        HTrip.push_back(Trip(i,j,Vij/2.)); // Dividing by 2 so I can do H=H+H*
 
-                }else{
-                    HTrip.push_back(Trip(i,j,Vij)); // Exploiting Hermiticity (Hij=Hji)
+                    }else{
+                        HTrip.push_back(Trip(i,j,Vij)); // Exploiting Hermiticity (Hij=Hji)
+                    }
                 }
             }
         }
@@ -949,7 +955,7 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
     return;
 };
 
-inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, bool MakeZeroth = true, bool MakeAnharm = true)
+inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, bool MakeZeroth, bool MakeAnharm)
 {
     //Build the sparse CI Hamiltonian
     vector< Trip > HTrip;
@@ -979,7 +985,7 @@ inline void MakeHamDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet
 std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, int NEig)
 {
     SpMat H(BasisSet.size(), BasisSet.size());
-    MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC, true, true);
     typedef SparseSymMatProd<double,Eigen::Lower,0,ptrdiff_t> SparseMVProd;
     SparseMVProd op(H);
     // Construct eigen solver object, requesting the largest three eigenvalues
@@ -1036,7 +1042,14 @@ Eigen::MatrixXd GenerateHam0V(std::vector<WaveFunction> &BasisSet, std::vector<d
 SpMat GenerateSparseHamV(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
     SpMat H(BasisSet.size(), BasisSet.size());
-    MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC, true, true);
+    return H;
+}
+
+SpMat GenerateSparseHamAnharmV(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    SpMat H(BasisSet.size(), BasisSet.size());
+    MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC, false, true);
     return H;
 }
 

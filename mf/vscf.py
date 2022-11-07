@@ -1,6 +1,6 @@
 import numpy as np
-from vstr.utils.init_funcs import FormW, InitTruncatedBasis
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamV, GetVEffCPP
+from vstr.utils.init_funcs import FormW, InitTruncatedBasis, InitGridBasis
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP
 
 def GetModalBasis(mVSCF, Mode, Quanta, MBasis = None):
     if MBasis is None:
@@ -89,7 +89,8 @@ def MakeAnharmTensor(mVSCF):
             QuinticFC.append(W)
         elif W.Order == 6:
             SexticFC.append(W)
-        H = GenerateSparseHamV(mVSCF.Basis, mVSCF.Frequencies, mVSCF.PotentialList, CubicFC, QuarticFC, QuinticFC, SexticFC)
+        H = GenerateSparseHamAnharmV(mVSCF.Basis, mVSCF.Frequencies, mVSCF.PotentialList, CubicFC, QuarticFC, QuinticFC, SexticFC)
+        print(H)
         AnharmTensor.append(H)
     return AnharmTensor
 
@@ -175,7 +176,10 @@ def GetFock(mVSCF, hs = None, Cs = None):
     if hs is None:
         hs = mVSCF.GetHCore(Cs = Cs)
 
+    print(mVSCF.Cs)
     Vs = mVSCF.GetVEff()
+    print(Vs)
+    print(diieie)
     Fs = []
     for Mode in range(mVSCF.NModes):
         Fs.append(hs[Mode] + Vs[Mode])
@@ -199,7 +203,7 @@ def StoreFock(mVSCF):
         mVSCF.AllErrs = mVSCF.AllErrs[-mVSCF.DIISSpace:]
                 
 def DIISUpdate(mVSCF):
-    for Mode in range(mVHCI.NModes):
+    for Mode in range(mVSCF.NModes):
         B = np.ones((mVSCF.DIISSpace + 1, mVSCF.DIISSpace + 1))
         for i in range(mVSCF.DIISSpace):
             for j in range(mVSCF.DIISSpace):
@@ -220,7 +224,7 @@ def SCFIteration(mVSCF, It, DoDIIS = True):
     if DoDIIS:
         mVSCF.StoreFock()
         if It > mVSCF.DIISStart:
-            mVSCF.DIISUpdate(mVSCF) # Replaces Fock matrices with DIIS updated fock matrices
+            mVSCF.DIISUpdate() # Replaces Fock matrices with DIIS updated fock matrices
     COld = mVSCF.Cs.copy()
     mVSCF.Cs = []
     mVSCF.Es = []
@@ -230,7 +234,7 @@ def SCFIteration(mVSCF, It, DoDIIS = True):
         mVSCF.Cs.append(C)
     SCFErr = 0.0
     for Mode in range(mVSCF.NModes):
-        SCFErr = ((COld[Mode] - mVSCF.Cs[Mode])**2).sum()
+        SCFErr = ((abs(COld[Mode]) - abs(mVSCF.Cs[Mode]))**2).sum()
     return SCFErr
 
 def SCF(mVSCF, DoDIIS = True, tol = 1e-8):
@@ -242,8 +246,10 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8):
     It = 1
     while(ConvErr > tol):
         ConvErr = mVSCF.SCFIteration(It, DoDIIS = DoDIIS)
-        print("VSCF Iteration %d complete with an SCF error of %.10f" % (It, ConvErr))
+        print("VSCF Iteration %d complete with an SCF error of %.12f" % (It, ConvErr))
         It += 1
+        if It > mVSCF.MaxIterations:
+            raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
 
 class VSCF:
     InitModalBasis = InitModalBasis
@@ -277,7 +283,7 @@ class VSCF:
         else:
             self.MaxQuanta = MaxQuanta
 
-        self.Basis = InitTruncatedBasis(self.NModes, self.Frequencies, MaxQuanta)
+        self.Basis = InitGridBasis(self.Frequencies, MaxQuanta)
         self.ModalBasis = self.InitModalBasis()
         self.ModalSlices = self.GetModalSlices()
         self.HamHO = self.MakeHOHam()
@@ -293,6 +299,6 @@ class VSCF:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.SCF()
