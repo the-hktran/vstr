@@ -90,7 +90,6 @@ def MakeAnharmTensor(mVSCF):
         elif W.Order == 6:
             SexticFC.append(W)
         H = GenerateSparseHamAnharmV(mVSCF.Basis, mVSCF.Frequencies, mVSCF.PotentialList, CubicFC, QuarticFC, QuinticFC, SexticFC)
-        print(H)
         AnharmTensor.append(H)
     return AnharmTensor
 
@@ -176,10 +175,7 @@ def GetFock(mVSCF, hs = None, Cs = None):
     if hs is None:
         hs = mVSCF.GetHCore(Cs = Cs)
 
-    print(mVSCF.Cs)
     Vs = mVSCF.GetVEff()
-    print(Vs)
-    print(diieie)
     Fs = []
     for Mode in range(mVSCF.NModes):
         Fs.append(hs[Mode] + Vs[Mode])
@@ -299,6 +295,6 @@ class VSCF:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('ethylene_oxide.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.SCF()

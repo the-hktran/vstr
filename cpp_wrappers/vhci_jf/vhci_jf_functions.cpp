@@ -1460,13 +1460,19 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         for (unsigned int s = 0; s < Ns; s++)
         {
             DeltaE[n] += DeltaESample[n][s];
-            SigmaDeltaE[n] += pow(DeltaESample[n][s], 2);
+            //SigmaDeltaE[n] += pow(DeltaESample[n][s], 2);
         }
-        SigmaDeltaE[n] -= (pow(DeltaE[n], 2) / Ns);
+        //SigmaDeltaE[n] -= (pow(DeltaE[n], 2) / Ns);
         DeltaE[n] /= Ns;
+        std::cout << setprecision(12);
+        for (unsigned int s = 0; s < Ns; s++)
+        {
+            SigmaDeltaE[n] += pow(DeltaESample[n][s] - DeltaE[n], 2);
+        }
         if (SemiStochastic) DeltaE[n] += DeltaEDet[n];
         SigmaDeltaE[n] /= (Ns - 1);
-        SigmaDeltaE[n] = sqrt(SigmaDeltaE[n]);
+        SigmaDeltaE[n] = sqrt(SigmaDeltaE[n]); // This is sample standard deviation
+        SigmaDeltaE[n] /= sqrt(Ns); // This is standard error
         //cout << DeltaE[n] << " " << SigmaDeltaE[n] << std::endl;
     }
 
