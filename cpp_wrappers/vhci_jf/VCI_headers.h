@@ -44,6 +44,7 @@ Headers, libraries, and data structures for VHCI
 #include <Spectra/MatOp/SparseSymMatProd.h>
 #include <boost/functional/hash.hpp>
 #include <numeric>
+#include <random>
 
 //Set namespaces for common libraries
 using namespace Eigen;
