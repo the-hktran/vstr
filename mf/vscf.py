@@ -146,8 +146,11 @@ def MakeHOHam(mVSCF, ModalBasis = None):
         ModalBasis = mVSCF.ModalBasis
     HamHO = []
     for Mode in range(mVSCF.NModes):
-        hM = GenerateHam0V(ModalBasis[Mode], mVSCF.Frequencies)
+        hM = np.zeros((mVSCF.MaxQuanta[Mode], mVSCF.MaxQuanta[Mode]))
+        for i in range(mVSCF.MaxQuanta[Mode]):
+            hM[i, i] = (i + 0.5) * mVSCF.Frequencies[Mode]
         HamHO.append(hM)
+        print(hM)
     return HamHO
 
 '''
@@ -163,19 +166,35 @@ def GetHCore(mVSCF, Cs = None, HamHO = None):
         hs.append(Cs[Mode].T @ HamHO[Mode] @ Cs[Mode])
     return hs
 
+def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
+    if ModeOcc is None:
+        ModeOcc = mVSCF.ModeOcc
+    if V0 is None:
+        V0 = mVSCF.GetVEff(ModeOcc = ModeOcc, FirstV = True)[0]
+    DC = (mVSCF.Cs[0][:, ModeOcc[0]].T @ V0 @ mVSCF.Cs[0][:, ModeOcc[0]])
+    E_SCF = 0.0
+    for Mode, E in enumerate(mVSCF.Es):
+        E_SCF += E[ModeOcc[Mode]]
+    return E_SCF - DC
+
 '''
 Takes stored anharmonic Hamiltonians and contracts it into the modal basis
 '''
-def GetVEff(mVSCF):
-    return GetVEffCPP(mVSCF.AnharmTensor, mVSCF.Basis, mVSCF.Cs, mVSCF.ModalSlices, mVSCF.MaxQuanta, mVSCF.ModeOcc)
+def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
+    if ModeOcc is None:
+        ModeOcc = mVSCF.ModeOcc
+    return GetVEffCPP(mVSCF.AnharmTensor, mVSCF.Basis, mVSCF.Cs, mVSCF.ModalSlices, mVSCF.MaxQuanta, ModeOcc, FirstV)
 
-def GetFock(mVSCF, hs = None, Cs = None):
+def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
     if Cs is None:
         Cs = mVSCF.Cs
     if hs is None:
-        hs = mVSCF.GetHCore(Cs = Cs)
+        hs = mVSCF.HamHO
 
     Vs = mVSCF.GetVEff()
+    # Save the double counting term while we have the effective potentials
+    if CalcE:
+        mVSCF.ESCF = mVSCF.CalcESCF(ModeOcc = mVSCF.ModeOcc, V0 = Vs[0])
     Fs = []
     for Mode in range(mVSCF.NModes):
         Fs.append(hs[Mode] + Vs[Mode])
@@ -216,7 +235,8 @@ def DIISUpdate(mVSCF):
         
 
 def SCFIteration(mVSCF, It, DoDIIS = True):
-    mVSCF.Fs = mVSCF.GetFock()
+    mVSCF.Fs = mVSCF.GetFock(CalcE = (It > 1))
+    print(mVSCF.ESCF)
     if DoDIIS:
         mVSCF.StoreFock()
         if It > mVSCF.DIISStart:
@@ -228,6 +248,7 @@ def SCFIteration(mVSCF, It, DoDIIS = True):
         E, C = np.linalg.eigh(F)
         mVSCF.Es.append(E)
         mVSCF.Cs.append(C)
+        print(C)
     SCFErr = 0.0
     for Mode in range(mVSCF.NModes):
         SCFErr = ((abs(COld[Mode]) - abs(mVSCF.Cs[Mode]))**2).sum()
@@ -261,6 +282,7 @@ class VSCF:
     DIISUpdate = DIISUpdate
     SCF = SCF
     SCFIteration = SCFIteration
+    CalcESCF = CalcESCF
 
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
@@ -286,8 +308,9 @@ class VSCF:
         self.AnharmTensor = self.MakeAnharmTensor()
         self.Cs = self.InitCs()
         self.ModeOcc = [0] * self.NModes
+        self.ESCF = 0.0
 
-        self.DoDIIS = True
+        self.DoDIIS = False 
         self.DIISSpace = 5
         self.DIISStart = 10
         self.MaxIterations = 1000
@@ -295,6 +318,7 @@ class VSCF:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('ethylene_oxide.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
-    mf.SCF()
+    mf.SCF(DoDIIS = False)
+    print(mf.CalcESCF())
