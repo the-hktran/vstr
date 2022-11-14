@@ -46,4 +46,4 @@ def InitGridBasis(Frequencies, MaxQuanta):
 
     for B in BasisList:
         Basis.append(WaveFunction(B, Frequencies))
-    return Basis
+    return Basis, BasisList

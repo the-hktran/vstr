@@ -271,6 +271,23 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
 
+def PrintResults(mVSCF):
+    FinalE = []
+    for B in mVSCF.BasisList:
+        FinalE.append(mVSCF.CalcESCF(ModeOcc = B))
+    SortedInd = np.argsort(np.asarray(FinalE))
+    for i in SortedInd:
+        OutLine = '{:.8f}\t'.format(FinalE[i])
+        ModeLabel = ""
+        for j, n in enumerate(mVSCF.BasisList[i]):
+            if n > 1:
+                ModeLabel += str(n)
+            if n > 0:
+                ModeLabel += 'w{} + '.format(j)
+        ModeLabel = ModeLabel[:-3]
+        OutLine += ModeLabel
+        print(OutLine)
+
 class VSCF:
     InitModalBasis = InitModalBasis
     InitCs = InitCs
@@ -286,6 +303,8 @@ class VSCF:
     SCF = SCF
     SCFIteration = SCFIteration
     CalcESCF = CalcESCF
+
+    PrintResults = PrintResults
 
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
@@ -304,7 +323,7 @@ class VSCF:
         else:
             self.MaxQuanta = MaxQuanta
 
-        self.Basis = InitGridBasis(self.Frequencies, MaxQuanta)
+        self.Basis, self.BasisList = InitGridBasis(self.Frequencies, MaxQuanta)
         self.ModalBasis = self.InitModalBasis()
         self.ModalSlices = self.GetModalSlices()
         self.HamHO = self.MakeHOHam()
@@ -325,3 +344,4 @@ if __name__ == "__main__":
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
+    mf.PrintResults()
