@@ -150,7 +150,6 @@ def MakeHOHam(mVSCF, ModalBasis = None):
         for i in range(mVSCF.MaxQuanta[Mode]):
             hM[i, i] = (i + 0.5) * mVSCF.Frequencies[Mode]
         HamHO.append(hM)
-        print(hM)
     return HamHO
 
 '''
@@ -235,8 +234,7 @@ def DIISUpdate(mVSCF):
         
 
 def SCFIteration(mVSCF, It, DoDIIS = True):
-    mVSCF.Fs = mVSCF.GetFock(CalcE = (It > 1))
-    print(mVSCF.ESCF)
+    mVSCF.Fs = mVSCF.GetFock(CalcE = True)
     if DoDIIS:
         mVSCF.StoreFock()
         if It > mVSCF.DIISStart:
@@ -248,22 +246,27 @@ def SCFIteration(mVSCF, It, DoDIIS = True):
         E, C = np.linalg.eigh(F)
         mVSCF.Es.append(E)
         mVSCF.Cs.append(C)
-        print(C)
     SCFErr = 0.0
     for Mode in range(mVSCF.NModes):
         SCFErr = ((abs(COld[Mode]) - abs(mVSCF.Cs[Mode]))**2).sum()
     return SCFErr
 
-def SCF(mVSCF, DoDIIS = True, tol = 1e-8):
+def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
     if DoDIIS:
         mVSCF.AllFs = []
         mVSCF.AllErrs = []
 
+    mVSCF.Es = []
+    for HHO in mVSCF.HamHO:
+        mVSCF.Es.append(np.diag(HHO))
     ConvErr = 1
     It = 1
-    while(ConvErr > tol):
+    EnergyErr = 1
+    while(ConvErr > tol or EnergyErr > etol):
+        EnergyErr = mVSCF.ESCF
         ConvErr = mVSCF.SCFIteration(It, DoDIIS = DoDIIS)
-        print("VSCF Iteration %d complete with an SCF error of %.12f" % (It, ConvErr))
+        EnergyErr = abs(EnergyErr - mVSCF.ESCF)
+        print("VSCF Iteration %d complete with an SCF error of %.12f/%.12f and SCF Energy of %.6f" % (It, ConvErr, EnergyErr, mVSCF.ESCF))
         It += 1
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
@@ -320,5 +323,5 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
-    mf.SCF(DoDIIS = False)
+    mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
