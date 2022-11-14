@@ -42,7 +42,6 @@ def InitGridBasis(Frequencies, MaxQuanta):
         QuantaList.append(list(range(n)))
     BasisList = list(itertools.product(*QuantaList))
     Basis = []
-    print("Initial basis functions are:\n", BasisList)
 
     for B in BasisList:
         Basis.append(WaveFunction(B, Frequencies))
