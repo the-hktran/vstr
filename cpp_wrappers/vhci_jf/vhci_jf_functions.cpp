@@ -1492,6 +1492,7 @@ std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>>
     for (unsigned int Mode = 0; Mode < NModes; Mode++)
     {
         Eigen::MatrixXd V = Eigen::MatrixXd::Zero(MaxQuanta[Mode], MaxQuanta[Mode]);
+        #pragma omp parallel for
         for (unsigned int n = 0; n < MaxQuanta[Mode]; n++)
         {
             for (unsigned int m = n; m < MaxQuanta[Mode]; m++)
