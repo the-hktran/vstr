@@ -174,7 +174,7 @@ def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
     E_SCF = 0.0
     for Mode, E in enumerate(mVSCF.Es):
         E_SCF += E[ModeOcc[Mode]]
-    return E_SCF - DC
+    return E_SCF - (mVSCF.NModes - 1) * DC
 
 '''
 Takes stored anharmonic Hamiltonians and contracts it into the modal basis
