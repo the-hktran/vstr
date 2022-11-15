@@ -1526,14 +1526,14 @@ std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>>
                                     {
                                         if (a != Mode)
                                         {
-                                            CVC *= CByModes[a](BraModeBasis[a], ModeOcc[Mode]);
+                                            CVC *= CByModes[a](BraModeBasis[a], ModeOcc[a]);
                                         }
                                     }
                                     for (unsigned int a = 0; a < KetModeBasis.size(); a++)
                                     {
                                         if (a != Mode)
                                         {
-                                            CVC *= CByModes[a](KetModeBasis[a], ModeOcc[Mode]);
+                                            CVC *= CByModes[a](KetModeBasis[a], ModeOcc[a]);
                                         }
                                     }
                                     Vnm += CVC;
