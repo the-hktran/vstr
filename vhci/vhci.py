@@ -124,10 +124,30 @@ def TranslateBasisToString(B):
     BString = ""
     for j, HO in enumerate(B.Modes):
         if HO.Quanta == 1:
-            BString += 'w%d + ' % (j)
+            BString += 'w%d + ' % (j + 1)
         elif HO.Quanta > 1:
-            BString += '%dw%d + ' % (HO.Quanta, j)
+            BString += '%dw%d + ' % (HO.Quanta, j + 1)
     return BString[:-3]
+
+'''
+This function prints the linear combination of the most important product states
+'''
+def LCLine(mVHCI, n, thr = 1e-6):
+    def BasisToString(B):
+        BString = '|'
+        for HO in B.Modes:
+            BString += str(HO.Quanta)
+        BString += '>'
+        return BString
+    
+    LC = ''
+    for i in range(mVHCI.C.shape[0]):
+        if abs(mVHCI.C[i, n]) > thr:
+            LC += str(mVHCI.C[i, n])
+            LC += BasisToString(mVHCI.Basis[i])
+            LC += ' + '
+    return LC[:-3]
+    
 
 def PrintResults(mVHCI):
     if mVHCI.dE_PT2 is None:
@@ -141,6 +161,8 @@ def PrintResults(mVHCI):
         if mVHCI.sE_PT2 is not None:
             Outline += '+/- {:.8E}\t'.format(mVHCI.sE_PT2[n])
         Outline += '\t%s' % (BString)
+        LCString = mVHCI.LCLine(n)
+        Outline += '\t%s' % (LCString)
         print(Outline)
             
 '''
@@ -157,6 +179,7 @@ class VHCI:
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
     PrintResults = PrintResults
+    LCLine = LCLine
 
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, MaxTotalQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies # 1D array of all harmonic frequencies.
@@ -219,7 +242,7 @@ if __name__ == "__main__":
     mVHCI.Diagonalize()
     mVHCI.HCI()
     #print(mVHCI.E[:NStates])
-    mVHCI.PT2(doStochastic = True)
+    #mVHCI.PT2(doStochastic = True)
     #print(mVHCI.E[:NStates])
     #print(mVHCI.dE_PT2)
     #print(mVHCI.E_HCI_PT2)

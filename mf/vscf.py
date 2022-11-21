@@ -170,6 +170,7 @@ def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
         ModeOcc = mVSCF.ModeOcc
     if V0 is None:
         V0 = mVSCF.GetVEff(ModeOcc = ModeOcc, FirstV = True)[0]
+    
     DC = (mVSCF.Cs[0][:, ModeOcc[0]].T @ V0 @ mVSCF.Cs[0][:, ModeOcc[0]])
     E_SCF = 0.0
     for Mode, E in enumerate(mVSCF.Es):
@@ -271,6 +272,25 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
 
+def LCLine(mVSCF, ModeOcc, thr = 1e-6):
+    def BasisToString(B):
+        BString = '|'
+        for Q in B:
+            BString += str(Q)
+        BString += '>'
+        return BString
+
+    LC = ''
+    for B in mVSCF.BasisList:
+        Coeff = 1.0
+        for i, n in enumerate(B):
+            Coeff *= mVSCF.Cs[i][n, ModeOcc[i]]
+            if abs(Coeff) < thr:
+                break
+        if abs(Coeff) > thr:
+            LC += str(Coeff) + BasisToString(B) + ' + '
+    return LC[:-3]
+	
 def PrintResults(mVSCF):
     FinalE = []
     for B in mVSCF.BasisList:
@@ -283,9 +303,11 @@ def PrintResults(mVSCF):
             if n > 1:
                 ModeLabel += str(n)
             if n > 0:
-                ModeLabel += 'w{} + '.format(j)
+                ModeLabel += 'w{} + '.format(j + 1)
         ModeLabel = ModeLabel[:-3]
         OutLine += ModeLabel
+        LCString = mVSCF.LCLine(mVSCF.BasisList[i])
+        OutLine += '\t%s' % (LCString)
         print(OutLine)
 
 class VSCF:
@@ -305,7 +327,7 @@ class VSCF:
     CalcESCF = CalcESCF
 
     PrintResults = PrintResults
-
+    LCLine = LCLine
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
@@ -341,7 +363,7 @@ class VSCF:
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, ModeOcc = [0, 1, 0])
     mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
     mf.PrintResults()
