@@ -272,7 +272,7 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
 
-def LCLine(mVSCF, ModeOcc, thr = 1e-6):
+def LCLine(mVSCF, ModeOcc, thr = 1e-2):
     def BasisToString(B):
         BString = '|'
         for Q in B:
@@ -291,11 +291,15 @@ def LCLine(mVSCF, ModeOcc, thr = 1e-6):
             LC += str(Coeff) + BasisToString(B) + ' + '
     return LC[:-3]
 	
-def PrintResults(mVSCF):
+def PrintResults(mVSCF, NStates = None):
     FinalE = []
     for B in mVSCF.BasisList:
         FinalE.append(mVSCF.CalcESCF(ModeOcc = B))
     SortedInd = np.argsort(np.asarray(FinalE))
+    
+    if NStates is None:
+        NStates = SortedInd.shape[0]
+    Count = 0
     for i in SortedInd:
         OutLine = '{:.8f}\t'.format(FinalE[i])
         ModeLabel = ""
@@ -309,6 +313,9 @@ def PrintResults(mVSCF):
         LCString = mVSCF.LCLine(mVSCF.BasisList[i])
         OutLine += '\t%s' % (LCString)
         print(OutLine)
+        Count += 1
+        if Count > NStates - 1:
+            break
 
 class VSCF:
     InitModalBasis = InitModalBasis
@@ -366,4 +373,4 @@ if __name__ == "__main__":
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, ModeOcc = [0, 1, 0])
     mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
-    mf.PrintResults()
+    mf.PrintResults(NStates = 5)
