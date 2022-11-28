@@ -197,7 +197,7 @@ def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
     if ModeOcc is None:
         ModeOcc = mVSCF.ModeOcc
     if V0 is None:
-        if mVSCF.SLOW:
+        if mVSCF.SlowV:
             V0 = mVSCF.GetVEffSLOW(ModeOcc = ModeOcc, FirstV = True)[0]
         else:
             V0 = mVSCF.GetVEff(ModeOcc = ModeOcc, FirstV = True)[0]
@@ -271,7 +271,7 @@ def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
     if hs is None:
         hs = mVSCF.HamHO
 
-    if mVSCF.SLOW:
+    if mVSCF.SlowV:
         Vs = mVSCF.GetVEffSLOW()
     else:
         Vs = mVSCF.GetVEff()
@@ -421,7 +421,7 @@ class VSCF:
 
     PrintResults = PrintResults
     LCLine = LCLine
-    def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, SLOW = True, **kwargs):
+    def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, SlowV = False, **kwargs):
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
 
@@ -442,8 +442,8 @@ class VSCF:
         self.ModalBasis = self.InitModalBasis()
         self.ModalSlices = self.GetModalSlices()
         self.HamHO = self.MakeHOHam()
-        self.SLOW = SLOW
-        if self.SLOW:
+        self.SlowV = SlowV
+        if self.SlowV:
             self.AnharmTensor = self.MakeAnharmTensorSLOW()
         else:
             self.AnharmTensor, self.RestrictedBases, self.QUniques = self.MakeAnharmTensor()
@@ -460,7 +460,7 @@ class VSCF:
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SLOW = False, ModeOcc = [0, 0, 0])
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
     mf.PrintResults(NStates = 5)
