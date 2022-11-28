@@ -2,49 +2,6 @@ import numpy as np
 from vstr.utils.init_funcs import FormW, InitTruncatedBasis, InitGridBasis
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP, MakeCTensorCPP, GetVEffFASTCPP
 
-def GetModalBasis(mVSCF, Mode, Quanta, MBasis = None):
-    if MBasis is None:
-        MB = []
-        for n in range(self.NModes):
-            if n != Mode:
-                for i in range(mVSCF.MaxQuanta[n]):
-                    B = [0] * self.NModes
-                    B[n] = i;
-                    B[Mode] = Quanta
-                    WF = WaveFunction(B, mVSCF.Frequencies)
-                    MB.append(WF)
-    else:
-        MB = MBasis.copy()
-        for N, WF in enumerate(MB):
-            WF.Modes[Mode].Quanta = Quanta
-            MB[N] = WF
-    return MB
-
-'''
-def InitBasis(mVSCF):
-    B0 = [0] * mVSCF.NModes
-    Basis = []
-    Basis.append(B0)
-    for N in range(mVSCF.NModes):
-        for n in range(mVSCF.MaxQuanta[N]):
-            for B in Basis:
-                BC = B.copy()
-                BC[N] = n
-                Basis.append(BC)
-    return Basis
-'''
-
-def InitModalBasis(mVSCF):
-    ModalBasis = []
-    for N in range(mVSCF.NModes):
-        MBasis = []
-        for n in range(mVSCF.MaxQuanta[N]):
-            B = [0] * mVSCF.NModes
-            B[N] = n;
-            MBasis.append(WaveFunction(B, mVSCF.Frequencies))
-        ModalBasis.append(MBasis)
-    return ModalBasis
-
 def InitCs(mVSCF):
     Cs = []
     for Mode in range(mVSCF.NModes):
@@ -169,9 +126,7 @@ Forms the Harmonic Oscillator Hamiltonian for each mode. This plays the role of
 the one electron integrals in electronic structure. This is stored and is later
 used to form the contracted "h" part of the Fock matrix.
 '''
-def MakeHOHam(mVSCF, ModalBasis = None):
-    if ModalBasis is None:
-        ModalBasis = mVSCF.ModalBasis
+def MakeHOHam(mVSCF):
     HamHO = []
     for Mode in range(mVSCF.NModes):
         hM = np.zeros((mVSCF.MaxQuanta[Mode], mVSCF.MaxQuanta[Mode]))
@@ -374,16 +329,39 @@ def LCLine(mVSCF, ModeOcc, thr = 1e-2):
         if abs(Coeff) > thr:
             LC += str(Coeff) + BasisToString(B) + ' + '
     return LC[:-3]
-	
+
+def LowestStates(mVSCF, NStates):
+    LStates = []
+    LStates.append([0] * mVSCF.NModes)
+    EMax = np.sum([mVSCF.MaxQuanta[i] * e for i, e in enumerate(mVSCF.Frequencies)])
+    for n in range(NStates):
+        NextMode = 0
+        EOld = EMax.copy()
+        for B in LStates:
+            for m in range(mVSCF.NModes):
+                BTestIncr = B.copy()
+                BTestIncr[m] += 1
+                if BTestIncr in LStates:
+                    continue
+                E = np.sum([BTestIncr[i] * e for i, e in enumerate(mVSCF.Frequencies)])
+                if E < EOld:
+                    NextMode = m
+                    BSave = B.copy()
+                    EOld = E.copy()
+        BSave[NextMode] += 1
+        LStates.append(BSave)
+    return LStates
+
+
 def PrintResults(mVSCF, NStates = None):
     FinalE = []
-    for B in mVSCF.BasisList:
+    if NStates is None:
+        NStates = np.prod(mVSCF.MaxQuanta)
+    EnergyBList = mVSCF.LowestStates(NStates)
+    for B in  EnergyBList:
         FinalE.append(mVSCF.CalcESCF(ModeOcc = B))
     SortedInd = np.argsort(np.asarray(FinalE))
     
-    if NStates is None:
-        NStates = SortedInd.shape[0]
-    Count = 0
     for i in SortedInd:
         OutLine = '{:.8f}\t'.format(FinalE[i])
         ModeLabel = ""
@@ -397,12 +375,8 @@ def PrintResults(mVSCF, NStates = None):
         LCString = mVSCF.LCLine(mVSCF.BasisList[i])
         OutLine += '\t%s' % (LCString)
         print(OutLine)
-        Count += 1
-        if Count > NStates - 1:
-            break
 
 class VSCF:
-    InitModalBasis = InitModalBasis
     InitCs = InitCs
     GetModalSlices = GetModalSlices
     MakeAnharmTensor = MakeAnharmTensor
@@ -417,6 +391,7 @@ class VSCF:
     DIISUpdate = DIISUpdate
     SCF = SCF
     SCFIteration = SCFIteration
+    LowestStates = LowestStates
     CalcESCF = CalcESCF
 
     PrintResults = PrintResults
@@ -438,11 +413,11 @@ class VSCF:
         else:
             self.MaxQuanta = MaxQuanta
 
-        self.Basis, self.BasisList = InitGridBasis(self.Frequencies, MaxQuanta)
-        self.ModalBasis = self.InitModalBasis()
-        self.ModalSlices = self.GetModalSlices()
-        self.HamHO = self.MakeHOHam()
         self.SlowV = SlowV
+        if self.SlowV:
+            self.Basis, self.BasisList = InitGridBasis(self.Frequencies, MaxQuanta)
+            self.ModalSlices = self.GetModalSlices()
+        self.HamHO = self.MakeHOHam()
         if self.SlowV:
             self.AnharmTensor = self.MakeAnharmTensorSLOW()
         else:
@@ -460,7 +435,7 @@ class VSCF:
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, ModeOcc = [0, 0, 0])
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = True, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
-    mf.PrintResults(NStates = 5)
+    mf.PrintResults(NStates = 10)
