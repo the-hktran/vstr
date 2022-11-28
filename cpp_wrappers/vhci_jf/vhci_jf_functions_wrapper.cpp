@@ -35,4 +35,6 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("DoPT2", DoPT2, "Runs PT2 corrections");
     m.def("DoSPT2", DoSPT2, "Runs SPT2 corrections");
     m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode.");
+    m.def("MakeCTensorsCPP", MakeCTensorsCPP, "Generates all C Tensors for each anharmonic term.");
+    m.def("MakeCTensorCPP", MakeCTensorCPP, "Generates the C Tensor given the list of modes.");
 }

@@ -1550,3 +1550,39 @@ std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>>
     }
     return VEff;
 }
+
+std::vector<Eigen::MatrixXd> MakeCTensorsCPP(std::vector<Eigen::MatrixXd> &Cs, std::vector<std::vector<int>> QUniques, std::vector<int> ModeOcc, std::vector<std::vector<WaveFunction>> &RestrictedBases)
+{
+    std::vector<Eigen::MatrixXd> CTensors;
+    for (unsigned int q = 0; q < RestrictedBases.size(); q++)
+    {
+        Eigen::MatrixXd CTensor = Eigen::MatrixXd::Ones(RestrictedBases[q].size(), 1);
+        #pragma omp parallel for
+        for (unsigned int i = 0; i < RestrictedBases[q].size(); i++)
+        {
+            for (unsigned int m = 0; m < QUniques[q].size(); m++)
+            {
+                CTensor(i, 0) *= Cs[QUniques[q][m]](RestrictedBases[q][i].Modes[QUniques[q][m]].Quanta, ModeOcc[QUniques[q][m]]);
+            }
+        }
+        CTensors.push_back(CTensor);
+    }
+    return CTensors;
+}
+
+Eigen::MatrixXd MakeCTensorCPP(std::vector<Eigen::MatrixXd> &Cs, std::vector<int> QUnique, std::vector<std::vector<int>> ModeOccs, std::vector<WaveFunction> &RestrictedBasis)
+{
+    Eigen::MatrixXd CTensor = Eigen::MatrixXd::Ones(RestrictedBasis.size(), ModeOccs.size());
+    for (unsigned int k = 0; k < ModeOccs.size(); k++)
+    {
+        #pragma omp parallel for
+        for (unsigned int i = 0; i < RestrictedBasis.size(); i++)
+        {
+            for (unsigned int m = 0; m < QUnique.size(); m++)
+            {
+                CTensor(i, k) *= Cs[QUnique[m]](RestrictedBasis[i].Modes[QUnique[m]].Quanta, ModeOccs[k][QUnique[m]]);
+            }
+        }
+    }
+    return CTensor;
+}

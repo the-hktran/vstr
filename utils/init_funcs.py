@@ -56,7 +56,7 @@ def InitGridBasis(Frequencies, MaxQuanta):
         Bi = BasisList[-1].copy()
         Bi = IncrementBasis(Bi, MaxQuanta, 0)
         BasisList.append(Bi)
-    
+   
     Basis = []
     for B in BasisList:
         Basis.append(WaveFunction(B, Frequencies))
