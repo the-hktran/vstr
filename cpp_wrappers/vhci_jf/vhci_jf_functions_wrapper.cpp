@@ -37,4 +37,5 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode.");
     m.def("MakeCTensorsCPP", MakeCTensorsCPP, "Generates all C Tensors for each anharmonic term.");
     m.def("MakeCTensorCPP", MakeCTensorCPP, "Generates the C Tensor given the list of modes.");
+    m.def("GetVEffFASTCPP", GetVEffFASTCPP, "Generates the effective potential for each mode using memory efficient implementation.");
 }

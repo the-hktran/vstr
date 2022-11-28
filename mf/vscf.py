@@ -1,6 +1,6 @@
 import numpy as np
 from vstr.utils.init_funcs import FormW, InitTruncatedBasis, InitGridBasis
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP, MakeCTensorCPP
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP, MakeCTensorCPP, GetVEffFASTCPP
 
 def GetModalBasis(mVSCF, Mode, Quanta, MBasis = None):
     if MBasis is None:
@@ -223,6 +223,7 @@ def GetRestrictedSlice(RestrictedBasis, Ind, Mode):
             RSlice.append(i)
     return RSlice
 
+'''
 def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
     if ModeOcc is None:
         ModeOcc = mVSCF.ModeOcc
@@ -257,6 +258,12 @@ def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
             Vm += Vmq
         VEff.append(Vm)
     return VEff
+'''
+
+def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
+    if ModeOcc is None:
+        ModeOcc = mVSCF.ModeOcc
+    return GetVEffFASTCPP(mVSCF.AnharmTensor, mVSCF.RestrictedBases, mVSCF.QUniques, mVSCF.Cs, mVSCF.MaxQuanta, ModeOcc, FirstV)
 
 def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
     if Cs is None:
@@ -453,7 +460,7 @@ class VSCF:
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SLOW = True, ModeOcc = [0, 0, 0])
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SLOW = False, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
     mf.PrintResults(NStates = 5)

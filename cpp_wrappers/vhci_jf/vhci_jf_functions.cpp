@@ -1586,3 +1586,118 @@ Eigen::MatrixXd MakeCTensorCPP(std::vector<Eigen::MatrixXd> &Cs, std::vector<int
     }
     return CTensor;
 }
+
+std::tuple<std::vector<int>, std::vector<WaveFunction>> GetRestrictedSlice(std::vector<WaveFunction> &RestrictedBasis, unsigned int n, unsigned int Mode)
+{
+    std::vector<int> SlicedIndex;
+    std::vector<WaveFunction> SlicedBasis;
+    for (unsigned int i = 0; i < RestrictedBasis.size(); i++)
+    {
+        if (RestrictedBasis[i].Modes[Mode].Quanta == n)
+        {
+            SlicedBasis.push_back(RestrictedBasis[i]);
+            SlicedIndex.push_back(i);
+        }
+    }
+    return std::make_tuple(SlicedIndex, SlicedBasis);
+}
+
+Eigen::MatrixXd SliceMatrix(Eigen::SparseMatrix<double> M, std::vector<int> Ind, bool Row)
+{
+    Eigen::MatrixXd SlicedM;
+    if (Row)
+    {
+        SlicedM = Eigen::MatrixXd::Zero(Ind.size(), M.cols());
+        for (unsigned int i = 0; i < Ind.size(); i++)
+        {
+            SlicedM.row(i) = M.row(Ind[i]);
+        }
+    }
+    else
+    {
+        SlicedM = Eigen::MatrixXd::Zero(M.rows(), Ind.size());
+        for (unsigned int i = 0; i < Ind.size(); i++)
+        {
+            SlicedM.col(i) = M.col(Ind[i]);
+        }
+    }
+    return SlicedM;
+}
+
+Eigen::MatrixXd SliceMatrix(Eigen::MatrixXd M, std::vector<int> Ind, bool Row)
+{
+    Eigen::MatrixXd SlicedM;
+    if (Row)
+    {
+        SlicedM = Eigen::MatrixXd::Zero(Ind.size(), M.cols());
+        for (unsigned int i = 0; i < Ind.size(); i++)
+        {
+            SlicedM.row(i) = M.row(Ind[i]);
+        }
+    }
+    else
+    {
+        SlicedM = Eigen::MatrixXd::Zero(M.rows(), Ind.size());
+        for (unsigned int i = 0; i < Ind.size(); i++)
+        {
+            SlicedM.col(i) = M.col(Ind[i]);
+        }
+    }
+    return SlicedM;
+}
+
+std::vector<Eigen::MatrixXd> GetVEffFASTCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<std::vector<WaveFunction>> &RestrictedBases, std::vector<std::vector<int>> &QUniques, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> MaxQuanta, std::vector<int> ModeOcc, bool FirstV)
+{
+    std::vector<Eigen::MatrixXd> VEff;
+    int NModes = Cs.size();
+    if (FirstV) NModes = 1;
+    std::vector<std::vector<int>> ModeOccVec;
+    ModeOccVec.push_back(ModeOcc);
+
+    for (unsigned int Mode = 0; Mode < NModes; Mode++)
+    {
+        Eigen::MatrixXd Vm = Eigen::MatrixXd::Zero(MaxQuanta[Mode], MaxQuanta[Mode]);
+        for (unsigned int q = 0; q < AnharmTensor.size(); q++)
+        {
+            Eigen::MatrixXd Vmq = Eigen::MatrixXd::Zero(MaxQuanta[Mode], MaxQuanta[Mode]);
+            if (!std::count(QUniques[q].begin(), QUniques[q].end(), Mode))
+            {
+                Eigen::MatrixXd CTensor = MakeCTensorCPP(Cs, QUniques[q], ModeOccVec, RestrictedBases[q]);
+                Vmq = Eigen::MatrixXd::Identity(MaxQuanta[Mode], MaxQuanta[Mode]) * (CTensor.transpose() * AnharmTensor[q] * CTensor)(0, 0);
+            }
+            else
+            {
+                std::vector<int> Qs = QUniques[q];
+                std::vector<int>::iterator iMode = std::find(Qs.begin(), Qs.end(), Mode);
+                Qs.erase(iMode);
+                for (unsigned int i = 0; i < MaxQuanta[Mode]; i++)
+                {
+                    std::tuple<std::vector<int>, std::vector<WaveFunction>> SliceI = GetRestrictedSlice(RestrictedBases[q], i, Mode);
+                    Eigen::MatrixXd CTensorI = MakeCTensorCPP(Cs, Qs, ModeOccVec, std::get<1>(SliceI));
+                    Eigen::MatrixXd HI = SliceMatrix(AnharmTensor[q], std::get<0>(SliceI), true);
+                    for (unsigned int j = i; j < MaxQuanta[Mode]; j++)
+                    {
+                        std::tuple<std::vector<int>, std::vector<WaveFunction>> SliceJ;
+                        Eigen::MatrixXd CTensorJ;
+                        if (j == i)
+                        {
+                            SliceJ = SliceI;
+                            CTensorJ = CTensorI;
+                        }
+                        else
+                        {
+                            SliceJ = GetRestrictedSlice(RestrictedBases[q], j, Mode);
+                            CTensorJ = MakeCTensorCPP(Cs, Qs, ModeOccVec, std::get<1>(SliceJ));
+                        }
+                        Eigen::MatrixXd HIJ = SliceMatrix(HI, std::get<0>(SliceJ), false);
+                        Vmq(i, j) = (CTensorI.transpose() * HIJ * CTensorJ)(0, 0);
+                        Vmq(j, i) = Vmq(i, j);
+                    }
+                }
+            }
+            Vm += Vmq;
+        }
+        VEff.push_back(Vm);
+    }
+    return VEff;
+}
