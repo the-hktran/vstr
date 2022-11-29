@@ -1657,6 +1657,7 @@ std::vector<Eigen::MatrixXd> GetVEffFASTCPP(std::vector<Eigen::SparseMatrix<doub
     for (unsigned int Mode = 0; Mode < NModes; Mode++)
     {
         Eigen::MatrixXd Vm = Eigen::MatrixXd::Zero(MaxQuanta[Mode], MaxQuanta[Mode]);
+        #pragma omp parallel for 
         for (unsigned int q = 0; q < AnharmTensor.size(); q++)
         {
             Eigen::MatrixXd Vmq = Eigen::MatrixXd::Zero(MaxQuanta[Mode], MaxQuanta[Mode]);
@@ -1695,6 +1696,7 @@ std::vector<Eigen::MatrixXd> GetVEffFASTCPP(std::vector<Eigen::SparseMatrix<doub
                     }
                 }
             }
+            #pragma omp critical
             Vm += Vmq;
         }
         VEff.push_back(Vm);
