@@ -342,15 +342,16 @@ def LCLine(mVSCF, ModeOcc, thr = 1e-2):
             LC += str(Coeff) + BasisToString(B) + ' + '
     return LC[:-3]
 
-def LowestStates(mVSCF, NStates):
+def LowestStates(mVSCF, NStates, MaxQuanta = None):
     LStates = []
     LStates.append([0] * mVSCF.NModes)
-    EMax = np.sum([mVSCF.MaxQuanta[i] * e for i, e in enumerate(mVSCF.Frequencies)])
+    EMax = 1e10 #np.sum([mVSCF.MaxQuanta[i] * e for i, e in enumerate(mVSCF.Frequencies)])
     for n in range(NStates):
         NextMode = 0
         EOld = EMax.copy()
         for B in LStates:
             for m in range(mVSCF.NModes):
+                if MaxQuanta is not None and B[m] >= MaxQuanta[m] - 1
                 BTestIncr = B.copy()
                 BTestIncr[m] += 1
                 if BTestIncr in LStates:
@@ -458,6 +459,6 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False, ModeOcc = [0, 0, 0])
-    mf.SCF(DoDIIS = True)
+    mf.SCF(DoDIIS = False)
     print(mf.CalcESCF())
     mf.PrintResults(NStates = 10)
