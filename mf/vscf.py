@@ -351,7 +351,8 @@ def LowestStates(mVSCF, NStates, MaxQuanta = None):
         EOld = EMax.copy()
         for B in LStates:
             for m in range(mVSCF.NModes):
-                if MaxQuanta is not None and B[m] >= MaxQuanta[m] - 1
+                if MaxQuanta is not None and B[m] >= MaxQuanta[m] - 1:
+                    continue
                 BTestIncr = B.copy()
                 BTestIncr[m] += 1
                 if BTestIncr in LStates:
