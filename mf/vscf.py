@@ -348,7 +348,7 @@ def LowestStates(mVSCF, NStates, MaxQuanta = None):
     EMax = 1e10 #np.sum([mVSCF.MaxQuanta[i] * e for i, e in enumerate(mVSCF.Frequencies)])
     for n in range(NStates):
         NextMode = 0
-        EOld = EMax.copy()
+        EOld = EMax
         for B in LStates:
             for m in range(mVSCF.NModes):
                 if MaxQuanta is not None and B[m] >= MaxQuanta[m] - 1:
