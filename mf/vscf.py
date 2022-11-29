@@ -161,7 +161,7 @@ def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
             V0 = mVSCF.GetVEffSLOW(ModeOcc = ModeOcc, FirstV = True)[0]
         else:
             V0 = mVSCF.GetVEff(ModeOcc = ModeOcc, FirstV = True)[0]
-    
+
     DC = (mVSCF.Cs[0][:, ModeOcc[0]].T @ V0 @ mVSCF.Cs[0][:, ModeOcc[0]])
     E_SCF = 0.0
     for Mode, E in enumerate(mVSCF.Es):
@@ -367,16 +367,18 @@ def LowestStates(mVSCF, NStates, MaxQuanta = None):
     return LStates
 
 
-def PrintResults(mVSCF, NStates = None):
+def PrintResults(mVSCF, NStates = None, PrintLC = False):
     FinalE = []
     if NStates is None:
         NStates = np.prod(mVSCF.MaxQuanta)
+    assert(NStates <= np.prod(mVSCF.MaxQuanta))
     EnergyBList = mVSCF.LowestStates(NStates, MaxQuanta = mVSCF.MaxQuanta)
     for B in  EnergyBList:
         FinalE.append(mVSCF.CalcESCF(ModeOcc = B))
     SortedInd = np.argsort(np.asarray(FinalE))
 
-    mVSCF.BasisList = InitGridBasis(mVSCF.Frequencies, mVSCF.MaxQuanta, ListOnly = True)
+    if PrintLC:
+        mVSCF.BasisList = InitGridBasis(mVSCF.Frequencies, mVSCF.MaxQuanta, ListOnly = True)
     
     for i in SortedInd:
         OutLine = '{:.8f}\t'.format(FinalE[i])
@@ -388,9 +390,10 @@ def PrintResults(mVSCF, NStates = None):
                 ModeLabel += 'w{} + '.format(j + 1)
         ModeLabel = ModeLabel[:-3]
         OutLine += ModeLabel
-        LCString = mVSCF.LCLine(EnergyBList[i])
-        OutLine += '\t%s' % (LCString)
-        print(OutLine)
+        if PrintLC:
+            LCString = mVSCF.LCLine(EnergyBList[i])
+            OutLine += '\t%s' % (LCString)
+        print(OutLine, flush = True)
 
 class VSCF:
     InitCs = InitCs
