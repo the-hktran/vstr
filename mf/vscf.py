@@ -371,7 +371,7 @@ def PrintResults(mVSCF, NStates = None):
     FinalE = []
     if NStates is None:
         NStates = np.prod(mVSCF.MaxQuanta)
-    EnergyBList = mVSCF.LowestStates(NStates)
+    EnergyBList = mVSCF.LowestStates(NStates, MaxQuanta = mVSCF.MaxQuanta)
     for B in  EnergyBList:
         FinalE.append(mVSCF.CalcESCF(ModeOcc = B))
     SortedInd = np.argsort(np.asarray(FinalE))
