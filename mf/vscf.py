@@ -317,7 +317,7 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         EnergyErr = mVSCF.ESCF
         ConvErr = mVSCF.SCFIteration(It, DoDIIS = DoDIIS)
         EnergyErr = abs(EnergyErr - mVSCF.ESCF)
-        print("VSCF Iteration %d complete with an SCF error of %.12f/%.12f and SCF Energy of %.6f" % (It, ConvErr, EnergyErr, mVSCF.ESCF))
+        print("VSCF Iteration %d complete with an SCF error of %.12f/%.12f and SCF Energy of %.6f" % (It, ConvErr, EnergyErr, mVSCF.ESCF), flush = True)
         It += 1
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
