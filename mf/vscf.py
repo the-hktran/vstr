@@ -1,6 +1,7 @@
 import numpy as np
 from vstr.utils.init_funcs import FormW, InitTruncatedBasis, InitGridBasis
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP, MakeCTensorCPP, GetVEffFASTCPP
+from vstr.utils.perf_utils import TIMER
 
 def InitCs(mVSCF):
     Cs = []
@@ -56,12 +57,15 @@ def MakeAnharmTensor(mVSCF):
     QUniques = []
     for W in mVSCF.PotentialList:
         # First we need to make a basis restricted only to relevant modes. These need to be saved to generate the new C tensors
+        mVSCF.Timer.start(0)
         RestrictedMaxQ = [1] * mVSCF.NModes
         QUniques.append(W.QUnique)
         for i in W.QUnique:
             RestrictedMaxQ[i] = mVSCF.MaxQuanta[i]
         RestrictedBasis = InitGridBasis(mVSCF.Frequencies, RestrictedMaxQ)[0]
         RestrictedBases.append(RestrictedBasis)
+        mVSCF.Timer.stop(0)
+        mVSCF.Timer.start(1)
         CubicFC = []
         QuarticFC = []
         QuinticFC = []
@@ -76,6 +80,7 @@ def MakeAnharmTensor(mVSCF):
             SexticFC.append(W)
         H = GenerateSparseHamAnharmV(RestrictedBasis, mVSCF.Frequencies, mVSCF.PotentialList, CubicFC, QuarticFC, QuinticFC, SexticFC)
         AnharmTensor.append(H)
+        mVSCF.Timer.stop(1)
     return AnharmTensor, RestrictedBases, QUniques
 
 '''
@@ -274,11 +279,16 @@ def DIISUpdate(mVSCF):
         
 
 def SCFIteration(mVSCF, It, DoDIIS = True):
+    mVSCF.Timer.start(2)
     mVSCF.Fs = mVSCF.GetFock(CalcE = True)
+    mVSCF.Timer.stop(2)
+    mVSCF.Timer.start(3)
     if DoDIIS:
         mVSCF.StoreFock()
         if It > mVSCF.DIISStart:
             mVSCF.DIISUpdate() # Replaces Fock matrices with DIIS updated fock matrices
+    mVSCF.Timer.stop(3)
+    mVSCF.Timer.start(4)
     COld = mVSCF.Cs.copy()
     mVSCF.Cs = []
     mVSCF.Es = []
@@ -289,6 +299,7 @@ def SCFIteration(mVSCF, It, DoDIIS = True):
     SCFErr = 0.0
     for Mode in range(mVSCF.NModes):
         SCFErr = ((abs(COld[Mode]) - abs(mVSCF.Cs[Mode]))**2).sum()
+    mVSCF.Timer.stop(4)
     return SCFErr
 
 def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
@@ -310,6 +321,7 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         It += 1
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
+    mVSCF.Timer.report(mVSCF.TimerNames)
 
 def LCLine(mVSCF, ModeOcc, thr = 1e-2):
     def BasisToString(B):
@@ -361,18 +373,20 @@ def PrintResults(mVSCF, NStates = None):
     for B in  EnergyBList:
         FinalE.append(mVSCF.CalcESCF(ModeOcc = B))
     SortedInd = np.argsort(np.asarray(FinalE))
+
+    mVSCF.BasisList = InitGridBasis(mVSCF.Frequencies, mVSCF.MaxQuanta, ListOnly = True)
     
     for i in SortedInd:
         OutLine = '{:.8f}\t'.format(FinalE[i])
         ModeLabel = ""
-        for j, n in enumerate(mVSCF.BasisList[i]):
+        for j, n in enumerate(EnergyBList[i]):
             if n > 1:
                 ModeLabel += str(n)
             if n > 0:
                 ModeLabel += 'w{} + '.format(j + 1)
         ModeLabel = ModeLabel[:-3]
         OutLine += ModeLabel
-        LCString = mVSCF.LCLine(mVSCF.BasisList[i])
+        LCString = mVSCF.LCLine(EnergyBList[i])
         OutLine += '\t%s' % (LCString)
         print(OutLine)
 
@@ -400,6 +414,10 @@ class VSCF:
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
 
+        self.Timer = TIMER(5)
+        self.Timer.set_overhead(self.Timer.estimate_overhead())
+        self.TimerNames = ["Basis Init", "Anharm Pot Init", "Fock Generation", "DIIS", "Solve Fock"]
+
         self.Potential = [[]] * 4
         for V in UnscaledPotential:
             Wp = FormW(V)
@@ -415,11 +433,15 @@ class VSCF:
 
         self.SlowV = SlowV
         if self.SlowV:
+            self.Timer.start(0)
             self.Basis, self.BasisList = InitGridBasis(self.Frequencies, MaxQuanta)
             self.ModalSlices = self.GetModalSlices()
+            self.Timer.stop(0)
         self.HamHO = self.MakeHOHam()
         if self.SlowV:
+            self.Timer.start(1)
             self.AnharmTensor = self.MakeAnharmTensorSLOW()
+            self.Timer.stop(1)
         else:
             self.AnharmTensor, self.RestrictedBases, self.QUniques = self.MakeAnharmTensor()
         self.Cs = self.InitCs()
@@ -435,7 +457,7 @@ class VSCF:
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = True, ModeOcc = [0, 0, 0])
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = True)
     print(mf.CalcESCF())
     mf.PrintResults(NStates = 10)

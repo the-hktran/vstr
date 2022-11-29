@@ -37,7 +37,7 @@ def InitTruncatedBasis(NModes, Frequencies, MaxQuanta, MaxTotalQuanta = None):
         BasisWF.append(WF)
     return BasisWF
 
-def InitGridBasis(Frequencies, MaxQuanta):
+def InitGridBasis(Frequencies, MaxQuanta, ListOnly = False):
     def IncrementBasis(B, Max, Mode):
         if B[Mode] >= Max[Mode] - 1:
             B[Mode] = 0
@@ -56,7 +56,8 @@ def InitGridBasis(Frequencies, MaxQuanta):
         Bi = BasisList[-1].copy()
         Bi = IncrementBasis(Bi, MaxQuanta, 0)
         BasisList.append(Bi)
-   
+    if ListOnly:
+        return BasisList
     Basis = []
     for B in BasisList:
         Basis.append(WaveFunction(B, Frequencies))
