@@ -34,9 +34,9 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("HeatBath_Sort_FC", HeatBath_Sort_FC, "Sorts the force constants from highest to lowest");
     m.def("DoPT2", DoPT2, "Runs PT2 corrections");
     m.def("DoSPT2", DoSPT2, "Runs SPT2 corrections");
-    m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode.");
+    m.def("GetVEffSLOW1CPP", GetVEffSLOW1CPP, "Generates the effective potential for each mode.");
     m.def("MakeCTensorsCPP", MakeCTensorsCPP, "Generates all C Tensors for each anharmonic term.");
     m.def("MakeCTensorCPP", MakeCTensorCPP, "Generates the C Tensor given the list of modes.");
-    m.def("GetVEffFASTCPP", GetVEffFASTCPP, "Generates the effective potential for each mode using memory efficient implementation.");
-    m.def("GetVEffMFCPP", GetVEffMFCPP, "Generates the effective potential for each mode using mode independent memory efficient implementation.");
+    m.def("GetVEffSLOW2CPP", GetVEffSLOW2CPP, "Generates the effective potential for each mode using memory efficient implementation.");
+    m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode using mode independent memory efficient implementation.");
 }

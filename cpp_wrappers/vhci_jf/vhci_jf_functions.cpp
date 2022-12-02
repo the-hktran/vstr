@@ -1483,7 +1483,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
 ************************************* VSCF Functions *********************************
 *************************************************************************************/
 
-std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<WaveFunction> Basis, std::vector<Eigen::MatrixXd> &CByModes, std::vector<std::vector<std::vector<int>>> &ModalSlices, std::vector<int> &MaxQuanta, std::vector<int> &ModeOcc, bool FirstV = false)
+std::vector<Eigen::MatrixXd> GetVEffSLOW1CPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<WaveFunction> Basis, std::vector<Eigen::MatrixXd> &CByModes, std::vector<std::vector<std::vector<int>>> &ModalSlices, std::vector<int> &MaxQuanta, std::vector<int> &ModeOcc, bool FirstV = false)
 {
     int NModes = CByModes.size();
     std::vector<Eigen::MatrixXd> VEff;
@@ -1646,7 +1646,7 @@ Eigen::MatrixXd SliceMatrix(Eigen::MatrixXd M, std::vector<int> Ind, bool Row)
     return SlicedM;
 }
 
-std::vector<Eigen::MatrixXd> GetVEffFASTCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<std::vector<WaveFunction>> &RestrictedBases, std::vector<std::vector<int>> &QUniques, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> MaxQuanta, std::vector<int> ModeOcc, bool FirstV)
+std::vector<Eigen::MatrixXd> GetVEffSLOW2CPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<std::vector<WaveFunction>> &RestrictedBases, std::vector<std::vector<int>> &QUniques, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> MaxQuanta, std::vector<int> ModeOcc, bool FirstV)
 {
     std::vector<Eigen::MatrixXd> VEff;
     int NModes = Cs.size();
@@ -1730,7 +1730,7 @@ std::vector<std::vector<double>> ContractedAnharmonicPotential(std::vector<Eigen
     return Ys;
 }
 
-std::vector<Eigen::MatrixXd> GetVEffMFCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<double> &FCs, std::vector<std::vector<int>> &QUniques, std::vector<std::vector<int>> &QPowers, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> &MaxQuanta, std::vector<int> &ModeOcc1, std::vector<int> &ModeOcc2, bool FirstV)
+std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<double> &FCs, std::vector<std::vector<int>> &QUniques, std::vector<std::vector<int>> &QPowers, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> &MaxQuanta, std::vector<int> &ModeOcc1, std::vector<int> &ModeOcc2, bool FirstV)
 {
     std::vector<Eigen::MatrixXd> VEff;
     int NModes = Cs.size();

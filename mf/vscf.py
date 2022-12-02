@@ -1,6 +1,6 @@
 import numpy as np
 from vstr.utils.init_funcs import FormW, InitTruncatedBasis, InitGridBasis
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP, MakeCTensorCPP, GetVEffFASTCPP, GetVEffMFCPP
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP
 from vstr.utils.perf_utils import TIMER
 
 def InitCs(mVSCF):
@@ -31,6 +31,7 @@ def GetModalSlices(mVSCF):
 
 '''
 This function collects all the nonzero anharmonic terms, for each anharmonic force constant
+'''
 '''
 def MakeAnharmTensorSLOW(mVSCF):
     AnharmTensor = []
@@ -83,8 +84,9 @@ def MakeAnharmTensor(mVSCF):
         mVSCF.Timer.stop(1)
     
     return AnharmTensor, RestrictedBases, QUniques
+'''
 
-def MakeGenericAnharmTensor(mVSCF):
+def MakeAnharmTensor(mVSCF):
     AnharmTensor = []
     FCs = []
     QUniques = []
@@ -185,6 +187,7 @@ def MakeHOHam(mVSCF):
 '''
 Takes a stored HO Hamiltonian and contracts it into the modal basis
 '''
+'''
 def GetHCore(mVSCF, Cs = None, HamHO = None):
     if Cs is None:
         Cs = mVSCF.Cs
@@ -194,18 +197,12 @@ def GetHCore(mVSCF, Cs = None, HamHO = None):
     for Mode in range(mVSCF.NModes):
         hs.append(Cs[Mode].T @ HamHO[Mode] @ Cs[Mode])
     return hs
-
+'''
 def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
     if ModeOcc is None:
         ModeOcc = mVSCF.ModeOcc
-    if V0 is None:
-        if mVSCF.SlowV:
-            V0 = mVSCF.GetVEffSLOW(ModeOcc = ModeOcc, FirstV = True)[0]
-        else:
-            if mVSCF.FastType == 1:
-                V0 = mVSCF.GetVEff(ModeOcc = ModeOcc, FirstV = True)[0]
-            else:
-                V0 = mVSCF.GetVEffMF(ModeOcc1 = ModeOcc, FirstV = True)[0]
+    
+    V0 = mVSCF.GetVEff(ModeOcc1 = ModeOcc, FirstV = True)[0]
 
     DC = (mVSCF.Cs[0][:, ModeOcc[0]].T @ V0 @ mVSCF.Cs[0][:, ModeOcc[0]])
     E_SCF = 0.0
@@ -215,6 +212,7 @@ def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
 
 '''
 Takes stored anharmonic Hamiltonians and contracts it into the modal basis
+'''
 '''
 def GetVEffSLOW(mVSCF, ModeOcc = None, FirstV = False):
     if ModeOcc is None:
@@ -227,7 +225,7 @@ def GetRestrictedSlice(RestrictedBasis, Ind, Mode):
         if RestrictedBasis[i].Modes[Mode].Quanta == Ind:
             RSlice.append(i)
     return RSlice
-
+'''
 '''
 def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
     if ModeOcc is None:
@@ -264,18 +262,18 @@ def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
         VEff.append(Vm)
     return VEff
 '''
-
+'''
 def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
     if ModeOcc is None:
         ModeOcc = mVSCF.ModeOcc
     return GetVEffFASTCPP(mVSCF.AnharmTensor, mVSCF.RestrictedBases, mVSCF.QUniques, mVSCF.Cs, mVSCF.MaxQuanta, ModeOcc, FirstV)
-
-def GetVEffMF(mVSCF, ModeOcc1 = None, ModeOcc2 = None, FirstV = False):
+'''
+def GetVEff(mVSCF, ModeOcc1 = None, ModeOcc2 = None, FirstV = False):
     if ModeOcc1 is None:
         ModeOcc1 = mVSCF.ModeOcc
     if ModeOcc2 is None:
         ModeOcc2 = ModeOcc1
-    return GetVEffMFCPP(mVSCF.AnharmTensor, mVSCF.FCs, mVSCF.QUniques, mVSCF.QPowers, mVSCF.Cs, mVSCF.MaxQuanta, ModeOcc1, ModeOcc2, FirstV)
+    return GetVEffCPP(mVSCF.AnharmTensor, mVSCF.FCs, mVSCF.QUniques, mVSCF.QPowers, mVSCF.Cs, mVSCF.MaxQuanta, ModeOcc1, ModeOcc2, FirstV)
 
 
 def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
@@ -284,13 +282,7 @@ def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
     if hs is None:
         hs = mVSCF.HamHO
 
-    if mVSCF.SlowV:
-        Vs = mVSCF.GetVEffSLOW()
-    else:
-        if mVSCF.FastType == 1:
-            Vs = mVSCF.GetVEff()
-        else:
-            Vs = mVSCF.GetVEffMF()
+    Vs = mVSCF.GetVEff()
 
     # Save the double counting term while we have the effective potentials
     if CalcE:
@@ -454,15 +446,10 @@ def PrintResults(mVSCF, NStates = None, PrintLC = False):
 class VSCF:
     InitCs = InitCs
     GetModalSlices = GetModalSlices
-    MakeGenericAnharmTensor = MakeGenericAnharmTensor
     MakeAnharmTensor = MakeAnharmTensor
-    MakeAnharmTensorSLOW = MakeAnharmTensorSLOW
     MakeHOHam = MakeHOHam
    
-    GetHCore = GetHCore
     GetVEff = GetVEff
-    GetVEffSLOW = GetVEffSLOW
-    GetVEffMF = GetVEffMF
     GetFock = GetFock
     StoreFock = StoreFock
     DIISUpdate = DIISUpdate
@@ -473,7 +460,7 @@ class VSCF:
 
     PrintResults = PrintResults
     LCLine = LCLine
-    def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, SlowV = False, FastType = 0, **kwargs):
+    def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
 
@@ -494,6 +481,7 @@ class VSCF:
         else:
             self.MaxQuanta = MaxQuanta
 
+        '''
         self.SlowV = SlowV
         self.FastType = FastType
         if self.SlowV:
@@ -501,7 +489,9 @@ class VSCF:
             self.Basis, self.BasisList = InitGridBasis(self.Frequencies, MaxQuanta)
             self.ModalSlices = self.GetModalSlices()
             self.Timer.stop(0)
+        '''
         self.HamHO = self.MakeHOHam()
+        '''
         if self.SlowV:
             self.Timer.start(1)
             self.AnharmTensor = self.MakeAnharmTensorSLOW()
@@ -510,9 +500,11 @@ class VSCF:
             if self.FastType == 1:
                 self.AnharmTensor, self.RestrictedBases, self.QUniques = self.MakeAnharmTensor()
             else:
-                self.AnharmTensor, self.FCs, self.QUniques, self.QPowers = self.MakeGenericAnharmTensor()
-                self.PotentialList = []
-                self.Potential = []
+        '''
+        self.AnharmTensor, self.FCs, self.QUniques, self.QPowers = self.MakeAnharmTensor()
+        self.PotentialList = []
+        self.Potential = []
+        
         self.Cs = self.InitCs()
         self.ModeOcc = [0] * self.NModes
         self.ESCF = 0.0
