@@ -1,6 +1,6 @@
 import numpy as np
 from vstr.utils.init_funcs import FormW, InitTruncatedBasis, InitGridBasis
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP, MakeCTensorCPP, GetVEffFASTCPP
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP, MakeCTensorCPP, GetVEffFASTCPP, GetVEffMFCPP
 from vstr.utils.perf_utils import TIMER
 
 def InitCs(mVSCF):
@@ -81,7 +81,49 @@ def MakeAnharmTensor(mVSCF):
         H = GenerateSparseHamAnharmV(RestrictedBasis, mVSCF.Frequencies, mVSCF.PotentialList, CubicFC, QuarticFC, QuinticFC, SexticFC)
         AnharmTensor.append(H)
         mVSCF.Timer.stop(1)
+    
     return AnharmTensor, RestrictedBases, QUniques
+
+def MakeGenericAnharmTensor(mVSCF):
+    AnharmTensor = []
+    FCs = []
+    QUniques = []
+    QPowers = []
+        
+    mVSCF.Timer.start(0)
+    MaxQ = [mVSCF.MaxQuanta[0]]
+    Freq = [1.0]
+    GenericBasis = InitGridBasis(Freq, MaxQ)[0]
+    mVSCF.Timer.stop(0)
+
+    mVSCF.Timer.start(1)
+    for W in mVSCF.PotentialList:
+        FCs.append(W.fc)
+        QUniques.append(W.QUnique)
+        QPowers.append(W.QPowers)
+    AnharmTensor.append(np.zeros((0,0)))
+    for p in range(1, 7):
+        W = FConst(1.0, [0] * p, False)
+        W = [W]
+        W.append(FConst(0.0, [0] * 6, False))
+        CubicFC = []
+        QuarticFC = []
+        QuinticFC = []
+        SexticFC = []
+        if p == 1 or p == 3:
+            CubicFC = W.copy()
+        elif p == 2 or p == 4:
+            QuarticFC = W.copy()
+        elif p == 5:
+            QuinticFC = W.copy()
+        elif p == 6:
+            SexticFC = W.copy()
+        H = GenerateSparseHamAnharmV(GenericBasis, Freq, W, CubicFC, QuarticFC, QuinticFC, SexticFC)
+        AnharmTensor.append(H)
+    AnharmTensor[0] = AnharmTensor[1]
+    mVSCF.Timer.stop(1)
+    return AnharmTensor, FCs, QUniques, QPowers
+
 
 '''
 def GetVEffByMode(mVSCF, Mode):
@@ -160,7 +202,10 @@ def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
         if mVSCF.SlowV:
             V0 = mVSCF.GetVEffSLOW(ModeOcc = ModeOcc, FirstV = True)[0]
         else:
-            V0 = mVSCF.GetVEff(ModeOcc = ModeOcc, FirstV = True)[0]
+            if mVSCF.FastType == 1:
+                V0 = mVSCF.GetVEff(ModeOcc = ModeOcc, FirstV = True)[0]
+            else:
+                V0 = mVSCF.GetVEffMF(ModeOcc1 = ModeOcc, FirstV = True)[0]
 
     DC = (mVSCF.Cs[0][:, ModeOcc[0]].T @ V0 @ mVSCF.Cs[0][:, ModeOcc[0]])
     E_SCF = 0.0
@@ -225,6 +270,14 @@ def GetVEff(mVSCF, ModeOcc = None, FirstV = False):
         ModeOcc = mVSCF.ModeOcc
     return GetVEffFASTCPP(mVSCF.AnharmTensor, mVSCF.RestrictedBases, mVSCF.QUniques, mVSCF.Cs, mVSCF.MaxQuanta, ModeOcc, FirstV)
 
+def GetVEffMF(mVSCF, ModeOcc1 = None, ModeOcc2 = None, FirstV = False):
+    if ModeOcc1 is None:
+        ModeOcc1 = mVSCF.ModeOcc
+    if ModeOcc2 is None:
+        ModeOcc2 = ModeOcc1
+    return GetVEffMFCPP(mVSCF.AnharmTensor, mVSCF.FCs, mVSCF.QUniques, mVSCF.QPowers, mVSCF.Cs, mVSCF.MaxQuanta, ModeOcc1, ModeOcc2, FirstV)
+
+
 def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
     if Cs is None:
         Cs = mVSCF.Cs
@@ -234,7 +287,10 @@ def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
     if mVSCF.SlowV:
         Vs = mVSCF.GetVEffSLOW()
     else:
-        Vs = mVSCF.GetVEff()
+        if mVSCF.FastType == 1:
+            Vs = mVSCF.GetVEff()
+        else:
+            Vs = mVSCF.GetVEffMF()
 
     # Save the double counting term while we have the effective potentials
     if CalcE:
@@ -371,7 +427,7 @@ def PrintResults(mVSCF, NStates = None, PrintLC = False):
     FinalE = []
     if NStates is None:
         NStates = np.prod(mVSCF.MaxQuanta)
-    assert(NStates <= np.prod(mVSCF.MaxQuanta))
+    #assert(NStates <= np.prod(mVSCF.MaxQuanta))
     EnergyBList = mVSCF.LowestStates(NStates, MaxQuanta = mVSCF.MaxQuanta)
     for B in  EnergyBList:
         FinalE.append(mVSCF.CalcESCF(ModeOcc = B))
@@ -398,6 +454,7 @@ def PrintResults(mVSCF, NStates = None, PrintLC = False):
 class VSCF:
     InitCs = InitCs
     GetModalSlices = GetModalSlices
+    MakeGenericAnharmTensor = MakeGenericAnharmTensor
     MakeAnharmTensor = MakeAnharmTensor
     MakeAnharmTensorSLOW = MakeAnharmTensorSLOW
     MakeHOHam = MakeHOHam
@@ -405,6 +462,7 @@ class VSCF:
     GetHCore = GetHCore
     GetVEff = GetVEff
     GetVEffSLOW = GetVEffSLOW
+    GetVEffMF = GetVEffMF
     GetFock = GetFock
     StoreFock = StoreFock
     DIISUpdate = DIISUpdate
@@ -415,7 +473,7 @@ class VSCF:
 
     PrintResults = PrintResults
     LCLine = LCLine
-    def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, SlowV = False, **kwargs):
+    def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, SlowV = False, FastType = 0, **kwargs):
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
 
@@ -437,6 +495,7 @@ class VSCF:
             self.MaxQuanta = MaxQuanta
 
         self.SlowV = SlowV
+        self.FastType = FastType
         if self.SlowV:
             self.Timer.start(0)
             self.Basis, self.BasisList = InitGridBasis(self.Frequencies, MaxQuanta)
@@ -448,7 +507,12 @@ class VSCF:
             self.AnharmTensor = self.MakeAnharmTensorSLOW()
             self.Timer.stop(1)
         else:
-            self.AnharmTensor, self.RestrictedBases, self.QUniques = self.MakeAnharmTensor()
+            if self.FastType == 1:
+                self.AnharmTensor, self.RestrictedBases, self.QUniques = self.MakeAnharmTensor()
+            else:
+                self.AnharmTensor, self.FCs, self.QUniques, self.QPowers = self.MakeGenericAnharmTensor()
+                self.PotentialList = []
+                self.Potential = []
         self.Cs = self.InitCs()
         self.ModeOcc = [0] * self.NModes
         self.ESCF = 0.0

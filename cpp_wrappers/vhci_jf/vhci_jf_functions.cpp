@@ -1703,3 +1703,82 @@ std::vector<Eigen::MatrixXd> GetVEffFASTCPP(std::vector<Eigen::SparseMatrix<doub
     }
     return VEff;
 }
+
+/*************************************************************************************
+************************************ HO2MO Functions *********************************
+*************************************************************************************/
+
+// Computers C.T @ V @ C for each power and mode. First index is Mode, second index is power.
+std::vector<std::vector<double>> ContractedAnharmonicPotential(std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &Vs, std::vector<int> &ModeOcc1, std::vector<int> &ModeOcc2)
+{
+    unsigned int NumP = Vs.size();
+    unsigned int NumM = Cs.size();
+    
+    std::vector<std::vector<double>> Ys;
+    for (unsigned int m = 0; m < NumM; m++)
+    {
+        std::vector<double> Ym;
+        Eigen::VectorXd C1 = Cs[m].col(ModeOcc1[m]);
+        Eigen::VectorXd C2 = Cs[m].col(ModeOcc2[m]);
+        for (unsigned int p = 0; p < NumP; p++)
+        {
+            double Y = C1.transpose() * Vs[p] * C2;
+            Ym.push_back(Y);
+        }
+        Ys.push_back(Ym);
+    }
+    return Ys;
+}
+
+std::vector<Eigen::MatrixXd> GetVEffMFCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<double> &FCs, std::vector<std::vector<int>> &QUniques, std::vector<std::vector<int>> &QPowers, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> &MaxQuanta, std::vector<int> &ModeOcc1, std::vector<int> &ModeOcc2, bool FirstV)
+{
+    std::vector<Eigen::MatrixXd> VEff;
+    int NModes = Cs.size();
+    if (FirstV) NModes = 1;
+
+    std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(Cs, AnharmTensor, ModeOcc1, ModeOcc2);
+
+    for (unsigned int Mode = 0; Mode < NModes; Mode++)
+    {
+        Eigen::MatrixXd Vm = Eigen::MatrixXd::Zero(MaxQuanta[Mode], MaxQuanta[Mode]);
+        #pragma omp parallel for 
+        for (unsigned int q = 0; q < FCs.size(); q++)
+        {
+            Eigen::MatrixXd Vmq; // = Eigen::MatrixXd::Zero(MaxQuanta[Mode], MaxQuanta[Mode]);
+            if (!std::count(QUniques[q].begin(), QUniques[q].end(), Mode))
+            {
+                Vmq = Eigen::MatrixXd::Identity(MaxQuanta[Mode], MaxQuanta[Mode]) * FCs[q];
+                for (unsigned int Q = 0; Q < QUniques[q].size(); Q++)
+                {
+                    Vmq *= Ys[QUniques[q][Q]][QPowers[q][Q]];
+                }
+            }
+            else
+            {
+                std::vector<int>::iterator itMode = std::find(QUniques[q].begin(), QUniques[q].end(), Mode);
+                int iMode = itMode - QUniques[q].begin();
+                Vmq = AnharmTensor[QPowers[q][iMode]] * FCs[q]; 
+                for (unsigned int i = 0; i < Vmq.rows(); i++)
+                {
+                    for (unsigned int j = i; j < Vmq.cols(); j++)
+                    {
+                        if (abs(Vmq(i, j)) < 1e-12) continue;
+                        else
+                        {
+                            for (unsigned int Q = 0; Q < QUniques[q].size(); Q++)
+                            {
+                                if (QUniques[q][Q] == Mode) continue;
+                                Vmq(i, j) *= Ys[QUniques[q][Q]][QPowers[q][Q]];
+                            }
+                            Vmq(j, i) = Vmq(i, j);
+                        }
+                    }
+                }
+            }
+            #pragma omp critical
+            Vm += Vmq;
+        }
+        VEff.push_back(Vm);
+    }
+    return VEff;
+}
