@@ -1847,10 +1847,10 @@ Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<
                 if (DiffModes.size() == 0)
                 {
                     std::vector<double> Xs = ContractedHOTerms(Cs, Frequencies, ModeOccI, ModeOccJ);
-                    double HOij = 1.0;
+                    double HOij = 0.0;
                     for (unsigned int m = 0; m < Xs.size(); m++)
                     {
-                        HOij *= Xs[m];
+                        HOij += Xs[m];
                     }
                     Vij += HOij;
                 }
@@ -1869,12 +1869,11 @@ Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<
 
             // Anharmonic Part
             std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(Cs, GenericV, ModeOccI, ModeOccJ);
-
             for (FConst &FC : FCs)
             {
                 double Vijq = 0.0;
                 if (VectorContainedIn(DiffModes, FC.QUnique))
-                {
+                {      
                     Vijq = FC.fc;
                     for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                     {

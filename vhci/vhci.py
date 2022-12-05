@@ -85,6 +85,7 @@ def PT2(mVHCI, doStochastic = False):
 
 def Diagonalize(mVHCI):
     H = GenerateHamV(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
+    print(H)
     mVHCI.E, mVHCI.C = np.linalg.eigh(H)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
