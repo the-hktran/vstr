@@ -39,4 +39,5 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("MakeCTensorCPP", MakeCTensorCPP, "Generates the C Tensor given the list of modes.");
     m.def("GetVEffSLOW2CPP", GetVEffSLOW2CPP, "Generates the effective potential for each mode using memory efficient implementation.");
     m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode using mode independent memory efficient implementation.");
+    m.def("VCIHamFromVSCF", VCIHamFromVSCF, "Generates H in the modal basis.");
 }

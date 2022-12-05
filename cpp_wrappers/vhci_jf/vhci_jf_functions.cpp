@@ -1782,3 +1782,110 @@ std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>>
     }
     return VEff;
 }
+
+/*************************************************************************************
+************************************* VCI Functions **********************************
+*************************************************************************************/
+
+std::vector<int> CalcDiffModes(WaveFunction &Bi, WaveFunction &Bj)
+{
+    std::vector<int> DiffModes;
+    for (unsigned int i = 0; i < Bi.Modes.size(); i++)
+    {
+        if (Bi.Modes[i].Quanta - Bj.Modes[i].Quanta != 0) DiffModes.push_back(i);
+    }
+    return DiffModes;
+}
+
+bool VectorContainedIn(std::vector<int> &b, std::vector<int> &B)
+{
+    for (auto &a : b)
+    {
+        if (std::find(B.begin(), B.end(), a) == B.end()) return false;
+    }
+    return true;
+}
+
+std::vector<double> ContractedHOTerms(std::vector<Eigen::MatrixXd> &Cs, std::vector<double> &Frequencies, std::vector<int> ModeOccI, std::vector<int> ModeOccJ)
+{
+    std::vector<double> Xs;
+    for (unsigned int m = 0; m < Cs.size(); m++)
+    {
+        double Xm = 0.0;
+        for (unsigned int i = 0; i < Cs[m].rows(); i++)
+        {
+            Xm += Cs[m](i, ModeOccI[m]) * Cs[m](i, ModeOccJ[m]) * (i + 0.5);
+        }
+        Xm *= Frequencies[m];
+        Xs.push_back(Xm);
+    }
+    return Xs;
+}
+
+Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV)
+{
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
+
+    std::vector<int> MaxQuanta;
+    for (Eigen::MatrixXd &C : Cs) MaxQuanta.push_back(C.rows());
+
+    #pragma omp parallel for
+    for (unsigned int i = 0; i < BasisSet.size(); i++)
+    {
+        std::vector<int> ModeOccI;
+        for (unsigned int m = 0; m < BasisSet[i].Modes.size(); m++) ModeOccI.push_back(BasisSet[i].Modes[m].Quanta);
+        for (unsigned int j = i; j < BasisSet.size(); j++) // starts with j=i to exploit Hermiticity (Hij = Hji)
+        {
+            double Vij = 0;
+            std::vector<int> ModeOccJ;
+            for (unsigned int m = 0; m < BasisSet[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet[j].Modes[m].Quanta);
+            std::vector<int> DiffModes = CalcDiffModes(BasisSet[i], BasisSet[j]);
+           
+            // Harmonic Part
+            if (DiffModes.size() < 2)
+            {
+                if (DiffModes.size() == 0)
+                {
+                    std::vector<double> Xs = ContractedHOTerms(Cs, Frequencies, ModeOccI, ModeOccJ);
+                    double HOij = 1.0;
+                    for (unsigned int m = 0; m < Xs.size(); m++)
+                    {
+                        HOij *= Xs[m];
+                    }
+                    Vij += HOij;
+                }
+                if (DiffModes.size() == 1)
+                {
+                    Eigen::MatrixXd Cm = Cs[DiffModes[0]];
+                    double Xm = 0.0;
+                    for (unsigned int im = 0; im < Cs[DiffModes[0]].rows(); im++)
+                    {
+                        Xm += Cs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * Cs[DiffModes[0]](im, ModeOccJ[DiffModes[0]]) * (im + 0.5);
+                    }
+                    Xm *= Frequencies[DiffModes[0]];
+                    Vij += Xm;
+                }
+            }
+
+            // Anharmonic Part
+            std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(Cs, GenericV, ModeOccI, ModeOccJ);
+
+            for (FConst &FC : FCs)
+            {
+                double Vijq = 0.0;
+                if (VectorContainedIn(DiffModes, FC.QUnique))
+                {
+                    Vijq = FC.fc;
+                    for (unsigned int m = 0; m < FC.QUnique.size(); m++)
+                    {
+                        Vijq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                    }
+                }
+                Vij += Vijq;
+            }
+            H(i, j) += Vij;
+            if (i != j) H(j, i) += Vij;
+        }
+    }
+    return H;
+};

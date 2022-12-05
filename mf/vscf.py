@@ -502,8 +502,9 @@ class VSCF:
             else:
         '''
         self.AnharmTensor, self.FCs, self.QUniques, self.QPowers = self.MakeAnharmTensor()
+        # These needs to be saved for VCI
+        #self.Potential = []
         self.PotentialList = []
-        self.Potential = []
         
         self.Cs = self.InitCs()
         self.ModeOcc = [0] * self.NModes

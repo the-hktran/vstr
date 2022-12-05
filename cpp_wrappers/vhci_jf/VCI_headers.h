@@ -297,3 +297,5 @@ std::vector<Eigen::MatrixXd> GetVEffSLOW1CPP(std::vector<Eigen::SparseMatrix<dou
 Eigen::MatrixXd MakeCTensorCPP(std::vector<Eigen::MatrixXd> &Cs, std::vector<int> QUnique, std::vector<std::vector<int>> ModeOccs, std::vector<WaveFunction> &RestrictedBasis);
 std::vector<Eigen::MatrixXd> GetVEffSLOW2CPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<std::vector<WaveFunction>> &RestrictedBases, std::vector<std::vector<int>> &QUniques, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> MaxQuanta, std::vector<int> ModeOcc, bool FirstV);
 std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<double> &FCs, std::vector<std::vector<int>> &QUniques, std::vector<std::vector<int>> &QPowers, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> &MaxQuanta, std::vector<int> &ModeOcc1, std::vector<int> &ModeOcc2, bool FirstV);
+
+Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV);
