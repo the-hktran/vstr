@@ -1,6 +1,6 @@
 import numpy as np
 from vstr.utils.init_funcs import FormW, InitTruncatedBasis, InitGridBasis
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, GenerateHam0V, GenerateSparseHamAnharmV, GetVEffCPP
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, GenerateHam0V, GenerateSparseHamAnharmV, GenerateHamAnharmV, GetVEffCPP
 from vstr.utils.perf_utils import TIMER
 
 def InitCs(mVSCF):
@@ -519,7 +519,9 @@ class VSCF:
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
+    print(MaxQuanta)
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = False)
     print(mf.CalcESCF())
+    print(mf.Cs[0].shape)
     mf.PrintResults(NStates = 10)

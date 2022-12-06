@@ -85,7 +85,6 @@ def PT2(mVHCI, doStochastic = False):
 
 def Diagonalize(mVHCI):
     H = GenerateHamV(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
-    print(H)
     mVHCI.E, mVHCI.C = np.linalg.eigh(H)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
@@ -111,8 +110,6 @@ def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
                         BNext.append(NewB)
         Basis = Basis + BNext
         Bs = BNext.copy()
-    
-    print("Initial basis functions are:\n", Basis)
     
     # We need to translate this into the wavefunction object
     BasisWF = []

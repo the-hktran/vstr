@@ -981,6 +981,12 @@ inline void MakeHamDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet
     return;
 }
 
+inline void MakeHamAnharmDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    AnharmHam(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    return;
+}
+
 //Utility functions
 std::tuple<Eigen::VectorXd, Eigen::MatrixXd> SparseDiagonalizeCPP(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, int NEig)
 {
@@ -1038,6 +1044,12 @@ Eigen::MatrixXd GenerateHam0V(std::vector<WaveFunction> &BasisSet, std::vector<d
     return H;
 }
 
+Eigen::MatrixXd GenerateHamAnharmV(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
+    AnharmHam(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    return H;
+}
 
 SpMat GenerateSparseHamV(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
@@ -1720,9 +1732,19 @@ std::vector<std::vector<double>> ContractedAnharmonicPotential(std::vector<Eigen
         std::vector<double> Ym;
         Eigen::VectorXd C1 = Cs[m].col(ModeOcc1[m]);
         Eigen::VectorXd C2 = Cs[m].col(ModeOcc2[m]);
-        for (unsigned int p = 0; p < NumP; p++)
+        for (int p = 0; p < NumP; p++)
         {
             double Y = C1.transpose() * Vs[p] * C2;
+            /*
+            double Y = 0.0;
+            for (int i = 0; i < C1.rows(); i++)
+            {
+                for (int pi = i - p; pi <= i + p; pi += 2)
+                {
+                    if (pi >= 0 && pi < C2.rows()) Y += C1[i] * C2[pi] * Vs[p].coeff(i, pi);
+                }
+            }
+            */
             Ym.push_back(Y);
         }
         Ys.push_back(Ym);
@@ -1888,3 +1910,284 @@ Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<
     }
     return H;
 };
+
+bool FitsMaxQuanta(WaveFunction &B, std::vector<int> &MaxQuanta)
+{
+    for (unsigned int m = 0; m < B.Modes.size(); m++)
+    {
+        if (B.Modes[m].Quanta >= MaxQuanta[m]) return false;
+    }
+    return true;
+}
+
+std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<int> &MaxQuanta){ // Expand basis via Heat Bath algorithm
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
+    for( WaveFunction& wfn : BasisSet){
+        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    }
+
+    std::vector<double> CVec;
+    for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
+    std::vector<long unsigned int> CSortedInd = SortIndices(CVec);
+    for(unsigned int i=0; i<AnharmHB.size(); ++i){ // Loop over sorted force constants
+        if (abs(AnharmHB[i].fc * C[CSortedInd[CSortedInd.size() - 1]]) < eps) break; // means that the largest Cn doesn't meet the criteria so we are done
+        for (int nn = CSortedInd.size() - 1; nn >= 0; nn--)
+        {
+            unsigned int n = CSortedInd[nn];
+            double Cn = C[n];
+            if(abs(Cn*AnharmHB[i].fc) >= eps){ // States connected by fc will be added if |fc*Cn| >= eps
+                if(AnharmHB[i].QUnique.size()==1){ // Stupid way to enumerate new states from F_ij
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        if( a != 0){// Skip if no change
+                            WaveFunction tmp = BasisSet[n];
+                            tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                            if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                                HashedBasisInit.count(tmp) == 0
+                                    ){ //make sure a|0> = 0 and tmp does not exist in original basis
+                                if (FitsMaxQuanta(tmp, MaxQuanta))
+                                {
+                                    HashedNewStates.insert(tmp); // add new state to set
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==2){ // Stupid way to enumerate new states from F_ij
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            if(abs(a)+abs(b) != 0){// Skip if no change
+                                WaveFunction tmp = BasisSet[n];
+                                tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                       tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0 && 
+                                                                       HashedBasisInit.count(tmp) == 0
+                                       ){ //make sure a|0> = 0
+                                        if (FitsMaxQuanta(tmp, MaxQuanta))
+                                        {
+                                            HashedNewStates.insert(tmp); // add new state to set
+                                        }
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==3){ // Stupid way to enumerate new states from F_ijk
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                if(abs(a)+abs(b)+abs(c) != 0){// Skip if no change
+                                    WaveFunction tmp = BasisSet[n];
+                                    tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                    tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                    tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                    if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                           tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                           tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                           HashedBasisInit.count(tmp) == 0
+                                           ){ //make sure a|0> = 0
+                                        if (FitsMaxQuanta(tmp, MaxQuanta))
+                                        {
+                                            HashedNewStates.insert(tmp); // add new state
+                                        }
+                                    }
+                                }      
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==4){ // Stupid way to enumerate new states from F_ijkl
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    if(abs(a)+abs(b)+abs(c)+abs(d) != 0){ // Skip if no change
+                                        WaveFunction tmp = BasisSet[n];
+                                        tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                        tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                        tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                        tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                        if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                               tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                               tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                               tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                               HashedBasisInit.count(tmp) == 0
+                                               ){ //make sure a|0> = 0
+                                                if (FitsMaxQuanta(tmp, MaxQuanta))
+                                                {
+                                                    HashedNewStates.insert(tmp); // add new state
+                                                }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }   
+                if(AnharmHB[i].QUnique.size()==5){ // Stupid way to enumerate new states from F_ijklm 
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    for( int f=-(AnharmHB[i].QPowers[4]); f<(AnharmHB[i].QPowers[4]+1); f+=2 ){
+                                        if(abs(a)+abs(b)+abs(c)+abs(d)+abs(f) != 0){ // Skip if no change
+                                            WaveFunction tmp = BasisSet[n];
+                                            tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                            tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                            tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                            tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                            tmp.Modes[AnharmHB[i].QUnique[4]].Quanta += f;
+                                            if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0  &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                                   tmp.Modes[AnharmHB[i].QUnique[4]].Quanta >=0 && 
+                                                   HashedBasisInit.count(tmp) == 0
+                                                   ){ //make sure a|0> = 0
+                                                    if (FitsMaxQuanta(tmp, MaxQuanta))
+                                                    {
+                                                        HashedNewStates.insert(tmp); // add new state
+                                                    }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].QUnique.size()==6){ // Stupid way to enumerate new states from F_ijklmn 
+                    for( int a=-(AnharmHB[i].QPowers[0]); a<(AnharmHB[i].QPowers[0]+1); a+=2 ){
+                        for( int b=-(AnharmHB[i].QPowers[1]); b<(AnharmHB[i].QPowers[1]+1); b+=2 ){
+                            for( int c=-(AnharmHB[i].QPowers[2]); c<(AnharmHB[i].QPowers[2]+1); c+=2 ){
+                                for( int d=-(AnharmHB[i].QPowers[3]); d<(AnharmHB[i].QPowers[3]+1); d+=2 ){
+                                    for( int f=-(AnharmHB[i].QPowers[4]); f<(AnharmHB[i].QPowers[4]+1); f+=2 ){
+                                        for( int g=-(AnharmHB[i].QPowers[5]); g<(AnharmHB[i].QPowers[5]+1); g+=2 ){
+                                            if(abs(a)+abs(b)+abs(c)+abs(d)+abs(f)+abs(g) != 0){ // Skip if no change
+                                                WaveFunction tmp = BasisSet[n];
+                                                tmp.Modes[AnharmHB[i].QUnique[0]].Quanta += a;
+                                                tmp.Modes[AnharmHB[i].QUnique[1]].Quanta += b;
+                                                tmp.Modes[AnharmHB[i].QUnique[2]].Quanta += c;
+                                                tmp.Modes[AnharmHB[i].QUnique[3]].Quanta += d;
+                                                tmp.Modes[AnharmHB[i].QUnique[4]].Quanta += f;
+                                                tmp.Modes[AnharmHB[i].QUnique[5]].Quanta += g;
+                                                if( tmp.Modes[AnharmHB[i].QUnique[0]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[1]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[2]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[3]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[4]].Quanta >=0 &&
+                                                       tmp.Modes[AnharmHB[i].QUnique[5]].Quanta >=0 &&
+                                                                                                       HashedBasisInit.count(tmp) == 0
+                                                       ){ //make sure a|0> = 0
+                                                        if (FitsMaxQuanta(tmp, MaxQuanta))
+                                                        {
+                                                            HashedNewStates.insert(tmp); // add new state
+                                                        }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if(AnharmHB[i].fcpow.size() == 0 || AnharmHB[i].fcpow.size() > 6 ){
+                    //Print error message
+                    cout << "Error: HCI only works with force constants up to 6th order." << endl;
+                    cout.flush();
+                    exit(0);
+                }
+            }
+            else{break;}// break loop if you've reached element < eps, since all future elements will be smaller (HB sorting)
+        }
+    }
+    std::vector<WaveFunction> NewBasis;
+    for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
+    return NewBasis;
+}
+
+SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV)
+{
+    SpMat H(BasisSet.size(), BasisSet.size());
+    std::vector<Trip> HTrip;
+
+    std::vector<int> MaxQuanta;
+    for (Eigen::MatrixXd &C : Cs) MaxQuanta.push_back(C.rows());
+
+    #pragma omp parallel for
+    for (unsigned int i = 0; i < BasisSet.size(); i++)
+    {
+        std::vector<int> ModeOccI;
+        for (unsigned int m = 0; m < BasisSet[i].Modes.size(); m++) ModeOccI.push_back(BasisSet[i].Modes[m].Quanta);
+        for (unsigned int j = i; j < BasisSet.size(); j++) // starts with j=i to exploit Hermiticity (Hij = Hji)
+        {
+            double Vij = 0;
+            std::vector<int> ModeOccJ;
+            for (unsigned int m = 0; m < BasisSet[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet[j].Modes[m].Quanta);
+            std::vector<int> DiffModes = CalcDiffModes(BasisSet[i], BasisSet[j]);
+           
+            // Harmonic Part
+            if (DiffModes.size() < 2)
+            {
+                if (DiffModes.size() == 0)
+                {
+                    std::vector<double> Xs = ContractedHOTerms(Cs, Frequencies, ModeOccI, ModeOccJ);
+                    double HOij = 0.0;
+                    for (unsigned int m = 0; m < Xs.size(); m++)
+                    {
+                        HOij += Xs[m];
+                    }
+                    Vij += HOij;
+                }
+                if (DiffModes.size() == 1)
+                {
+                    Eigen::MatrixXd Cm = Cs[DiffModes[0]];
+                    double Xm = 0.0;
+                    for (unsigned int im = 0; im < Cs[DiffModes[0]].rows(); im++)
+                    {
+                        Xm += Cs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * Cs[DiffModes[0]](im, ModeOccJ[DiffModes[0]]) * (im + 0.5);
+                    }
+                    Xm *= Frequencies[DiffModes[0]];
+                    Vij += Xm;
+                }
+            }
+
+            // Anharmonic Part
+            std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(Cs, GenericV, ModeOccI, ModeOccJ);
+            for (FConst &FC : FCs)
+            {
+                double Vijq = 0.0;
+                if (VectorContainedIn(DiffModes, FC.QUnique))
+                {      
+                    Vijq = FC.fc;
+                    for (unsigned int m = 0; m < FC.QUnique.size(); m++)
+                    {
+                        Vijq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                    }
+                }
+                Vij += Vijq;
+            }
+            if (abs(Vij) > 1e-12)
+            {
+                if (i == j) HTrip.push_back(Trip(i, j, Vij / 2.0));
+                else HTrip.push_back(Trip(i, j, Vij));
+            }
+        }
+    }
+    
+    H.setFromTriplets(HTrip.begin(), HTrip.end());
+    H.makeCompressed();
+    HTrip = std::vector<Trip>(); // Free memory
+    SpMat HT = H.transpose();
+    HT.makeCompressed();
+    H += HT; // Complete symmetric matrix
+    HT = SpMat(1,1); // Free memory
+    H.makeCompressed();
+    cout << "The Hamiltonian is " << fixed << setprecision(2) << 
+        100*(1.-(double)H.nonZeros()/(double)H.size()) << "% sparse." << endl;
+    return H;
+};
+
+

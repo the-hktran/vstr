@@ -1,7 +1,8 @@
 import numpy as np
 from vstr import utils
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, HeatBath_Sort_FC, DoPT2, DoSPT2, VCIHamFromVSCF
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, HeatBath_Sort_FC, DoPT2, DoSPT2, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBWithMax
+from vstr.utils.perf_utils import TIMER
 from functools import reduce
 import itertools
 import math
@@ -52,12 +53,14 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis = AddStatesHB(mVHCI.Basis, Ws, C, eps)
+    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
+    mVHCI.Timer.start(2)
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.PotentialListFull, C = abs(mVHCI.C[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
     mVHCI.Basis += NewBasis
+    mVHCI.Timer.stop(2)
     return NAdded
 
 def HCI(mVHCI):
@@ -84,14 +87,20 @@ def PT2(mVHCI, doStochastic = False):
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
 def Diagonalize(mVHCI):
-    H = VCIHamFromVSCF(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Cs, mVHCI.GenericV)
+    mVHCI.Timer.start(1)
+    H = VCIHamFromVSCF(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV)
+    mVHCI.Timer.stop(1)
+    mVHCI.Timer.start(0)
     mVHCI.E, mVHCI.C = np.linalg.eigh(H)
-    print(H)
+    mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
 def SparseDiagonalize(mVHCI):
-    H = GenerateSparseHamV(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
+    H = VCISparseHamFromVSCF(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV)
+    mVHCI.Timer.stop(1)
+    mVHCI.Timer.start(0)
     mVHCI.E, mVHCI.C = sparse.linalg.eigsh(H, k = mVHCI.NStates, which = 'SM')
+    mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
 def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
@@ -184,7 +193,7 @@ class VCI:
 
     def __init__(self, mVSCF, MaxTotalQuanta = 2, NStates = 10, **kwargs):
         self.mVSCF = mVSCF
-        self.Cs = mVSCF.Cs
+        self.ModalCs = mVSCF.Cs
         self.Frequencies = mVSCF.Frequencies # 1D array of all harmonic frequencies.
         self.NModes = mVSCF.Frequencies.shape[0]
         self.MaxQuanta = mVSCF.MaxQuanta
@@ -218,11 +227,22 @@ class VCI:
 
         self.__dict__.update(kwargs)
 
-        # Initialize the Energies and Coefficients
-        self.Diagonalize()
+        self.Timer = TIMER(4)
+        self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction']
 
-    def kernel(self):
-        pass
+        # Initialize the Energies and Coefficients
+        self.Timer.start(0)
+        self.Diagonalize()
+        self.Timer.stop(0)
+
+    def kernel(self, doVHCI = True):
+        self.Timer.start(0)
+        self.Diagonalize()
+        self.Timer.stop(0)
+
+        if doVHCI:
+            self.HCI()
+        self.Timer.report(self.TimerNames)
 
 if __name__ == "__main__":
     '''
@@ -243,12 +263,13 @@ if __name__ == "__main__":
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = False)
-    mVCI = VCI(mf, MaxTotalQuanta)
+    mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     #mVCI.Diagonalize()
-    print(mVCI.E_HCI)
+    mVCI.kernel()
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
+    mVHCI.HCI()
     #mVHCI.Diagonalize()
-    print(mVHCI.E_HCI)
+    #print(mVHCI.E_HCI)
     #print(mVHCI.E[:NStates])
     #mVHCI.PT2(doStochastic = True)
     #print(mVHCI.E[:NStates])

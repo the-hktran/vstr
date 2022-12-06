@@ -30,6 +30,7 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("GenerateHam0V", GenerateHam0V, "Forms dense zeroth order vibrational Hamiltonian");
     m.def("GenerateSparseHamV", GenerateSparseHamV, "Forms sparse vibrational Hamiltonian");
     m.def("GenerateSparseHamAnharmV", GenerateSparseHamAnharmV, "Forms sparse vibrational Anharmonic Hamiltonian");
+    m.def("GenerateHamAnharmV", GenerateHamAnharmV, "Forms vibrational Anharmonic Hamiltonian");
     m.def("AddStatesHB", AddStatesHB, "Screens for states above the HB threshold");
     m.def("HeatBath_Sort_FC", HeatBath_Sort_FC, "Sorts the force constants from highest to lowest");
     m.def("DoPT2", DoPT2, "Runs PT2 corrections");
@@ -40,4 +41,6 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("GetVEffSLOW2CPP", GetVEffSLOW2CPP, "Generates the effective potential for each mode using memory efficient implementation.");
     m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode using mode independent memory efficient implementation.");
     m.def("VCIHamFromVSCF", VCIHamFromVSCF, "Generates H in the modal basis.");
+    m.def("VCISparseHamFromVSCF", VCISparseHamFromVSCF, "Generates H in the modal basis.");
+    m.def("AddStatesHBWithMax", AddStatesHBWithMax, "Screens for states above the HB threshold with a maximum on Quanta per mode.");
 }

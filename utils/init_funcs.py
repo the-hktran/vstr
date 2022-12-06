@@ -29,8 +29,6 @@ def InitTruncatedBasis(NModes, Frequencies, MaxQuanta, MaxTotalQuanta = None):
         Basis = Basis + BNext
         Bs = BNext.copy()
     
-    print("Initial basis functions are:\n", Basis)
-
     BasisWF = []
     for B in Basis:
         WF = WaveFunction(B, Frequencies)
