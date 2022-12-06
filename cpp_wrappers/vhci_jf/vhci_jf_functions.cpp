@@ -2169,6 +2169,7 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<doub
                 }
                 Vij += Vijq;
             }
+            #pragma omp critical
             if (abs(Vij) > 1e-12)
             {
                 if (i == j) HTrip.push_back(Trip(i, j, Vij / 2.0));
