@@ -1,7 +1,7 @@
 import numpy as np
 from vstr import utils
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, HeatBath_Sort_FC, DoPT2, DoSPT2, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBWithMax
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBWithMax
 from vstr.utils.perf_utils import TIMER
 from functools import reduce
 import itertools
@@ -76,14 +76,16 @@ def HCI(mVHCI):
 
 def PT2(mVHCI, doStochastic = False):
     assert(mVHCI.eps2 < mVHCI.eps1)
+    mVHCI.Timer.start(3)
     if doStochastic:
         if mVHCI.eps3 < 0:
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, False, mVHCI.eps3)
         else:
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, True, mVHCI.eps3)
     else:
-        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.eps2, mVHCI.NStates)
+        mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.ModalCs, mVHCI.GenericV)
+    mVHCI.Timer.stop(3)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
 def Diagonalize(mVHCI):
@@ -235,13 +237,15 @@ class VCI:
         self.Diagonalize()
         self.Timer.stop(0)
 
-    def kernel(self, doVHCI = True):
+    def kernel(self, doVHCI = True, doPT2 = False, doSPT2 = False):
         self.Timer.start(0)
         self.Diagonalize()
         self.Timer.stop(0)
 
         if doVHCI:
             self.HCI()
+        if doPT2 or doSPT2:
+            self.PT2(doStochastic = doSPT2)
         self.Timer.report(self.TimerNames)
 
 if __name__ == "__main__":
@@ -260,24 +264,15 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     from vstr.mf.vscf import VSCF
     from vstr.vhci.vhci import VHCI
+    #w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('../examples/jf_input/CLO2.inp')
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False, ModeOcc = [0, 0, 0])
-    #mf.SCF(DoDIIS = False)
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, ModeOcc = [0, 0, 0])
+    mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
+    mVCI.kernel(doSPT2 = True)
     mVCI.PrintResults()
-    #mVCI.Diagonalize()
-    #mVCI.kernel()
-    mVCI.PT2()
-    mVCI.PrintResults()
+
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    #mVHCI.HCI()
-    mVHCI.PT2()
+    mVHCI.HCI()
+    mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
-    #mVHCI.Diagonalize()
-    #print(mVHCI.E_HCI)
-    #print(mVHCI.E[:NStates])
-    #mVHCI.PT2(doStochastic = True)
-    #print(mVHCI.E[:NStates])
-    #print(mVHCI.dE_PT2)
-    #print(mVHCI.E_HCI_PT2)
-    #mVHCI.PrintResults()
