@@ -68,7 +68,7 @@ def HCI(mVHCI):
     it = 1
     while (float(NAdded) / float(len(mVHCI.Basis))) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
-        print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
+        print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
         mVHCI.SparseDiagonalize()
         it += 1
         if it > mVHCI.MaxIter:
@@ -246,26 +246,31 @@ class VCI:
         self.Diagonalize()
         print("===== VSCF-VCI RESULTS =====", flush = True)
         self.PrintResults()
+        print("")
         self.Timer.stop(0)
         
         if doVHCI:
-            self.HCI()
             print("===== VSCF-VHCI RESULTS =====", flush = True)
+            self.HCI()
             self.PrintResults()
+            print("")
         if doPT2 or doSPT2:
-            self.PT2(doStochastic = doSPT2)
             print("===== VSCF-VHCI+PT2 RESULTS =====", flush = True)
+            self.PT2(doStochastic = doSPT2)
             self.PrintResults()
+            print("")
             if ComparePT2:
-                self.PT2(doStochastic = True)
                 print("===== VSCF-VHCI+SPT2 RESULTS =====", flush = True)
+                self.PT2(doStochastic = True)
                 self.PrintResults()
+                print("")
+                print("===== VSCF-VHCI+SSPT2 RESULTS =====", flush = True)
                 eps = self.eps2
                 self.eps2 *= 10
                 self.eps3 = eps
                 self.PT2(doStochastic = True)
-                print("===== VSCF-VHCI+SSPT2 RESULTS =====", flush = True)
                 self.PrintResults()
+                print("")
         self.Timer.report(self.TimerNames)
 
 if __name__ == "__main__":
