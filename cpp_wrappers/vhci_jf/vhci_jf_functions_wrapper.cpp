@@ -43,4 +43,5 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("VCIHamFromVSCF", VCIHamFromVSCF, "Generates H in the modal basis.");
     m.def("VCISparseHamFromVSCF", VCISparseHamFromVSCF, "Generates H in the modal basis.");
     m.def("AddStatesHBWithMax", AddStatesHBWithMax, "Screens for states above the HB threshold with a maximum on Quanta per mode.");
+    m.def("DoPT2FromVSCF", DoPT2FromVSCF, "Runs PT2 corrections in the modal basis.");
 }

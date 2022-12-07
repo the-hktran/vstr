@@ -2143,7 +2143,6 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<doub
                 }
                 if (DiffModes.size() == 1)
                 {
-                    Eigen::MatrixXd Cm = Cs[DiffModes[0]];
                     double Xm = 0.0;
                     for (unsigned int im = 0; im < Cs[DiffModes[0]].rows(); im++)
                     {
@@ -2190,5 +2189,396 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<doub
         100*(1.-(double)H.nonZeros()/(double)H.size()) << "% sparse." << endl;
     return H;
 };
+
+std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, double PT2_Eps, int NEig, std::vector<Eigen::MatrixXd> &ModalCs, std::vector<Eigen::SparseMatrix<double>> &GenericVs)
+{
+    int N_opt;
+    if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
+        N_opt = BasisSet.size();
+    }else{ // If number of states exceeds the number selected to optimize
+        N_opt = NEig;
+    }
+
+    vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
+
+    std::vector<double> Frequencies;
+    for (unsigned int m = 0; m < BasisSet[0].Modes.size(); m++) Frequencies.push_back(BasisSet[0].Modes[m].Freq);
+
+    std::vector<int> MaxQuanta;
+    for (Eigen::MatrixXd &C : ModalCs) MaxQuanta.push_back(C.rows());
+
+    for (unsigned int n = 0; n < N_opt; n++)
+    {
+        std::vector<WaveFunction> PTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
+        std::cout << " Perturbative space for state " << n << " contains " << PTBasisSet.size() << " basis states." << std::endl;
+
+        #pragma omp parallel for
+        for (unsigned int a = 0; a < PTBasisSet.size(); a++)
+        {
+            double HaiCi = 0.0;
+            std::vector<int> ModeOccA;
+            for (unsigned int m = 0; m < PTBasisSet[a].Modes.size(); m++) ModeOccA.push_back(PTBasisSet[a].Modes[m].Quanta);
+
+            for (unsigned int i = 0; i < BasisSet.size(); i++)
+            {
+                std::vector<int> ModeOccI;
+                for (unsigned int m = 0; m < BasisSet[i].Modes.size(); m++) ModeOccI.push_back(BasisSet[i].Modes[m].Quanta);
+
+                std::vector<int> DiffModes = CalcDiffModes(PTBasisSet[a], BasisSet[i]);
+                if (DiffModes.size() == 1)
+                {
+                    double Xm = 0.0;
+                    for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
+                    {
+                        Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
+                    }
+                    Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
+                    HaiCi += Xm * Evecs(i, n);
+                }
+
+                std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccI);
+                for (FConst &FC : AnharmFC)
+                {
+                    double Haiq = 0.0;
+                
+                    if (DiffModes.size() == 1)
+                    {
+                        double Xm = 0.0;
+                        for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
+                        {
+                            Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
+                        }
+                        Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
+                        Haiq += Xm;
+                    }
+                    HaiCi += Haiq * Evecs(i, n);
+
+                    Haiq = 0.0;
+                    if (VectorContainedIn(DiffModes, FC.QUnique))
+                    {
+                        Haiq = FC.fc;
+                        for (unsigned int m = 0; m < FC.QUnique.size(); m++)
+                        {
+                            Haiq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                        }
+                    }
+                    HaiCi += Haiq * Evecs(i, n);
+                }
+
+            }
+           
+            double Ea = 0.; //Hii matrix element
+            
+            // Harmonic Part
+            std::vector<double> Xs = ContractedHOTerms(ModalCs, Frequencies, ModeOccA, ModeOccA);
+            double HOij = 0.0;
+            for (unsigned int m = 0; m < Xs.size(); m++)
+            {
+                Ea += Xs[m];
+            }
+
+            // Anharmonic Part
+            std::vector<std::vector<double>> YAs = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccA);
+            double EaAnharm = 1.0;
+            for (FConst &FC : AnharmFC)
+            {   
+                // All FCs contribute
+                double Eaq = FC.fc;
+                for (unsigned int m = 0; m < FC.QUnique.size(); m++)
+                {
+                    Eaq *= YAs[FC.QUnique[m]][FC.QPowers[m]];
+                }
+                Ea += Eaq;
+            }
+            
+            #pragma omp atomic // Will cause floating point error if blindly done in parallel
+            DeltaE[n] += pow(HaiCi, 2) / (Evals(n) - Ea);
+        }
+    }
+    return DeltaE;    
+}
+
+std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
+{
+    int N_opt;
+    if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
+        N_opt = BasisSet.size();
+    }else{ // If number of states exceeds the number selected to optimize
+        N_opt = NEig;
+    }
+
+    vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
+    std::vector<std::vector<double>> DeltaESample;
+    std::vector<double> DeltaEDet(N_opt, 0.0);
+    int fcmax=0;
+    for (unsigned int k=0;k<AnharmFC.size();k++){ //Order of maximum anharmonic term
+        if(AnharmFC[k].fcpow.size()>fcmax){
+            fcmax = AnharmFC[k].fcpow.size();
+        }
+    }
+
+    for (unsigned int n = 0; n < N_opt; n++)
+    {
+        // For each state, we determine the perturbative basis and populate the state with walkers.
+        std::vector<WaveFunction> DetPTBasisSet;
+        if (SemiStochastic)
+        {
+            DetPTBasisSet = AddStatesHB(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps);
+            std::cout << "Perturbative space for state " << n << " contains " << DetPTBasisSet.size() << " deterministic basis states." << std::endl;
+        }
+
+        std::vector<double> Cn;
+        for (unsigned int i = 0; i < Evecs.rows(); i++) Cn.push_back(Evecs(i ,n));
+
+        // If we are doing semi-stochastic, I need to do a deterministic calculation first. That will be executed here with the DetPTBasisSet.
+        if (SemiStochastic)
+        {
+            #pragma omp parallel for
+            for (unsigned int a = 0; a < DetPTBasisSet.size(); a++)
+            {
+                double HaiCi = 0.0;
+                vector<int> qdiffvec(BasisSet[0].M,0);
+                for (unsigned int i = 0; i < BasisSet.size(); i++)
+                {
+                    double Hai = 0;
+                    int mchange = 0; // number of modes with nonzero change in quanta
+                    int qdiff = 0; // total number of quanta difference 
+                    QDiffVec(DetPTBasisSet[a], BasisSet[i], qdiff, mchange, qdiffvec);
+                    if(qdiff <= fcmax && mchange <= fcmax && qdiff%2==0)
+                    { 
+                        // States cannot differ by more than fcmax quanta
+                        for (unsigned int k=0;k<QuarticFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,QuarticFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(DetPTBasisSet[a], BasisSet[i], QuarticFC[k]);
+                            }
+                        }
+                        for (unsigned int k=0;k<SexticFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,SexticFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(DetPTBasisSet[a], BasisSet[i], SexticFC[k]);
+                            }
+                        }
+                        HaiCi += Hai * Evecs(i, n); // C_i Hai for each eigenvalue of interest
+                    }
+                    if(qdiff <= fcmax-1 && mchange <= fcmax-1 && qdiff%2==1)
+                    { 
+                        // fcmax-1 assumes 4th or 6th max order 
+                        // States cannot differ by more than fcmax quanta
+                        for (unsigned int k=0;k<CubicFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,CubicFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(DetPTBasisSet[a], BasisSet[i], CubicFC[k]);
+                            }
+                        }
+                        for (unsigned int k=0;k<QuinticFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,QuinticFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(DetPTBasisSet[a], BasisSet[i], QuinticFC[k]);
+                            }
+                        }
+                        HaiCi += Hai * Evecs(i, n); // C_i Hai for each eigenvalue of interest
+                    }
+                }
+                double Ea = 0.; //Hii matrix element
+                for (unsigned int j = 0; j < DetPTBasisSet[a].M; j++)
+                {
+                  //Calculate partial energies
+                  double Ej = 0.5;
+                  Ej += DetPTBasisSet[a].Modes[j].Quanta;
+                  Ej *= DetPTBasisSet[a].Modes[j].Freq;
+                  //Update matrix element
+                  Ea += Ej;
+                }
+                vector<int> zerodiffvec(BasisSet[0].M,0);
+                int qdiff=0;
+                int mchange=0;
+                for (unsigned int k = 0; k < QuarticFC.size(); k++) // Only even-ordered fc can affect this
+                {
+                    if (ScreenState(qdiff, mchange, zerodiffvec, QuarticFC[k]))
+                    {
+                        // Screen force constants that cannot connect basis states a and a
+                        //Add anharmonic matrix elements
+                        Ea += AnharmPot(DetPTBasisSet[a], DetPTBasisSet[a], QuarticFC[k]);
+                    }
+                }
+                for (unsigned int k = 0; k < SexticFC.size(); k++) // Only even-ordered fc can affect this
+                {    
+                    if (ScreenState(qdiff, mchange, zerodiffvec, SexticFC[k]))
+                    {
+                        // Screen force constants that cannot connect basis states a and a
+                        //Add anharmonic matrix elements
+                        Ea += AnharmPot(DetPTBasisSet[a], DetPTBasisSet[a], SexticFC[k]);
+                    }
+                }
+                #pragma omp atomic // Will cause floating point error if blindly done in parallel
+                DeltaEDet[n] += pow(HaiCi, 2) / (Evals(n) - Ea);
+            }
+        } // end deterministic calculation for semi-stochastic
+
+        std::vector<double> DeltaEs(Ns, 0.0);
+        int PTBasisSize = 0;
+        #pragma omp parallel for
+        for (unsigned int s = 0; s < Ns; s++)
+        {
+            std::vector<double> WalkerProbability = StateProbability(Cn);
+            std::map<int, int> WalkerPopulation;
+            FillWalkers(WalkerPopulation, WalkerProbability, Nd);
+
+            std::vector<WaveFunction> PTBasisSet;
+            HashedStates PTBasisSetHashed;
+            if (SemiStochastic)
+            {
+                std::vector<WaveFunction> VarDetBasisSet; // Actually I think this destructs outside of this if statement.
+                for (const WaveFunction &WF : BasisSet) VarDetBasisSet.push_back(WF);
+                for (const WaveFunction &WF : DetPTBasisSet) VarDetBasisSet.push_back(WF);
+                for (std::map<int, int>::iterator it = WalkerPopulation.begin(); it != WalkerPopulation.end(); ++it)
+                {
+                    int i = it->first;
+                    InternalAddStatesHB(VarDetBasisSet, PTBasisSetHashed, AnharmHB, i, Evecs(i, n), PT2_Eps2);
+                }
+            }
+            else
+            {
+                for (std::map<int, int>::iterator it = WalkerPopulation.begin(); it != WalkerPopulation.end(); ++it)
+                {
+                    int i = it->first;
+                    InternalAddStatesHB(BasisSet, PTBasisSetHashed, AnharmHB, i, Evecs(i, n), PT2_Eps);
+                }
+            }
+            for (const WaveFunction &WF : PTBasisSetHashed) PTBasisSet.push_back(WF);
+            PTBasisSetHashed = HashedStates();
+            PTBasisSize += PTBasisSet.size();
+            //std::cout << " Perturbative space for state " << n << " and sample " << s << " contains " << PTBasisSet.size() << " stochastic basis states." << std::endl;
+
+            for (unsigned int a = 0; a < PTBasisSet.size(); a++)
+            {
+                double HaiCi = 0.0;
+                double Hai2Ci2 = 0.0;
+                vector<int> qdiffvec(BasisSet[0].M,0);
+                for (std::map<int, int>::iterator it = WalkerPopulation.begin(); it != WalkerPopulation.end(); ++it)
+                {
+                    int i = it->first;
+                    double Hai = 0;
+                    int mchange = 0; // number of modes with nonzero change in quanta
+                    int qdiff = 0; // total number of quanta difference 
+                    QDiffVec(PTBasisSet[a], BasisSet[i], qdiff, mchange, qdiffvec);
+                    if(qdiff <= fcmax && mchange <= fcmax && qdiff%2==0)
+                    { 
+                        // States cannot differ by more than fcmax quanta
+                        for (unsigned int k=0;k<QuarticFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,QuarticFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(PTBasisSet[a], BasisSet[i], QuarticFC[k]);
+                            }
+                        }
+                        for (unsigned int k=0;k<SexticFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,SexticFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(PTBasisSet[a], BasisSet[i], SexticFC[k]);
+                            }
+                        }
+                        HaiCi += (Hai * Evecs(i, n) * WalkerPopulation[i]) / WalkerProbability[i]; // C_i Hai for each eigenvalue of interest
+                        Hai2Ci2 += (pow(Hai, 2) * pow(Evecs(i, n), 2)) * (WalkerPopulation[i] * (Nd - 1) / WalkerProbability[i] - pow(WalkerPopulation[i], 2) / pow(WalkerProbability[i], 2));
+                    }
+                    if(qdiff <= fcmax-1 && mchange <= fcmax-1 && qdiff%2==1)
+                    { 
+                        // fcmax-1 assumes 4th or 6th max order 
+                        // States cannot differ by more than fcmax quanta
+                        for (unsigned int k=0;k<CubicFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,CubicFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(PTBasisSet[a], BasisSet[i], CubicFC[k]);
+                            }
+                        }
+                        for (unsigned int k=0;k<QuinticFC.size();k++)
+                        {
+                            if ( ScreenState(qdiff,mchange,qdiffvec,QuinticFC[k]) ){
+                                //Screen force constants for connection                      
+                                //Add anharmonic matrix elements
+                                Hai += AnharmPot(PTBasisSet[a], BasisSet[i], QuinticFC[k]);
+                            }
+                        }
+                        HaiCi += (Hai * Evecs(i, n) * WalkerPopulation[i]) / WalkerProbability[i]; // C_i Hai for each eigenvalue of interest
+                        Hai2Ci2 += (pow(Hai, 2) * pow(Evecs(i, n), 2)) * (WalkerPopulation[i] * (Nd - 1) / WalkerProbability[i] - pow(WalkerPopulation[i], 2) / pow(WalkerProbability[i], 2));
+                    }
+                }
+                double Ea = 0.; //Hii matrix element
+                for (unsigned int j = 0; j < PTBasisSet[a].M; j++)
+                {
+                  //Calculate partial energies
+                  double Ej = 0.5;
+                  Ej += PTBasisSet[a].Modes[j].Quanta;
+                  Ej *= PTBasisSet[a].Modes[j].Freq;
+                  //Update matrix element
+                  Ea += Ej;
+                }
+                vector<int> zerodiffvec(BasisSet[0].M,0);
+                int qdiff=0;
+                int mchange=0;
+                for (unsigned int k = 0; k < QuarticFC.size(); k++) // Only even-ordered fc can affect this
+                {
+                    if (ScreenState(qdiff, mchange, zerodiffvec, QuarticFC[k]))
+                    {
+                        // Screen force constants that cannot connect basis states a and a
+                        //Add anharmonic matrix elements
+                        Ea += AnharmPot(PTBasisSet[a], PTBasisSet[a], QuarticFC[k]);
+                    }
+                }
+                for (unsigned int k = 0; k < SexticFC.size(); k++) // Only even-ordered fc can affect this
+                {    
+                    if (ScreenState(qdiff, mchange, zerodiffvec, SexticFC[k]))
+                    {
+                        // Screen force constants that cannot connect basis states a and a
+                        //Add anharmonic matrix elements
+                        Ea += AnharmPot(PTBasisSet[a], PTBasisSet[a], SexticFC[k]);
+                    }
+                }
+                #pragma omp atomic // Will cause floating point error if blindly done in parallel
+                DeltaEs[s] += (pow(HaiCi, 2) + Hai2Ci2) / ((Evals(n) - Ea) * Nd * (Nd - 1));
+            }
+        }
+        DeltaESample.push_back(DeltaEs);
+        std::cout << " Perturbative space for state " << n << " contains " << (float)PTBasisSize / (float)Ns << " stochastic basis states on average." << std::endl;
+    }
+
+    std::vector<double> SigmaDeltaE(N_opt, 0.0);
+    for (unsigned int n = 0; n < N_opt; n++)
+    {
+        for (unsigned int s = 0; s < Ns; s++)
+        {
+            DeltaE[n] += DeltaESample[n][s];
+            //SigmaDeltaE[n] += pow(DeltaESample[n][s], 2);
+        }
+        //SigmaDeltaE[n] -= (pow(DeltaE[n], 2) / Ns);
+        DeltaE[n] /= Ns;
+        std::cout << setprecision(12);
+        for (unsigned int s = 0; s < Ns; s++)
+        {
+            SigmaDeltaE[n] += pow(DeltaESample[n][s] - DeltaE[n], 2);
+        }
+        if (SemiStochastic) DeltaE[n] += DeltaEDet[n];
+        SigmaDeltaE[n] /= (Ns - 1);
+        SigmaDeltaE[n] = sqrt(SigmaDeltaE[n]); // This is sample standard deviation
+        SigmaDeltaE[n] /= sqrt(Ns); // This is standard error
+        //cout << DeltaE[n] << " " << SigmaDeltaE[n] << std::endl;
+    }
+
+    return std::make_tuple(DeltaE, SigmaDeltaE);
+}
 
 
