@@ -295,7 +295,7 @@ if __name__ == "__main__":
     mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mVCI.kernel(doPT2 = True, ComparePT2 = True)
-    mVCI.PrintResults()
+    #mVCI.PrintResults()
 
     '''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)

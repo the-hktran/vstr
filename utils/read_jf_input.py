@@ -25,7 +25,7 @@ def Read(FilePath):
         a, ws[i], MaxNs[i] = f.readline().split()
     for i in range(NModes):
         ws[i] = float(ws[i])
-        MaxNs[i] = int(MaxNs[i]) + 1
+        MaxNs[i] = int(MaxNs[i])
     ws = np.asarray(ws)
 
     NFC = int(f.readline().split()[1])
