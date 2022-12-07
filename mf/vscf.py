@@ -443,6 +443,25 @@ def PrintResults(mVSCF, NStates = None, PrintLC = False):
             OutLine += '\t%s' % (LCString)
         print(OutLine, flush = True)
 
+def AnalyzeModals(mVSCF):
+    print("|*****************************************|")
+    print("|********** VSCF Modal Analysis **********|", flush = True)
+    print("|*****************************************|")
+    print("")
+
+    for m in range(mVSCF.NModes):
+        print(" == Modal", m + 1, "== ")
+        Lines = [""] * (mVSCF.MaxQuanta[m] + 1)
+        for i in range(mVSCF.MaxQuanta[m]):
+            Lines[0] += '\tMO_%d' % (i + 1)
+        for n in range(mVSCF.MaxQuanta[m]):
+            Lines[n + 1] += 'HO_%d' % (n + 1)
+            for nn in range(mVSCF.MaxQuanta[m]):
+                Lines[n + 1] += '\t{:.6f}'.format(mVSCF.Cs[m][n, nn])
+        for Line in Lines:
+            print(Line, flush = True)
+        print("")
+            
 class VSCF:
     InitCs = InitCs
     GetModalSlices = GetModalSlices
@@ -460,6 +479,7 @@ class VSCF:
 
     PrintResults = PrintResults
     LCLine = LCLine
+    AnalyzeModals = AnalyzeModals
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
@@ -522,6 +542,5 @@ if __name__ == "__main__":
     print(MaxQuanta)
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = False)
-    print(mf.CalcESCF())
-    print(mf.Cs[0].shape)
     mf.PrintResults(NStates = 10)
+    mf.AnalyzeModals()
