@@ -76,16 +76,20 @@ def HCI(mVHCI):
 
 def PT2(mVHCI, doStochastic = False):
     assert(mVHCI.eps2 < mVHCI.eps1)
-    mVHCI.Timer.start(3)
     if doStochastic:
         if mVHCI.eps3 < 0:
+            mVHCI.Timer.start(4)
             mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, False, mVHCI.eps3)
+            mVHCI.Timer.stop(4)
         else:
+            mVHCI.Timer.start(5)
             assert (mVHCI.eps3 < mVHCI.eps2)
             mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, True, mVHCI.eps3)
+            mVHCI.Timer.stop(5)
     else:
+        mVHCI.Timer.start(3)
         mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.ModalCs, mVHCI.GenericV)
-    mVHCI.Timer.stop(3)
+        mVHCI.Timer.stop(3)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
 def Diagonalize(mVHCI):
@@ -175,7 +179,7 @@ def PrintResults(mVHCI):
         Outline += '\t%s' % (BString)
         LCString = mVHCI.LCLine(n)
         Outline += '\t%s' % (LCString)
-        print(Outline)
+        print(Outline, flush = True)
             
 '''
 Class that handles VHCI
@@ -229,23 +233,39 @@ class VCI:
 
         self.__dict__.update(kwargs)
 
-        self.Timer = TIMER(4)
-        self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction']
+        self.Timer = TIMER(6)
+        self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
 
         # Initialize the Energies and Coefficients
         self.Timer.start(0)
         self.Diagonalize()
         self.Timer.stop(0)
 
-    def kernel(self, doVHCI = True, doPT2 = False, doSPT2 = False):
+    def kernel(self, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
         self.Timer.start(0)
         self.Diagonalize()
+        print("===== VSCF-VCI RESULTS =====", flush = True)
+        self.PrintResults()
         self.Timer.stop(0)
-
+        
         if doVHCI:
             self.HCI()
+            print("===== VSCF-VHCI RESULTS =====", flush = True)
+            self.PrintResults()
         if doPT2 or doSPT2:
             self.PT2(doStochastic = doSPT2)
+            print("===== VSCF-VHCI+PT2 RESULTS =====", flush = True)
+            self.PrintResults()
+            if ComparePT2:
+                self.PT2(doStochastic = True)
+                print("===== VSCF-VHCI+SPT2 RESULTS =====", flush = True)
+                self.PrintResults()
+                eps = self.eps2
+                self.eps2 *= 10
+                self.eps3 = eps
+                self.PT2(doStochastic = True)
+                print("===== VSCF-VHCI+SSPT2 RESULTS =====", flush = True)
+                self.PrintResults()
         self.Timer.report(self.TimerNames)
 
 if __name__ == "__main__":
@@ -269,10 +289,12 @@ if __name__ == "__main__":
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, ModeOcc = [0, 0, 0])
     mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.kernel(doSPT2 = True)
+    mVCI.kernel(doPT2 = True, ComparePT2 = True)
     mVCI.PrintResults()
 
+    '''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mVHCI.HCI()
     mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
+    '''
