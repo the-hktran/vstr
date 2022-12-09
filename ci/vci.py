@@ -104,7 +104,6 @@ def Diagonalize(mVHCI):
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
 def SparseDiagonalize(mVHCI):
-    mVHCI.H = None
     if mVHCI.H is None:
         mVHCI.H = VCISparseHamFromVSCF(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, True)
     else:
@@ -303,16 +302,15 @@ if __name__ == "__main__":
     #w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('../examples/jf_input/CLO2.inp')
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
-    #mf.SCF(DoDIIS = False)
+    mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.kernel(doVHCI = True)
     mVCI.PrintResults()
-    #mVCI.kernel(doPT2 = True, ComparePT2 = True)
+    mVCI.kernel(doVHCI = True, doPT2 = True, ComparePT2 = True)
     #mVCI.PrintResults()
 
-    #'''
+    '''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mVHCI.HCI()
     #mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
-    #'''
+    '''
