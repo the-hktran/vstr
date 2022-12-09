@@ -61,18 +61,20 @@ def HCIStep(mVHCI, eps = 0.01):
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.PotentialListFull, C = abs(mVHCI.C[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
     mVHCI.Basis += NewBasis
     mVHCI.Timer.stop(2)
-    return NAdded
+    return NAdded, NewBasis
 
 def HCI(mVHCI):
     NAdded = len(mVHCI.Basis)
     it = 1
     while (float(NAdded) / float(len(mVHCI.Basis))) > mVHCI.tol:
-        NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
+        NAdded, mVHCI.NewBasis = mVHCI.HCIStep(eps = mVHCI.eps1)
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
         mVHCI.SparseDiagonalize()
         it += 1
         if it > mVHCI.MaxIter:
             raise RuntimeError("VHCI did not converge.")
+    mVHCI.NewBasis = None
+    mVHCI.H = None
 
 def PT2(mVHCI, doStochastic = False):
     assert(mVHCI.eps2 < mVHCI.eps1)
@@ -102,10 +104,18 @@ def Diagonalize(mVHCI):
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
 def SparseDiagonalize(mVHCI):
-    H = VCISparseHamFromVSCF(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV)
+    mVHCI.H = None
+    if mVHCI.H is None:
+        mVHCI.H = VCISparseHamFromVSCF(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, True)
+    else:
+        if len(mVHCI.NewBasis) != 0:
+            HIJ = VCISparseHamFromVSCF(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, False)
+            HJJ = VCISparseHamFromVSCF(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, True)
+            mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
+            mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
-    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(H, k = mVHCI.NStates, which = 'SM')
+    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')
     mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
@@ -220,6 +230,7 @@ class VCI:
         for Nm in self.MaxQuanta:
             assert(Nm >= self.MaxTotalQuanta)
         self.Basis = utils.init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
+        self.H = None
         self.eps1 = 0.1 # HB epsilon
         self.eps2 = 0.01 # PT2/SPT2 epsilon
         self.eps3 = -1.0 # SSPT2 epsilon, < 0 means do not do semi-stochastic
@@ -291,15 +302,17 @@ if __name__ == "__main__":
     from vstr.vhci.vhci import VHCI
     #w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('../examples/jf_input/CLO2.inp')
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, ModeOcc = [0, 0, 0])
-    mf.SCF(DoDIIS = False)
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
+    #mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.kernel(doPT2 = True, ComparePT2 = True)
+    mVCI.kernel(doVHCI = True)
+    mVCI.PrintResults()
+    #mVCI.kernel(doPT2 = True, ComparePT2 = True)
     #mVCI.PrintResults()
 
-    '''
+    #'''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mVHCI.HCI()
-    mVHCI.PT2(doStochastic = True)
+    #mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
-    '''
+    #'''

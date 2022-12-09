@@ -201,9 +201,7 @@ def GetHCore(mVSCF, Cs = None, HamHO = None):
 def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
     if ModeOcc is None:
         ModeOcc = mVSCF.ModeOcc
-    
     V0 = mVSCF.GetVEff(ModeOcc1 = ModeOcc, FirstV = True)[0]
-
     DC = (mVSCF.Cs[0][:, ModeOcc[0]].T @ V0 @ mVSCF.Cs[0][:, ModeOcc[0]])
     E_SCF = 0.0
     for Mode, E in enumerate(mVSCF.Es):
@@ -538,9 +536,17 @@ class VSCF:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('naphthalene.inp')
     print(MaxQuanta)
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False, ModeOcc = [0, 0, 0])
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False)
     mf.SCF(DoDIIS = False)
-    mf.PrintResults(NStates = 10)
     mf.AnalyzeModals()
+    mf.PrintResults(NStates = 10)
+    mo = [0]*48
+    #mo[-1]=2
+    #print(mf.CalcESCF(ModeOcc = mo))
+    mo[-1] = 3
+    print(mf.CalcESCF(ModeOcc = mo))
+    mf.ModeOcc = mo
+    mf.SCF(DoDIIS=False)
+    mf.PrintResults(NStates = 10)#mf.AnalyzeModals()

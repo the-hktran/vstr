@@ -2266,25 +2266,28 @@ void InternalAddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, HashedState
 }
 
 
-SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV)
+SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV, bool DiagonalBlock)
 {
-    SpMat H(BasisSet.size(), BasisSet.size());
+    SpMat H(BasisSet1.size(), BasisSet2.size());
     std::vector<Trip> HTrip;
 
     std::vector<int> MaxQuanta;
     for (Eigen::MatrixXd &C : Cs) MaxQuanta.push_back(C.rows());
 
     #pragma omp parallel for
-    for (unsigned int i = 0; i < BasisSet.size(); i++)
+    for (unsigned int i = 0; i < BasisSet1.size(); i++)
     {
         std::vector<int> ModeOccI;
-        for (unsigned int m = 0; m < BasisSet[i].Modes.size(); m++) ModeOccI.push_back(BasisSet[i].Modes[m].Quanta);
-        for (unsigned int j = i; j < BasisSet.size(); j++) // starts with j=i to exploit Hermiticity (Hij = Hji)
+        for (unsigned int m = 0; m < BasisSet1[i].Modes.size(); m++) ModeOccI.push_back(BasisSet1[i].Modes[m].Quanta);
+        unsigned int jstart;
+        if (DiagonalBlock) jstart = i;
+        else jstart = 0;
+        for (unsigned int j = jstart; j < BasisSet2.size(); j++) // starts with j=i to exploit Hermiticity (Hij = Hji)
         {
             double Vij = 0;
             std::vector<int> ModeOccJ;
-            for (unsigned int m = 0; m < BasisSet[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet[j].Modes[m].Quanta);
-            std::vector<int> DiffModes = CalcDiffModes(BasisSet[i], BasisSet[j]);
+            for (unsigned int m = 0; m < BasisSet2[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet2[j].Modes[m].Quanta);
+            std::vector<int> DiffModes = CalcDiffModes(BasisSet1[i], BasisSet2[j]);
            
             // Harmonic Part
             if (DiffModes.size() < 2)
@@ -2329,8 +2332,15 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<doub
             #pragma omp critical
             if (abs(Vij) > 1e-12)
             {
-                if (i == j) HTrip.push_back(Trip(i, j, Vij / 2.0));
-                else HTrip.push_back(Trip(i, j, Vij));
+                if (DiagonalBlock)
+                {
+                    if (i == j) HTrip.push_back(Trip(i, j, Vij / 2.0));
+                    else HTrip.push_back(Trip(i, j, Vij));
+                }
+                else
+                {
+                    HTrip.push_back(Trip(i, j, Vij));
+                }
             }
         }
     }
@@ -2338,11 +2348,14 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<doub
     H.setFromTriplets(HTrip.begin(), HTrip.end());
     H.makeCompressed();
     HTrip = std::vector<Trip>(); // Free memory
-    SpMat HT = H.transpose();
-    HT.makeCompressed();
-    H += HT; // Complete symmetric matrix
-    HT = SpMat(1,1); // Free memory
-    H.makeCompressed();
+    if (DiagonalBlock)
+    {
+        SpMat HT = H.transpose();
+        HT.makeCompressed();
+        H += HT; // Complete symmetric matrix
+        HT = SpMat(1,1); // Free memory
+        H.makeCompressed();
+    }
     cout << "The Hamiltonian is " << fixed << setprecision(2) << 
         100*(1.-(double)H.nonZeros()/(double)H.size()) << "% sparse." << endl;
     return H;
