@@ -1,7 +1,7 @@
 import numpy as np
 from vstr import utils
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBWithMax
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBWithMax
 from vstr.utils.perf_utils import TIMER
 from functools import reduce
 import itertools
@@ -53,7 +53,8 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta)
+    UniqueBasis, mVHCI.HighestQuanta = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
+    print(mVHCI.HighestQuanta)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -81,16 +82,16 @@ def PT2(mVHCI, doStochastic = False):
     if doStochastic:
         if mVHCI.eps3 < 0:
             mVHCI.Timer.start(4)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, False, mVHCI.eps3)
             mVHCI.Timer.stop(4)
         else:
             mVHCI.Timer.start(5)
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, True, mVHCI.eps3)
             mVHCI.Timer.stop(5)
     else:
         mVHCI.Timer.start(3)
-        mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.ModalCs, mVHCI.GenericV)
+        mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.ModalCs, mVHCI.GenericV)
         mVHCI.Timer.stop(3)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
@@ -226,6 +227,7 @@ class VCI:
         self.GenericV = mVSCF.AnharmTensor
 
         self.MaxTotalQuanta = MaxTotalQuanta
+        self.HighestQuanta = [MaxTotalQuanta] * self.NModes
         for Nm in self.MaxQuanta:
             assert(Nm >= self.MaxTotalQuanta)
         self.Basis = utils.init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
@@ -245,11 +247,6 @@ class VCI:
 
         self.Timer = TIMER(6)
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
-
-        # Initialize the Energies and Coefficients
-        self.Timer.start(0)
-        self.Diagonalize()
-        self.Timer.stop(0)
 
     def kernel(self, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
         self.Timer.start(0)
@@ -302,15 +299,14 @@ if __name__ == "__main__":
     #w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('../examples/jf_input/CLO2.inp')
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
-    mf.SCF(DoDIIS = False)
+    #mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.PrintResults()
     mVCI.kernel(doVHCI = True, doPT2 = True, ComparePT2 = True)
     #mVCI.PrintResults()
 
-    '''
+    #'''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mVHCI.HCI()
     #mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
-    '''
+    #'''

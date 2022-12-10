@@ -87,7 +87,6 @@ def Diagonalize(mVHCI):
     H = GenerateHamV(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
     mVHCI.E, mVHCI.C = np.linalg.eigh(H)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
-    print(mVHCI.E_HCI)
 
 def SparseDiagonalize(mVHCI):
     H = GenerateSparseHamV(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
