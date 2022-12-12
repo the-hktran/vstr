@@ -8,6 +8,24 @@ import itertools
 import math
 from scipy import sparse
 
+def ReadBasisFromFile(mVHCI, FileName):
+    mVHCI.Basis = []
+    with open(FileName) as CHKFile:
+        for Line in CHKFile:
+            B = Line.split()
+            B = [int(b) for b in B]
+            mVHCI.Basis.append(WaveFunction(B, mVHCI.Frequencies))
+
+def SaveBasisToFile(mVHCI, FileName):
+    CHKFile = open(FileName, 'w')
+    for B in mVHCI.Basis:
+        Line = ""
+        for i in range(mVHCI.NModes):
+            Line += str(B.Modes[i].Quanta) + " "
+        CHKFile.write(Line[:-1])
+        CHKFile.write('\n')
+    CHKFile.close()
+
 def FormW(mVHCI, V):
     Ws = []
     for v in V:
@@ -206,6 +224,8 @@ class VCI:
     InitTruncatedBasis = InitTruncatedBasis
     PrintResults = PrintResults
     LCLine = LCLine
+    SaveBasisToFile = SaveBasisToFile
+    ReadBasisFromFile = ReadBasisFromFile
 
     def __init__(self, mVSCF, MaxTotalQuanta = 2, NStates = 10, **kwargs):
         self.mVSCF = mVSCF
@@ -243,12 +263,22 @@ class VCI:
         self.dE_PT2 = None
         self.sE_PT2 = None
 
+        self.CHKFile = None
+        self.ReadFromFile = False
+        self.SaveToFile = False
+
         self.__dict__.update(kwargs)
 
         self.Timer = TIMER(6)
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
 
     def kernel(self, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
+
+        if self.SaveToFile:
+            assert(self.CHKFile is not None)
+        if self.ReadFromFile:
+            self.ReadBasisFromFile(self.CHKFile)
+
         self.Timer.start(0)
         self.Diagonalize()
         print("===== VSCF-VCI RESULTS =====", flush = True)
@@ -261,6 +291,8 @@ class VCI:
             self.HCI()
             self.PrintResults()
             print("")
+            if self.SaveToFile:
+                self.SaveBasisToFile(self.CHKFile)
         if doPT2 or doSPT2:
             print("===== VSCF-VHCI+PT2 RESULTS =====", flush = True)
             self.PT2(doStochastic = doSPT2)
@@ -301,12 +333,16 @@ if __name__ == "__main__":
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     #mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.kernel(doVHCI = True, doPT2 = True, ComparePT2 = True)
+    mVCI.CHKFile = "test.chk"
+    mVCI.SaveToFile = True
+    mVCI.kernel(doVHCI = True, doSPT2 = False, ComparePT2 = False)
+    mVCI.ReadFromFile = True
+    mVCI.kernel(doVHCI = False, doPT2 = True, ComparePT2 = False)
     #mVCI.PrintResults()
 
-    #'''
+    '''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVHCI.HCI()
+    mVHCI.PT2(doStochastic = True)
     #mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
-    #'''
+    '''
