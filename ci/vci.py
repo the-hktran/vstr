@@ -10,14 +10,16 @@ from scipy import sparse
 
 def ReadBasisFromFile(mVHCI, FileName):
     mVHCI.Basis = []
-    with open(FileName) as CHKFile:
+    with open(FileName + "_basis.chk") as CHKFile:
         for Line in CHKFile:
             B = Line.split()
             B = [int(b) for b in B]
             mVHCI.Basis.append(WaveFunction(B, mVHCI.Frequencies))
+    mVHCI.E = np.load(FileName + "_E.npy")
+    mVHCI.C = np.load(FileName + "_C.npy")
 
 def SaveBasisToFile(mVHCI, FileName):
-    CHKFile = open(FileName, 'w')
+    CHKFile = open(FileName + "_basis.chk", 'w')
     for B in mVHCI.Basis:
         Line = ""
         for i in range(mVHCI.NModes):
@@ -25,6 +27,9 @@ def SaveBasisToFile(mVHCI, FileName):
         CHKFile.write(Line[:-1])
         CHKFile.write('\n')
     CHKFile.close()
+
+    np.save(mVHCI.CHKFile + "_E", mVHCI.E)
+    np.save(mVHCI.CHKFile + "_C", mVHCI.C)
 
 def FormW(mVHCI, V):
     Ws = []
@@ -72,7 +77,6 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
     if C is None:
         C = mVHCI.C[0]
     UniqueBasis, mVHCI.HighestQuanta = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
-    print(mVHCI.HighestQuanta)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -89,6 +93,8 @@ def HCI(mVHCI):
         NAdded, mVHCI.NewBasis = mVHCI.HCIStep(eps = mVHCI.eps1)
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
         mVHCI.SparseDiagonalize()
+        if mVHCI.SaveToFile:
+            mVHCI.SaveBasisToFile(mVHCI.CHKFile)
         it += 1
         if it > mVHCI.MaxIter:
             raise RuntimeError("VHCI did not converge.")
@@ -250,7 +256,6 @@ class VCI:
         self.HighestQuanta = [MaxTotalQuanta] * self.NModes
         for Nm in self.MaxQuanta:
             assert(Nm >= self.MaxTotalQuanta)
-        self.Basis = utils.init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
         self.H = None
         self.eps1 = 0.1 # HB epsilon
         self.eps2 = 0.01 # PT2/SPT2 epsilon
@@ -272,27 +277,30 @@ class VCI:
         self.Timer = TIMER(6)
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
 
-    def kernel(self, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
+    def kernel(self, doVCI = True, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
 
-        if self.SaveToFile:
+        if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)
+
         if self.ReadFromFile:
             self.ReadBasisFromFile(self.CHKFile)
+        else:
+            self.Basis = utils.init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
 
-        self.Timer.start(0)
-        self.Diagonalize()
-        print("===== VSCF-VCI RESULTS =====", flush = True)
-        self.PrintResults()
-        print("")
-        self.Timer.stop(0)
+        if doVCI:
+            self.Timer.start(0)
+            self.Diagonalize()
+            print("===== VSCF-VCI RESULTS =====", flush = True)
+            self.PrintResults()
+            print("")
+            self.Timer.stop(0)
         
         if doVHCI:
             print("===== VSCF-VHCI RESULTS =====", flush = True)
             self.HCI()
             self.PrintResults()
             print("")
-            if self.SaveToFile:
-                self.SaveBasisToFile(self.CHKFile)
+
         if doPT2 or doSPT2:
             print("===== VSCF-VHCI+PT2 RESULTS =====", flush = True)
             self.PT2(doStochastic = doSPT2)
@@ -333,11 +341,11 @@ if __name__ == "__main__":
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     #mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.CHKFile = "test.chk"
+    mVCI.CHKFile = "chkfile"
     mVCI.SaveToFile = True
-    mVCI.kernel(doVHCI = True, doSPT2 = False, ComparePT2 = False)
+    mVCI.kernel(doVHCI = True, doPT2 = True, doSPT2 = False, ComparePT2 = False)
     mVCI.ReadFromFile = True
-    mVCI.kernel(doVHCI = False, doPT2 = True, ComparePT2 = False)
+    mVCI.kernel(doVCI = False, doVHCI = False, doPT2 = True, ComparePT2 = False)
     #mVCI.PrintResults()
 
     '''
