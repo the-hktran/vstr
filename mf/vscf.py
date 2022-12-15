@@ -363,11 +363,11 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         EnergyErr = mVSCF.ESCF
         ConvErr = mVSCF.SCFIteration(It, DoDIIS = DoDIIS)
         EnergyErr = abs(EnergyErr - mVSCF.ESCF)
-        print("VSCF Iteration %d complete with an SCF error of %.12f/%.12f and SCF Energy of %.6f" % (It, ConvErr, EnergyErr, mVSCF.ESCF), flush = True)
+        if self.verbose > 0:
+            print("VSCF Iteration %d complete with an SCF error of %.12f/%.12f and SCF Energy of %.6f" % (It, ConvErr, EnergyErr, mVSCF.ESCF), flush = True)
         It += 1
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
-    mVSCF.Timer.report(mVSCF.TimerNames)
 
 def LCLine(mVSCF, ModeOcc, thr = 1e-2):
     def BasisToString(B):
@@ -532,7 +532,16 @@ class VSCF:
         self.DIISSpace = 5
         self.DIISStart = 10
         self.MaxIterations = 1000
+
+        self.verbose = 2
+
         self.__dict__.update(kwargs)
+
+    def kernel(self):
+        self.SCF(DoDIIS = self.DoDIIS)
+        if self.verbose > 1:
+            self.Timer.report(self.TimerNames)
+        return self.ESCF
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read

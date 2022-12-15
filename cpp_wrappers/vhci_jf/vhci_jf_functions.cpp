@@ -3021,4 +3021,48 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
     return std::make_tuple(DeltaE, SigmaDeltaE);
 }
 
+/*************************************************************************************
+************************************* OC Functions ***********************************
+*************************************************************************************/
 
+Eigen::MatrixXd ProdU(std::vector<Eigen::MatrixXd> &Us, int NModes)
+{
+    Eigen::MatrixXd TotalU = Eigen::Matrix::Identity(NModes, NModes);   
+    int ij = 0;
+    for (unsigned int i = 0; i < NModes; i++)
+    {
+        for (unsigned int j = i + 1; j < NModes; j++)
+        {
+            // First, form Uij in the full basis
+            Eigen::MatrixXd Uij = Eigen::Matrix::Identity(NModes, NModes);
+            Uij(i, i) = Us[ij].coeff(0, 0);
+            Uij(j, j) = Us[ij].coeff(1, 1);
+            Uij(i, j) = Us[ij].coeff(0, 1);
+            Uij(i, j) = Us[ij].coeff(1, 0);
+
+            TotalU *= Uij;
+            ij++;
+        }
+    }
+    return TotalU;
+}
+
+Eigen::Matrix2d SetUij(double &theta)
+{
+    Eigen::Matrix2d Uij;
+    Uij(0, 0) = cos(theta);
+    Uij(0, 1) = -sin(theta);
+    Uij(1, 0) = sin(theta);
+    Uij(1, 1) = cos(theta);
+    return Uij;
+}
+
+std::vector<Eigen::Matrix2d> SetUs(std::vector<double> &thetas)
+{
+    std::vector<Eigen::Matrix2d> Us;
+    for (double &theta : thetas)
+    {
+        Eigen::Matrix2d Uij = SetUij(theta);
+        Us.push_back(Uij);
+    }
+}
