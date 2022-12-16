@@ -239,7 +239,7 @@ class VCI:
         self.Frequencies = mVSCF.Frequencies # 1D array of all harmonic frequencies.
         self.NModes = mVSCF.Frequencies.shape[0]
         self.MaxQuanta = mVSCF.MaxQuanta
-        self.Potential = mVSCF.Potential
+        self.Potential= mVSCF.Potential
         self.FormWSD()
 
         self.PotentialListFull = []
@@ -247,8 +247,8 @@ class VCI:
             self.PotentialListFull += Wp
         self.PotentialList = []
         for Wp in self.Potential:
-            self.PotentialList += Wp
             self.PotentialListFull += Wp
+            self.PotentialList += Wp
         self.PotentialListFull = HeatBath_Sort_FC(self.PotentialListFull) # Only need to sort these once
         self.GenericV = mVSCF.AnharmTensor
 

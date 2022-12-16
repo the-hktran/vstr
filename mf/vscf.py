@@ -86,7 +86,9 @@ def MakeAnharmTensor(mVSCF):
     return AnharmTensor, RestrictedBases, QUniques
 '''
 
-def MakeAnharmTensor(mVSCF):
+def MakeAnharmTensor(mVSCF, PotentialList = None):
+    if PotentialList is None:
+        PotentialList = mVSCF.PotentialList
     AnharmTensor = []
     FCs = []
     QUniques = []
@@ -99,7 +101,7 @@ def MakeAnharmTensor(mVSCF):
     mVSCF.Timer.stop(0)
 
     mVSCF.Timer.start(1)
-    for W in mVSCF.PotentialList:
+    for W in PotentialList:
         FCs.append(W.fc)
         QUniques.append(W.QUnique)
         QPowers.append(W.QPowers)
@@ -126,6 +128,18 @@ def MakeAnharmTensor(mVSCF):
     mVSCF.Timer.stop(1)
     return AnharmTensor, FCs, QUniques, QPowers
 
+def UpdateFC(mVSCF, PotentialList):
+    FCs = []
+    QUniques = []
+    QPowers = []
+        
+    for W in PotentialList:
+        FCs.append(W.fc)
+        QUniques.append(W.QUnique)
+        QPowers.append(W.QPowers)
+    mVSCF.FCs = FCs
+    mVSCF.QUniques = QUniques
+    mVSCF.QPowers = QPowers
 
 '''
 def GetVEffByMode(mVSCF, Mode):
@@ -363,11 +377,12 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         EnergyErr = mVSCF.ESCF
         ConvErr = mVSCF.SCFIteration(It, DoDIIS = DoDIIS)
         EnergyErr = abs(EnergyErr - mVSCF.ESCF)
-        if self.verbose > 0:
+        if mVSCF.verbose > 0:
             print("VSCF Iteration %d complete with an SCF error of %.12f/%.12f and SCF Energy of %.6f" % (It, ConvErr, EnergyErr, mVSCF.ESCF), flush = True)
         It += 1
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
+    mVSCF.Converged = True
 
 def LCLine(mVSCF, ModeOcc, thr = 1e-2):
     def BasisToString(B):
@@ -465,7 +480,8 @@ class VSCF:
     GetModalSlices = GetModalSlices
     MakeAnharmTensor = MakeAnharmTensor
     MakeHOHam = MakeHOHam
-   
+    UpdateFC = UpdateFC
+
     GetVEff = GetVEff
     GetFock = GetFock
     StoreFock = StoreFock
@@ -524,9 +540,9 @@ class VSCF:
         #self.Potential = []
         self.PotentialList = []
         
-        self.Cs = self.InitCs()
         self.ModeOcc = [0] * self.NModes
         self.ESCF = 0.0
+        self.Cs = self.InitCs()
 
         self.DoDIIS = False 
         self.DIISSpace = 5
@@ -534,10 +550,16 @@ class VSCF:
         self.MaxIterations = 1000
 
         self.verbose = 2
+        self.Converged = False
 
         self.__dict__.update(kwargs)
 
-    def kernel(self):
+    def kernel(self, C0s = None):
+        if C0s is not None:
+            self.Cs = C0s
+        else:
+            self.Cs = self.InitCs()
+        
         self.SCF(DoDIIS = self.DoDIIS)
         if self.verbose > 1:
             self.Timer.report(self.TimerNames)

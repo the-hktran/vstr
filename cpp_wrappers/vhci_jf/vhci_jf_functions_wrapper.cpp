@@ -45,4 +45,7 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("AddStatesHBWithMax", AddStatesHBWithMax, "Screens for states above the HB threshold with a maximum on Quanta per mode.");
     m.def("DoPT2FromVSCF", DoPT2FromVSCF, "Runs PT2 corrections in the modal basis.");
     m.def("DoSPT2FromVSCF", DoSPT2FromVSCF, "Runs stochastic PT2 corrections in the modal basis.");
+    m.def("ProdU", ProdU, "Multiplies a list of 2 x 2 matrices.");
+    m.def("SetUij", SetUij, "Makes a rotation metrix.");
+    m.def("SetUs", DoSPT2FromVSCF, "Makes a list of rotation matrices");
 }

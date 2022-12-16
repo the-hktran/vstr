@@ -969,6 +969,7 @@ inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::
     HSp += HSpT; // Complete symmetric matrix
     HSpT = SpMat(1,1); // Free memory
     HSp.makeCompressed();
+    if (AnharmFC.size() == 2) return;
     cout << "The Hamiltonian is " << fixed << setprecision(2) << 
         100*(1.-(double)HSp.nonZeros()/(double)HSp.size()) << "% sparse." << endl;
     return; 
@@ -3027,18 +3028,18 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
 
 Eigen::MatrixXd ProdU(std::vector<Eigen::MatrixXd> &Us, int NModes)
 {
-    Eigen::MatrixXd TotalU = Eigen::Matrix::Identity(NModes, NModes);   
+    Eigen::MatrixXd TotalU = Eigen::MatrixXd::Identity(NModes, NModes);   
     int ij = 0;
     for (unsigned int i = 0; i < NModes; i++)
     {
         for (unsigned int j = i + 1; j < NModes; j++)
         {
             // First, form Uij in the full basis
-            Eigen::MatrixXd Uij = Eigen::Matrix::Identity(NModes, NModes);
+            Eigen::MatrixXd Uij = Eigen::MatrixXd::Identity(NModes, NModes);
             Uij(i, i) = Us[ij].coeff(0, 0);
             Uij(j, j) = Us[ij].coeff(1, 1);
             Uij(i, j) = Us[ij].coeff(0, 1);
-            Uij(i, j) = Us[ij].coeff(1, 0);
+            Uij(j, i) = Us[ij].coeff(1, 0);
 
             TotalU *= Uij;
             ij++;
@@ -3065,4 +3066,268 @@ std::vector<Eigen::Matrix2d> SetUs(std::vector<double> &thetas)
         Eigen::Matrix2d Uij = SetUij(theta);
         Us.push_back(Uij);
     }
+    return Us;
+}
+
+void Contract3D(double V[], Eigen::MatrixXd &U, int N)
+{
+    std::vector<Eigen::MatrixXd> Vs;
+    for (unsigned int i = 0; i < N; i++)
+    {
+        Eigen::MatrixXd Vamm(N, N);
+        for (unsigned int j = 0; j < N; j++)
+        {
+            for (unsigned int k = 0; k < N; k++)
+            {
+                Vamm(j, k) = V[i * N * N + j * N + k];
+            }
+        }
+        Vamm = U.transpose() * Vamm * U;
+        Vs.push_back(Vamm);
+    }
+    for (unsigned int j = 0; j < N; j++)
+    {
+        for (unsigned int k = 0; k < N; k++)
+        {
+            Eigen::VectorXd W(N);
+            for (unsigned int i = 0; i < N; i++)
+            {
+                W(i) = Vs[i](j, k);
+            }
+            W = U.transpose() * W;
+            for (unsigned int i = 0; i < N; i++)
+            {
+                V[i * N * N + j * N + k] = W(i);
+            }
+        }
+    }
+}
+            
+void Contract4D(double V[], Eigen::MatrixXd &U, int N)
+{
+    std::vector<std::vector<Eigen::MatrixXd>> Vs;
+    for (unsigned int i = 0; i < N; i++)
+    {
+        std::vector<Eigen::MatrixXd> Vaamms;
+        for (unsigned int j = 0; j < N; j++)
+        {
+            Eigen::MatrixXd Vaamm(N, N);
+            for (unsigned int k = 0; k < N; k++)
+            {
+                for (unsigned int l = 0; l < N; l++)
+                {
+                    Vaamm(k, l) = V[i * N * N * N + j * N * N + k * N + l];
+                }
+            }
+            Vaamm = U.transpose() * Vaamm * U;
+            Vaamms.push_back(Vaamm);
+        }
+        Vs.push_back(Vaamms);
+    }
+
+    for (unsigned int k = 0; k < N; k++)
+    {
+        for (unsigned int l = 0; l < N; l++)
+        {
+            Eigen::MatrixXd Vmmmm(N, N);
+            for (unsigned int i = 0; i < N; i++)
+            {
+                for (unsigned int j = 0; j < N; j++)
+                {
+                    Vmmmm(i, j) = Vs[i][j](k, l);
+                }
+            }
+            Vmmmm = U.transpose() * Vmmmm * U;
+            for (unsigned int i = 0; i < N; i++)
+            {
+                for (unsigned int j = 0; j < N; j++)
+                {
+                    V[i * N * N * N + j * N * N + k * N + l] = Vmmmm(i, j);
+                }
+            }
+        }
+    }
+}
+
+
+std::vector<FConst> ContractFC(double V3[], double V4[], double V5[], double V6[], Eigen::MatrixXd &U, int N)
+{
+    // Cubic terms
+    Contract3D(V3, U, N);
+
+    // Quartic terms
+    Contract4D(V4, U, N);
+
+    // Quintic terms
+    for (unsigned int i = 0; i < N; i++)
+    {
+        for (unsigned int j = 0; j < N; j++)
+        {
+            double V5Sub3[N * N * N];
+            for (unsigned int k = 0; k < N; k++)
+            {
+                for (unsigned int l = 0; l < N; k++)
+                {
+                    for (unsigned int m = 0; m < N; m++)
+                    {
+                        V5Sub3[k * N * N + l * N + m] = V5[i * N * N * N * N + j * N * N * N + k * N * N + l * N + m];
+                    }
+                }
+            }
+            Contract3D(V5Sub3, U, N);
+            for (unsigned int k = 0; k < N; k++)
+            {
+                for (unsigned int l = 0; l < N; k++)
+                {
+                    for (unsigned int m = 0; m < N; m++)
+                    {
+                        V5[i * N * N * N * N + j * N * N * N + k * N * N + l * N + m] = V5Sub3[k * N * N + l * N + m];
+                    }
+                }
+            }
+            delete[] V5Sub3;
+        }
+    }
+    for (unsigned int k = 0; k < N; k++)
+    {
+        for (unsigned int l = 0; l < N; k++)
+        {
+            for (unsigned int m = 0; m < N; m++)
+            {
+                Eigen::MatrixXd W5Sub2(N, N);
+                for (unsigned int i = 0; i < N; i++)
+                {
+                    for (unsigned int j = 0; j < N; j++)
+                    {
+                        W5Sub2(i, j) =  V5[i * N * N * N * N + j * N * N * N + k * N * N + l * N + m];
+                    }
+                }
+                W5Sub2 = U.transpose() * W5Sub2 * U;
+                for (unsigned int i = 0; i < N; i++)
+                {
+                    for (unsigned int j = 0; j < N; j++)
+                    {
+                        V5[i * N * N * N * N + j * N * N * N + k * N * N + l * N + m] = W5Sub2(i, j);
+                    }
+                }
+
+            }
+        }
+    }
+
+    // Sextic terms
+    for (unsigned int i = 0; i < N; i++)
+    {
+        for (unsigned int j = 0; j < N; j++)
+        {
+            for (unsigned int k = 0; k < N; k++)
+            {
+                double V6Sub[N * N * N];
+                for (unsigned int l = 0; l < N; l++)
+                {
+                    for (unsigned int m = 0; m < N; m++)
+                    {
+                        for (unsigned int n = 0; n < N; n++)
+                        {
+                            V6Sub[l * N * N + m * N + n] = V6[i * N * N * N * N * N + j * N * N * N * N + k * N * N * N + l * N * N + m * N + n];
+                        }
+                    }
+                }
+                Contract3D(V6Sub, U, N);
+                for (unsigned int l = 0; l < N; l++)
+                {
+                    for (unsigned int m = 0; m < N; m++)
+                    {
+                        for (unsigned int n = 0; n < N; n++)
+                        {
+                            V6[i * N * N * N * N * N + j * N * N * N * N + k * N * N * N + l * N * N + m * N + n] = V6Sub[l * N * N + m * N + n];
+                        }
+                    }
+                }
+                delete[] V6Sub;
+            }
+        }
+    }
+    for (unsigned int l = 0; l < N; l++)
+    {
+        for (unsigned int m = 0; m < N; m++)
+        {
+            for (unsigned int n = 0; n < N; n++)
+            {
+                double V6Sub[N * N * N];
+                for (unsigned int i = 0; i < N; i++)
+                {
+                    for (unsigned int j = 0; j < N; j++)
+                    {
+                        for (unsigned int k = 0; k < N; k++)
+                        {
+                            
+                            V6Sub[i * N * N + j * N + k] = V6[i * N * N * N * N * N + j * N * N * N * N + k * N * N * N + l * N * N + m * N + n];
+                        }
+                    }
+                }
+                Contract3D(V6Sub, U, N);
+                for (unsigned int i = 0; i < N; i++)
+                {
+                    for (unsigned int j = 0; j < N; j++)
+                    {
+                        for (unsigned int k = 0; k < N; k++)
+                        {
+                            
+                            V6[i * N * N * N * N * N + j * N * N * N * N + k * N * N * N + l * N * N + m * N + n] = V6Sub[i * N * N + j * N + k];
+                        }
+                    }
+                }
+                delete[] V6Sub;
+            }
+        }
+    }
+
+    // Create new FCs
+    std::vector<FConst> ContractedFCs;
+    for (unsigned int i = 0; i < N; i++)
+    {
+        for (unsigned int j = i; j < N; j++)
+        {
+            for (unsigned int k = j; k < N; k++)
+            {
+                if (abs(V3[i * N * N + j * N + k]) > 1e-8)
+                {
+                    std::vector<int> Q3{i, j, k};
+                    FConst FC(V3[i * N * N + j * N + k], Q3, false);
+                    ContractedFCs.push_back(FC);
+                }
+                for (unsigned int l = k; l < N; l++)
+                {
+                    if (abs(V4[i * N * N * N + j * N * N + k * N + l]) > 1e-8)
+                    {
+                        std::vector<int> Q4{i, j, k, l};
+                        FConst FC(V4[i * N * N * N + j * N * N + k * N + l], Q4, false);
+                        ContractedFCs.push_back(FC);
+                    }
+
+                    for (unsigned int m = l; m < N; m++)
+                    {
+                        if (abs(V5[i * N * N * N * N + j * N * N * N + k * N * N + l * N + m]) > 1e-8)
+                        {
+                            std::vector<int> Q5{i, j, k, l, m};
+                            FConst FC(V5[i * N * N * N * N + j * N * N * N + k * N * N + l * N + m], Q5, false);
+                            ContractedFCs.push_back(FC);
+                        }
+                        for (unsigned int n = m; n < N; n++)
+                        {
+                            if (abs(V6[i * N * N * N * N * N + j * N * N * N * N + k * N * N * N + l * N * N + m * N + n]) > 1e-8)
+                            {
+                                std::vector<int> Qs{i, j, k, l, m, n};
+                                FConst FC(V6[i * N * N * N * N * N + j * N * N * N * N + k * N * N * N + l * N * N + m * N + n], Qs, false);
+                                ContractedFCs.push_back(FC);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return ContractedFCs;
 }

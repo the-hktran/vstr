@@ -305,3 +305,8 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
 SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV, bool DiagonalBlock);
 std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<int> &HighestQuanta, double PT2_Eps, int NEig, std::vector<Eigen::MatrixXd> &ModalCs, std::vector<Eigen::SparseMatrix<double>> &GenericVs);
 std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<int> &HighestQuanta, double PT2_Eps, int NEig, int Nd, int Ns, std::vector<Eigen::MatrixXd> &ModalCs, std::vector<Eigen::SparseMatrix<double>> &GenericVs, bool SemiStochastic, double PT2_Eps2);
+
+
+Eigen::MatrixXd ProdU(std::vector<Eigen::MatrixXd> &Us, int NModes);
+Eigen::Matrix2d SetUij(double &theta);
+std::vector<Eigen::Matrix2d> SetUs(std::vector<double> &thetas);
