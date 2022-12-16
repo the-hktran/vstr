@@ -3,22 +3,26 @@ from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import FConst, ProdU, SetUij, S
 from vstr.mf.vscf import VSCF
 from itertools import permutations
 
-def ContractFC(mCO, U):
-    FCs = []
-    N = mCO.mf.NModes
-    # First, make tensors
+def FCToTensors(mCO):
+    N = mCO.NModes
     VTensor3 = np.zeros((N, N, N))
     VTensor4 = np.zeros((N, N, N, N))
     VTensor5 = np.zeros((N, N, N, N, N))
     VTensor6 = np.zeros((N, N, N, N, N, N))
     VTensor = [VTensor3, VTensor4, VTensor5, VTensor6]
 
-    # Fill them in
     for FC in mCO.PotentialList:
         Is = list(permutations(FC.QIndices))
         for I in Is:
             VTensor[FC.Order - 3][I] = FC.fc
+    return VTensor
     
+
+def ContractFC(mCO, U):
+    FCs = []
+
+    N = mCO.NModes
+    VTensor = mCO.VTensor.copy()
     # Contract the anharmonic tensors
     VTensor[0] = np.einsum('ijk,ia,jb,kc->abc', VTensor[0], U, U, U, optimize = True)
     VTensor[1] = np.einsum('ijkl,ia,jb,kc,ld->abcd', VTensor[1], U, U, U, U, optimize = True)
@@ -69,7 +73,7 @@ def ContractFC(mCO, U):
                     for m in range(l, N):
                         for n in range(m, N):
                             if abs(VTensor[3][i, j, k, l, m, n]) > 1e-12:
-                                FCs.append(FConst(VTensor[0][i, j, k, l, m, n], [i, j, k, l, m, n], False))
+                                FCs.append(FConst(VTensor[3][i, j, k, l, m, n], [i, j, k, l, m, n], False))
 
     return FCs
 
@@ -107,13 +111,14 @@ def F(mCO, t, fn, tn):
     return F, dF, ddF
 
 def OptF(mCO, fn, tn, thr = 1e-6):
-    t = 0
+    i = np.argmin(np.asarray(fn))
+    t = tn[i]
     F, dF, ddF = mCO.F(t, fn, tn)
     it = 1
     while abs(dF) > thr:
         t = t - (dF / ddF)
         F, dF, ddF = mCO.F(t, fn, tn)
-        print('\tFourier minimum NR iteration %d complete with value %.6f and error %.12f' % (it, t, abs(dF)), flush = True)
+        print('\tFourier minimum NR iteration %d complete with value %.6f and error %.12f' % (it, t, dF), flush = True)
         it += 1
         if it > 20:
             print('\t!! Fourier minimum failed to converge !!', flush = True)
@@ -121,32 +126,31 @@ def OptF(mCO, fn, tn, thr = 1e-6):
             break
     return t
 
-def OptE(mCO, t, ij, fn, tn, dt = 1e-3, thr = 1e-6):
+def OptE(mCO, t, ij, dt = 1e-2, thr = 1e-6):
     E = mCO.E_SCF_ij(ij, t)
     Em = mCO.E_SCF_ij(ij, t - dt)
     Ep = mCO.E_SCF_ij(ij, t + dt) 
     dE = (Ep - Em) / (2 * dt)
     ddE = (Ep - 2 * E + Em) / (dt * dt)
+    if ij == 2:
+        t = 0
     it = 1
     while abs(dE) > thr:
-        t = t - dE / ddE
+        t = t - (dE / ddE)
         E = mCO.E_SCF_ij(ij, t)
         Em = mCO.E_SCF_ij(ij, t - dt)
         Ep = mCO.E_SCF_ij(ij, t + dt) 
         dE = (Ep - Em) / (2 * dt)
         ddE = (Ep - 2 * E + Em) / (dt * dt)
-        print('\tExact minimum NR iteration %d complete with energy %.6f and value %.6f and error %.12f' % (it, E, t, abs(dE)), flush = True)
+        print('\t - Exact minimum NR iteration %d complete with energy %.6f and value %.6f and error %.12f' % (it, E, t, dE), flush = True)
         it += 1
-    return t
+    return t, E
 
 def JacobiSweepIteration(mCO):
     # Optimize each Uij individually
     tn = []
     for n in range(-mCO.p, mCO.p + 1):
         tn.append(n * np.pi / (2 * (2 * mCO.p + 1)))
-
-    OptUs = []
-    thetas = []
     ij = 0
     # ij = (i - 2) (i - 1) / 2 + j
     for i in range(mCO.mf.NModes):
@@ -155,14 +159,16 @@ def JacobiSweepIteration(mCO):
             for tp in tn:
                 fn.append(mCO.E_SCF_ij(ij, tp))
             t0 = mCO.OptF(fn, tn)
-            t = mCO.OptE(t0, ij, fn, tn)
-            U = SetUij(t)
-            OptUs.append(U)
-            thetas.append(t)
+            t, ENext = mCO.OptE(t0, ij)
+
+            # In case the energy increases, just skip this Uij
+            if ENext < mCO.EOpt:
+                U = SetUij(t)
+                mCO.Us[ij] = U
+                mCO.U = ProdU(mCO.Us, mCO.NModes)
+                mCO.EOpt = ENext
+            
             ij += 1
-    mCO.Us = OptUs
-    mCO.thetas = thetas
-    mCO.U = ProdU(OptUs, mCO.mf.NModes)
 
 def JacobiSweep(mCO, thr = 1e-6):
     Ei = 0
@@ -171,8 +177,6 @@ def JacobiSweep(mCO, thr = 1e-6):
     while abs(Ef - Ei) > 1e-6:
         Ei = Ef
         mCO.JacobiSweepIteration()
-        print(mCO.Us)
-        print(mCO.U)
         Ef = mCO.E_SCF(mCO.U)
         print('== Jacobi Sweep iteration %d complete with SCF Energy %.6f and error %.12f' % (it, Ef, Ef - Ei), flush = True)
         it += 1
@@ -204,24 +208,30 @@ class CoordinateOptimizer:
     E_SCF_ij = E_SCF_ij
     E_SCF = E_SCF
     ContractFC = ContractFC
+    FCToTensors = FCToTensors
 
     MakeOCVSCF = MakeOCVSCF
 
-    def __init__(self, mf):
+    def __init__(self, mf, **kwargs):
         self.mf = mf
         self.PotentialList = []
         for Wp in self.mf.Potential:
             self.PotentialList += Wp
-        self.p = 3
+        self.p = 15
         self.NModes = mf.NModes
+        self.EOpt = mf.ESCF
+
+        self.VTensor = self.FCToTensors()
     
+        self.__dict__.update(kwargs)
+
     def kernel(self):
         self.InitU()
         self.JacobiSweep()
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False)
     mf.kernel()
     mCO = CoordinateOptimizer(mf)
