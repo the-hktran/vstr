@@ -3150,7 +3150,7 @@ void Contract4D(double V[], Eigen::MatrixXd &U, int N)
 }
 
 
-std::vector<FConst> ContractFC(double V3[], double V4[], double V5[], double V6[], Eigen::MatrixXd &U, int N)
+std::vector<FConst> ContractFCCPP(double V3[], double V4[], double V5[], double V6[], Eigen::MatrixXd &U, int N)
 {
     // Cubic terms
     Contract3D(V3, U, N);
@@ -3166,7 +3166,7 @@ std::vector<FConst> ContractFC(double V3[], double V4[], double V5[], double V6[
             double V5Sub3[N * N * N];
             for (unsigned int k = 0; k < N; k++)
             {
-                for (unsigned int l = 0; l < N; k++)
+                for (unsigned int l = 0; l < N; l++)
                 {
                     for (unsigned int m = 0; m < N; m++)
                     {
@@ -3177,7 +3177,7 @@ std::vector<FConst> ContractFC(double V3[], double V4[], double V5[], double V6[
             Contract3D(V5Sub3, U, N);
             for (unsigned int k = 0; k < N; k++)
             {
-                for (unsigned int l = 0; l < N; k++)
+                for (unsigned int l = 0; l < N; l++)
                 {
                     for (unsigned int m = 0; m < N; m++)
                     {
@@ -3185,12 +3185,12 @@ std::vector<FConst> ContractFC(double V3[], double V4[], double V5[], double V6[
                     }
                 }
             }
-            delete[] V5Sub3;
+            //delete[] V5Sub3;
         }
     }
     for (unsigned int k = 0; k < N; k++)
     {
-        for (unsigned int l = 0; l < N; k++)
+        for (unsigned int l = 0; l < N; l++)
         {
             for (unsigned int m = 0; m < N; m++)
             {
@@ -3244,7 +3244,7 @@ std::vector<FConst> ContractFC(double V3[], double V4[], double V5[], double V6[
                         }
                     }
                 }
-                delete[] V6Sub;
+                //delete[] V6Sub;
             }
         }
     }
@@ -3278,7 +3278,7 @@ std::vector<FConst> ContractFC(double V3[], double V4[], double V5[], double V6[
                         }
                     }
                 }
-                delete[] V6Sub;
+                //delete[] V6Sub;
             }
         }
     }

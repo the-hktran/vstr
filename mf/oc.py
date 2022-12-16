@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import FConst, ProdU, SetUij, SetUs
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import FConst, ProdU, SetUij, SetUs, ContractFCCPP
 from vstr.mf.vscf import VSCF
 from itertools import permutations
 
@@ -15,10 +15,16 @@ def FCToTensors(mCO):
         Is = list(permutations(FC.QIndices))
         for I in Is:
             VTensor[FC.Order - 3][I] = FC.fc
+    #return VTensor
+    # This part converges the tensors into lists so that they can be intepreted as arrays in C++
+    VTensor[0] = VTensor[0].reshape(N * N * N)#.tolist()
+    VTensor[1] = VTensor[1].reshape(N * N * N * N)#.tolist()
+    VTensor[2] = VTensor[2].reshape(N * N * N * N * N)#.tolist()
+    VTensor[3] = VTensor[3].reshape(N * N * N * N * N * N)#.tolist()
     return VTensor
     
-
 def ContractFC(mCO, U):
+    '''
     FCs = []
 
     N = mCO.NModes
@@ -76,10 +82,15 @@ def ContractFC(mCO, U):
                                 FCs.append(FConst(VTensor[3][i, j, k, l, m, n], [i, j, k, l, m, n], False))
 
     return FCs
+    '''
+    return ContractFCCPP(mCO.VTensor[0], mCO.VTensor[1], mCO.VTensor[2], mCO.VTensor[3], U, mCO.NModes)
 
 def E_SCF(mCO, U):
     mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 0)
     NewPotentialList = mCO.ContractFC(U)
+    print(U)
+    for FC in NewPotentialList:
+        print(FC.fc)
     mf_tmp.UpdateFC(NewPotentialList)
     return mf_tmp.kernel()
 
@@ -217,7 +228,7 @@ class CoordinateOptimizer:
         self.PotentialList = []
         for Wp in self.mf.Potential:
             self.PotentialList += Wp
-        self.p = 15
+        self.p = 3
         self.NModes = mf.NModes
         self.EOpt = mf.ESCF
 
@@ -231,7 +242,7 @@ class CoordinateOptimizer:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False)
     mf.kernel()
     mCO = CoordinateOptimizer(mf)

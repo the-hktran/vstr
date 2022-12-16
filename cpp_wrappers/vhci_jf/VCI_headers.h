@@ -52,6 +52,21 @@ using namespace std;
 using namespace Spectra;
 using namespace boost;
 
+template <class T> class ptr_wrapper
+{
+    public:
+        ptr_wrapper() : ptr(nullptr) {}
+        ptr_wrapper(T* ptr) : ptr(ptr) {}
+        ptr_wrapper(const ptr_wrapper& other) : ptr(other.ptr) {}
+        T& operator* () const { return *ptr; }
+        T* operator->() const { return  ptr; }
+        T* get() const { return ptr; }
+        void destroy() { delete ptr; }
+        T& operator[](std::size_t idx) const { return ptr[idx]; }
+    private:
+        T* ptr;
+};
+
 //Custom data structures
 struct HOFunc
 {
@@ -310,3 +325,4 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
 Eigen::MatrixXd ProdU(std::vector<Eigen::MatrixXd> &Us, int NModes);
 Eigen::Matrix2d SetUij(double &theta);
 std::vector<Eigen::Matrix2d> SetUs(std::vector<double> &thetas);
+std::vector<FConst> ContractFCCPP(double V3[], double V4[], double V5[], double V6[], Eigen::MatrixXd &U, int N);

@@ -23,6 +23,7 @@ PYBIND11_MODULE(vhci_jf_functions, m)
         .def(pybind11::init<std::vector<int>, std::vector<double>>())
         .def_readwrite("M", &WaveFunction::M)
         .def_readwrite("Modes", &WaveFunction::Modes);
+    pybind11::class_<ptr_wrapper<double>>(m, "ptr_double");
 
     //m.def("DenseDiagonalizeCPP", DenseDiagonalizeCPP, "Forms and diagonalizes dense vibrational Hamiltonian");
     //m.def("SparseDiagonalizeCPP", SparseDiagonalizeCPP, "Forms and diagonalizes sparse virbational Hamiltonian");
@@ -47,5 +48,14 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("DoSPT2FromVSCF", DoSPT2FromVSCF, "Runs stochastic PT2 corrections in the modal basis.");
     m.def("ProdU", ProdU, "Multiplies a list of 2 x 2 matrices.");
     m.def("SetUij", SetUij, "Makes a rotation metrix.");
-    m.def("SetUs", DoSPT2FromVSCF, "Makes a list of rotation matrices");
+    m.def("SetUs", SetUs, "Makes a list of rotation matrices");
+    m.def("ContractFCCPP", [](pybind11::array_t<double> buffer3, pybind11::array_t<double> buffer4, pybind11::array_t<double> buffer5, pybind11::array_t<double> buffer6, Eigen::MatrixXd U, int N)
+        {
+            pybind11::buffer_info info3 = buffer3.request(); 
+            pybind11::buffer_info info4 = buffer4.request(); 
+            pybind11::buffer_info info5 = buffer5.request(); 
+            pybind11::buffer_info info6 = buffer6.request(); 
+
+            return ContractFCCPP(static_cast<double*>(info3.ptr),static_cast<double*>(info4.ptr),static_cast<double*>(info5.ptr),static_cast<double*>(info6.ptr), U, N);
+        });
 }
