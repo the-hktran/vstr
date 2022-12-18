@@ -1,7 +1,7 @@
 import numpy as np
 from vstr import utils
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, HeatBath_Sort_FC, DoPT2, DoSPT2
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, AddStatesHBWithMax, HeatBath_Sort_FC, DoPT2, DoSPT2
 from functools import reduce
 import itertools
 import math
@@ -52,7 +52,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis = AddStatesHB(mVHCI.Basis, Ws, C, eps)
+    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.AverageQuanta)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -75,12 +75,12 @@ def PT2(mVHCI, doStochastic = False):
     assert(mVHCI.eps2 < mVHCI.eps1)
     if doStochastic:
         if mVHCI.eps3 < 0:
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
         else:
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
     else:
-        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.eps2, mVHCI.NStates)
+        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
 def Diagonalize(mVHCI):
@@ -197,11 +197,13 @@ class VHCI:
             self.PotentialList += Wp
             self.PotentialListFull += Wp
         self.PotentialListFull = HeatBath_Sort_FC(self.PotentialListFull) # Only need to sort these once
+        self.MaxQuanta = MaxQuanta
         if isinstance(MaxQuanta, int):
-            MaxQuanta = [MaxQuanta] * self.NModes
+            self.MaxQuanta = [MaxQuanta] * self.NModes
         
         self.MaxTotalQuanta = MaxTotalQuanta
-        self.Basis = self.InitTruncatedBasis(MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
+        self.IncludeSqrt = True
+        self.Basis = self.InitTruncatedBasis(self.MaxQuanta, MaxTotalQuanta = MaxTotalQuanta)
         self.eps1 = 0.1 # HB epsilon
         self.eps2 = 0.01 # PT2/SPT2 epsilon
         self.eps3 = -1.0 # SSPT2 epsilon, < 0 means do not do semi-stochastic
@@ -220,6 +222,22 @@ class VHCI:
 
     def kernel(self):
         pass
+
+    @property
+    def SummedQuanta(self):
+        SummedQuanta = [0] * self.NModes
+        for B in self.Basis:
+            for n in range(self.NModes):
+                SummedQuanta[n] += B.Modes[n].Quanta
+        return SummedQuanta
+
+    @property
+    def AverageQuanta(self):
+        if self.IncludeSqrt:
+            SummedQuanta = self.SummedQuanta
+            return [Q / len(self.Basis) for Q in SummedQuanta]
+        else:
+            return [0] * self.NModes
 
 if __name__ == "__main__":
     '''

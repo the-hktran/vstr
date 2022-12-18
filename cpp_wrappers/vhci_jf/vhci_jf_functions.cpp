@@ -1094,13 +1094,18 @@ void FillWalkers(std::map<int, int>& WalkerPopulation, std::vector<double>& C, i
     for (unsigned int i = 0; i < Nd; i++) WalkerPopulation[Distribution(Gen)]++;
 }
 
-std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig)
+std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<double> &AverageQuanta, double PT2_Eps, int NEig)
 {
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
         N_opt = BasisSet.size();
     }else{ // If number of states exceeds the number selected to optimize
         N_opt = NEig;
+    }
+
+    for (FConst &FC : AnharmHB)
+    {
+        for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
@@ -1209,13 +1214,18 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
     return DeltaE;    
 }
 
-std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
+std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<double> &AverageQuanta, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
 {
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
         N_opt = BasisSet.size();
     }else{ // If number of states exceeds the number selected to optimize
         N_opt = NEig;
+    }
+    
+    for (FConst &FC : AnharmHB)
+    {
+        for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
