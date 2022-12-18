@@ -31,6 +31,15 @@ def SaveBasisToFile(mVHCI, FileName):
     np.save(mVHCI.CHKFile + "_E", mVHCI.E)
     np.save(mVHCI.CHKFile + "_C", mVHCI.C)
 
+def SumQuanta(mVHCI, Basis = None):
+    if Basis is None:
+        Basis = mVHCI.Basis
+    SummedQuanta = [0] * mVHCI.NModes
+    for B in Basis:
+        for i in range(mVHCI.NModes):
+            SummedQuanta[i] += B.Modes[i].Quanta
+    return SummedQuanta
+
 def FormW(mVHCI, V):
     Ws = []
     for v in V:
@@ -76,12 +85,16 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis, mVHCI.HighestQuanta = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
+    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.AverageQuanta)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
     mVHCI.Timer.start(2)
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.PotentialListFull, C = abs(mVHCI.C[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
+    
+    NewSummedQuanta = mVHCI.SumQuanta(NewBasis)
+    mVHCI.SummedQuanta = [mVHCI.SummedQuanta[i] + NewSummedQuanta[i] for i in range(mVHCI.NModes)]
+    
     mVHCI.Basis += NewBasis
     mVHCI.Timer.stop(2)
     return NAdded, NewBasis
@@ -106,16 +119,16 @@ def PT2(mVHCI, doStochastic = False):
     if doStochastic:
         if mVHCI.eps3 < 0:
             mVHCI.Timer.start(4)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, False, mVHCI.eps3)
             mVHCI.Timer.stop(4)
         else:
             mVHCI.Timer.start(5)
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, True, mVHCI.eps3)
             mVHCI.Timer.stop(5)
     else:
         mVHCI.Timer.start(3)
-        mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.ModalCs, mVHCI.GenericV)
+        mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.ModalCs, mVHCI.GenericV)
         mVHCI.Timer.stop(3)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
@@ -129,6 +142,7 @@ def Diagonalize(mVHCI):
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
 def SparseDiagonalize(mVHCI):
+    mVHCI.Timer.start(1)
     if mVHCI.H is None:
         mVHCI.H = VCISparseHamFromVSCF(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, True)
     else:
@@ -228,6 +242,7 @@ class VCI:
     ScreenBasis = ScreenBasis
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
+    SumQuanta = SumQuanta
     PrintResults = PrintResults
     LCLine = LCLine
     SaveBasisToFile = SaveBasisToFile
@@ -253,7 +268,7 @@ class VCI:
         self.GenericV = mVSCF.AnharmTensor
 
         self.MaxTotalQuanta = MaxTotalQuanta
-        self.HighestQuanta = [MaxTotalQuanta] * self.NModes
+        self.IncludeSqrt = True
         for Nm in self.MaxQuanta:
             assert(Nm >= self.MaxTotalQuanta)
         self.H = None
@@ -286,10 +301,11 @@ class VCI:
             self.ReadBasisFromFile(self.CHKFile)
         else:
             self.Basis = utils.init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
+        self.SummedQuanta = self.SumQuanta()
 
         if doVCI:
             self.Timer.start(0)
-            self.Diagonalize()
+            self.SparseDiagonalize()
             print("===== VSCF-VCI RESULTS =====", flush = True)
             self.PrintResults()
             print("")
@@ -319,6 +335,13 @@ class VCI:
                 self.PrintResults()
                 print("")
         self.Timer.report(self.TimerNames)
+
+    @property
+    def AverageQuanta(self):
+        if self.IncludeSqrt:
+            return [Q / len(self.Basis) for Q in self.SummedQuanta]
+        else:
+            return [0] * self.NModes
 
 if __name__ == "__main__":
     '''

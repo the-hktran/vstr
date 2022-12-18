@@ -83,14 +83,11 @@ def ContractFC(mCO, U):
 
     return FCs
     '''
-    return ContractFCCPP(mCO.VTensor[0], mCO.VTensor[1], mCO.VTensor[2], mCO.VTensor[3], U, mCO.NModes)
+    return ContractFCCPP(mCO.VTensor[0].copy(), mCO.VTensor[1].copy(), mCO.VTensor[2].copy(), mCO.VTensor[3].copy(), U, mCO.NModes)
 
 def E_SCF(mCO, U):
     mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 0)
     NewPotentialList = mCO.ContractFC(U)
-    print(U)
-    for FC in NewPotentialList:
-        print(FC.fc)
     mf_tmp.UpdateFC(NewPotentialList)
     return mf_tmp.kernel()
 

@@ -2110,7 +2110,7 @@ std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet
 }
 
 
-std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<int> &MaxQuanta, std::vector<int> &HighestQuanta){ // Expand basis via Heat Bath algorithm
+std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<int> &MaxQuanta, std::vector<double> &AverageQuanta){ // Expand basis via Heat Bath algorithm
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
     HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
     for( WaveFunction& wfn : BasisSet){
@@ -2121,7 +2121,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
     {
         for (int q : FC.QIndices)
         {
-            FC.fc *= sqrt(HighestQuanta[q] + 1);
+            FC.fc *= sqrt(AverageQuanta[q] + 1);
         }
     }
 
@@ -2146,10 +2146,10 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                 if (FitsMaxQuanta(tmp, MaxQuanta))
                                 {
                                     HashedNewStates.insert(tmp); // add new state to set
-                                    if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
-                                    {
-                                        HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
-                                    }   
+                                    //if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
+                                    //{
+                                    //    HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
+                                    //}   
                                 }
                             }
                         }
@@ -2168,14 +2168,14 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                        ){ //make sure a|0> = 0
                                         if (FitsMaxQuanta(tmp, MaxQuanta))
                                         {
-                                            if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
+                                            /*if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
                                             {
                                                 HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
                                             }  
                                             if (tmp.Modes[AnharmHB[i].QUnique[1]].Quanta > HighestQuanta[AnharmHB[i].QUnique[1]])
                                             {
                                                 HighestQuanta[AnharmHB[i].QUnique[1]] = tmp.Modes[AnharmHB[i].QUnique[1]].Quanta;
-                                            }
+                                            }*/
                                             HashedNewStates.insert(tmp); // add new state to set
                                         }
                                 }
@@ -2199,7 +2199,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                            ){ //make sure a|0> = 0
                                         if (FitsMaxQuanta(tmp, MaxQuanta))
                                         {
-                                            if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
+                                            /*if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
                                             {
                                                 HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
                                             }  
@@ -2210,7 +2210,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                             if (tmp.Modes[AnharmHB[i].QUnique[2]].Quanta > HighestQuanta[AnharmHB[i].QUnique[2]])
                                             {
                                                 HighestQuanta[AnharmHB[i].QUnique[2]] = tmp.Modes[AnharmHB[i].QUnique[2]].Quanta;
-                                            }  
+                                            }*/ 
                                             HashedNewStates.insert(tmp); // add new state
                                         }
                                     }
@@ -2238,7 +2238,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                                ){ //make sure a|0> = 0
                                                 if (FitsMaxQuanta(tmp, MaxQuanta))
                                                 {
-                                                    if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
+                                                    /*if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
                                                     {
                                                         HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
                                                     }  
@@ -2253,7 +2253,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                                     if (tmp.Modes[AnharmHB[i].QUnique[3]].Quanta > HighestQuanta[AnharmHB[i].QUnique[3]])
                                                     {
                                                         HighestQuanta[AnharmHB[i].QUnique[3]] = tmp.Modes[AnharmHB[i].QUnique[3]].Quanta;
-                                                    }
+                                                    }*/
                                                     HashedNewStates.insert(tmp); // add new state
                                                 }
                                         }
@@ -2285,7 +2285,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                                    ){ //make sure a|0> = 0
                                                     if (FitsMaxQuanta(tmp, MaxQuanta))
                                                     {
-                                                        if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
+                                                        /*if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
                                                         {
                                                             HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
                                                         }  
@@ -2304,7 +2304,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                                         if (tmp.Modes[AnharmHB[i].QUnique[4]].Quanta > HighestQuanta[AnharmHB[i].QUnique[4]])
                                                         {
                                                             HighestQuanta[AnharmHB[i].QUnique[4]] = tmp.Modes[AnharmHB[i].QUnique[4]].Quanta;
-                                                        }
+                                                        }*/
                                                         HashedNewStates.insert(tmp); // add new state
                                                     }
                                             }
@@ -2340,7 +2340,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                                        ){ //make sure a|0> = 0
                                                         if (FitsMaxQuanta(tmp, MaxQuanta))
                                                         {
-                                                            if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
+                                                            /*if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
                                                             {
                                                                 HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
                                                             }  
@@ -2363,7 +2363,7 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
                                                             if (tmp.Modes[AnharmHB[i].QUnique[5]].Quanta > HighestQuanta[AnharmHB[i].QUnique[5]])
                                                             {
                                                                 HighestQuanta[AnharmHB[i].QUnique[5]] = tmp.Modes[AnharmHB[i].QUnique[5]].Quanta;
-                                                            }
+                                                            }*/
                                                             HashedNewStates.insert(tmp); // add new state
                                                         }
                                                 }
@@ -2387,7 +2387,8 @@ std::tuple<std::vector<WaveFunction>, std::vector<int>> AddStatesHBWithMax(std::
     }
     std::vector<WaveFunction> NewBasis;
     for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
-    return std::make_tuple(NewBasis, HighestQuanta);
+    //return std::make_tuple(NewBasis, HighestQuanta);
+    return NewBasis;
 }
 
 void InternalAddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, HashedStates &HashedNewStates, std::vector<FConst> &AnharmHB, int n, double Cn, double eps, std::vector<int> &MaxQuanta){ // Expand basis via Heat Bath algorithm
@@ -2643,7 +2644,7 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<Wav
     return H;
 };
 
-std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<int> &HighestQuanta, double PT2_Eps, int NEig, std::vector<Eigen::MatrixXd> &ModalCs, std::vector<Eigen::SparseMatrix<double>> &GenericVs)
+std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<double> &AverageQuanta, double PT2_Eps, int NEig, std::vector<Eigen::MatrixXd> &ModalCs, std::vector<Eigen::SparseMatrix<double>> &GenericVs)
 {
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
@@ -2654,7 +2655,7 @@ std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<
 
     for (FConst &FC : AnharmHB)
     {
-        for (int q : FC.QIndices) FC.fc *= sqrt(HighestQuanta[q] + 1);
+        for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
@@ -2753,7 +2754,7 @@ std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<
     return DeltaE;    
 }
 
-std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<int> &HighestQuanta, double PT2_Eps, int NEig, int Nd, int Ns, std::vector<Eigen::MatrixXd> &ModalCs, std::vector<Eigen::SparseMatrix<double>> &GenericVs, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
+std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<double> &AverageQuanta, double PT2_Eps, int NEig, int Nd, int Ns, std::vector<Eigen::MatrixXd> &ModalCs, std::vector<Eigen::SparseMatrix<double>> &GenericVs, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
 {
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
@@ -2764,7 +2765,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
 
     for (FConst &FC : AnharmHB)
     {
-        for (int q : FC.QIndices) FC.fc *= sqrt(HighestQuanta[q] + 1);
+        for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
