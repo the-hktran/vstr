@@ -149,6 +149,7 @@ def SparseDiagonalize(mVHCI):
         if len(mVHCI.NewBasis) != 0:
             HIJ = VCISparseHamFromVSCF(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, False)
             HJJ = VCISparseHamFromVSCF(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, True)
+            np.save("HIJ", mVHCI.H.todense())
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
@@ -364,12 +365,16 @@ if __name__ == "__main__":
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     #mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.kernel(doVHCI = False, doPT2 = True, doSPT2 = True, ComparePT2 = False)
+    #mVCI.CHKFile = "chk"
+    #mVCI.ReadFromFile=True
+    #mVCI.SaveToFile=True
+    mVCI.kernel(doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False)
     #mVCI.PrintResults()
 
     #'''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVHCI.kernel(doVHCI = False, doPT2 = True, doSPT2 = True, ComparePT2 = False)
+    mVHCI.kernel(doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False)
+    mVHCI.H = None
     #mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
     #'''

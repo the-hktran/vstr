@@ -2,7 +2,7 @@ import numpy as np
 from vstr import utils
 from vstr.utils.perf_utils import TIMER
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, AddStatesHB, AddStatesHBWithMax, HeatBath_Sort_FC, DoPT2, DoSPT2
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, AddStatesHB, AddStatesHBWithMax, HeatBath_Sort_FC, DoPT2, DoSPT2
 from functools import reduce
 import itertools
 import math
@@ -84,13 +84,13 @@ def HCIStep(mVHCI, eps = 0.01):
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.PotentialListFull, C = abs(mVHCI.C[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
     mVHCI.Basis += NewBasis
     mVHCI.Timer.stop(2)
-    return NAdded
+    return NAdded, NewBasis
 
 def HCI(mVHCI):
     NAdded = len(mVHCI.Basis)
     it = 1
     while (float(NAdded) / float(len(mVHCI.Basis))) > mVHCI.tol:
-        NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
+        NAdded, mVHCI.NewBasis = mVHCI.HCIStep(eps = mVHCI.eps1)
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
         mVHCI.SparseDiagonalize()
         if mVHCI.SaveToFile:
@@ -98,6 +98,8 @@ def HCI(mVHCI):
         it += 1
         if it > mVHCI.MaxIter:
             raise RuntimeError("VHCI did not converge.")
+    mVHCI.H = None
+    mVHCI.NewBasis = None
 
 def PT2(mVHCI, doStochastic = False):
     assert(mVHCI.eps2 < mVHCI.eps1)
@@ -128,10 +130,18 @@ def Diagonalize(mVHCI):
 
 def SparseDiagonalize(mVHCI):
     mVHCI.Timer.start(1)
-    H = GenerateSparseHamV(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
+    if mVHCI.H is None:
+        mVHCI.H = GenerateSparseHamV(mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
+    else:
+        if len(mVHCI.NewBasis) != 0:
+            HIJ = GenerateSparseHamVOD(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
+            HJJ = GenerateSparseHamV(mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
+            np.save("HIJ_test", mVHCI.H.todense())
+            mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
+            mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
-    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(H, k = mVHCI.NStates, which = 'SM')
+    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')
     mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
@@ -247,6 +257,7 @@ class VHCI:
         
         self.MaxTotalQuanta = MaxTotalQuanta
         self.IncludeSqrt = True
+        self.H = None
         self.eps1 = 0.1 # HB epsilon
         self.eps2 = 0.01 # PT2/SPT2 epsilon
         self.eps3 = -1.0 # SSPT2 epsilon, < 0 means do not do semi-stochastic

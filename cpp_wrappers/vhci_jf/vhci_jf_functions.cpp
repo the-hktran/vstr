@@ -955,6 +955,105 @@ void AnharmHamSparse(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet, s
     return;
 };
 
+void AnharmHamSparseOD(vector<Trip>& HTrip, std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    //Add anharmonic terms to the Sparse Hamiltonian in sparse form of Eigen::Triplet
+    int fcmax=0;
+    for (unsigned int k=0;k<AnharmFC.size();k++)
+    { //Order of maximum anharmonic term
+        if(AnharmFC[k].fcpow.size()>fcmax)
+        {
+            fcmax = AnharmFC[k].fcpow.size();
+        }
+    }
+    #pragma omp parallel for
+    for (unsigned int i=0;i<BasisSet1.size();i++)
+    {
+        vector<int> qdiffvec(BasisSet1[0].M,0);
+        for (unsigned int j=0;j<BasisSet2.size();j++) // starts with j=i to exploit Hermiticity (Hij = Hji)
+        {
+            double Vij = 0;
+            int mchange = 0; // number of modes with nonzero change in quanta
+            int qdiff = 0; // total number of quanta difference between states
+            QDiffVec(BasisSet1[i], BasisSet2[j],qdiff,mchange,qdiffvec);
+            if(qdiff <= fcmax && mchange <= fcmax && qdiff%2==0){ 
+                // States cannot differ by more than fcmax quanta
+                double W = 0.;
+                double V = 0.;
+                for (unsigned int k=0;k<QuarticFC.size();k++){
+                    if (ScreenState(qdiff,mchange,qdiffvec,QuarticFC[k])){
+                        // Screen force constants that cannot connect basis states i and j
+                        //Add anharmonic matrix elements
+                        double val = AnharmPot(BasisSet1[i], BasisSet2[j], QuarticFC[k]);
+                        Vij += val; 
+                        if(abs(val) > abs(W)){
+                            W = val;
+                            V = QuarticFC[k].fc;
+                        }
+                    }
+                }
+                for (unsigned int k=0;k<SexticFC.size();k++){
+                    if (ScreenState(qdiff,mchange,qdiffvec,SexticFC[k])){
+                        // Screen force constants that cannot connect basis states i and j
+                        //Add anharmonic matrix elements
+                        double val = AnharmPot(BasisSet1[i], BasisSet2[j], SexticFC[k]); 
+                        Vij += val;
+                        if(abs(val) > abs(W)){
+                            W = val;
+                            V = SexticFC[k].fc;
+                        }
+                    }
+                }
+                #pragma omp critical
+                if (abs(Vij) > 1e-12)
+                {
+                        HTrip.push_back(Trip(i,j,Vij)); // Exploiting Hermiticity (Hij=Hji)
+                }
+            }
+            if(qdiff <= fcmax-1 && mchange <= fcmax-1 && qdiff%2==1){
+                // fcmax-1 assumes max order is even (4th or 6th)
+                // States cannot differ by more than fcmax quanta 
+                double W = 0.;
+                double V = 0.;
+                for (unsigned int k=0;k<CubicFC.size();k++){
+                    if (ScreenState(qdiff,mchange,qdiffvec,CubicFC[k])){
+                        // Screen force constants that cannot connect basis states i and j
+                        //Add anharmonic matrix elements
+                        
+                        double val = AnharmPot(BasisSet1[i], BasisSet2[j], CubicFC[k]);
+                        Vij += val; 
+                        if(abs(val) > abs(W)){
+                            W = val;
+                            V = CubicFC[k].fc;
+                        }
+                        //Vij += AnharmPot(i,j,CubicFC[k]);
+                    }
+                }
+                for (unsigned int k=0;k<QuinticFC.size();k++){
+                    if (ScreenState(qdiff,mchange,qdiffvec,QuinticFC[k])){
+                        // Screen force constants that cannot connect basis states i and j
+                        //Add anharmonic matrix elements
+                        double val = AnharmPot(BasisSet1[i], BasisSet2[j], QuinticFC[k]);
+                        Vij += val; 
+                        if(abs(val) > abs(W)){
+                            W = val;
+                            V = QuinticFC[k].fc;
+                        }
+                        //Vij += AnharmPot(i,j,QuinticFC[k]);
+                    }
+                }
+                #pragma omp critical
+                if (abs(Vij) > 1e-12)
+                {
+                        HTrip.push_back(Trip(i,j,Vij)); // Exploiting Hermiticity (Hij=Hji)
+                }
+            }
+        }
+    }
+    return;
+};
+
+
 inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, bool MakeZeroth, bool MakeAnharm)
 {
     //Build the sparse CI Hamiltonian
@@ -974,6 +1073,26 @@ inline void MakeHamSparse(SpMat &HSp, std::vector<WaveFunction> &BasisSet, std::
         100*(1.-(double)HSp.nonZeros()/(double)HSp.size()) << "% sparse." << endl;
     return; 
 }
+
+inline void MakeHamSparseOD(SpMat &HSp, std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, bool MakeZeroth, bool MakeAnharm)
+{
+    //Build the sparse CI Hamiltonian
+    vector< Trip > HTrip;
+    if (MakeAnharm) AnharmHamSparseOD(HTrip, BasisSet1, BasisSet2, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    HSp.setFromTriplets(HTrip.begin(),HTrip.end());
+    HSp.makeCompressed();
+    HTrip = vector< Trip >(); // Free memory
+    //SpMat HSpT = HSp.transpose();
+    //HSpT.makeCompressed();
+    //HSp += HSpT; // Complete symmetric matrix
+    //HSpT = SpMat(1,1); // Free memory
+    //HSp.makeCompressed();
+    if (AnharmFC.size() == 2) return;
+    cout << "The Hamiltonian is " << fixed << setprecision(2) << 
+        100*(1.-(double)HSp.nonZeros()/(double)HSp.size()) << "% sparse." << endl;
+    return; 
+}
+
 
 inline void MakeHamDense(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
@@ -1056,6 +1175,13 @@ SpMat GenerateSparseHamV(std::vector<WaveFunction> &BasisSet, std::vector<double
 {
     SpMat H(BasisSet.size(), BasisSet.size());
     MakeHamSparse(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC, true, true);
+    return H;
+}
+
+SpMat GenerateSparseHamVOD(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    SpMat H(BasisSet1.size(), BasisSet2.size());
+    MakeHamSparseOD(H, BasisSet1, BasisSet2, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC, true, true);
     return H;
 }
 
