@@ -128,18 +128,29 @@ def MakeAnharmTensor(mVSCF, PotentialList = None):
     mVSCF.Timer.stop(1)
     return AnharmTensor, FCs, QUniques, QPowers
 
-def UpdateFC(mVSCF, PotentialList):
+def UpdateFC(mVSCF, Frequencies, PotentialList):
     FCs = []
     QUniques = []
     QPowers = []
-        
+    
+    mVSCF.Potential = [[]] * 4
     for W in PotentialList:
         FCs.append(W.fc)
         QUniques.append(W.QUnique)
         QPowers.append(W.QPowers)
+        if W.Order == 3:
+            mVSCF.Potential[0].append(W)
+        elif W.Order == 2 or W.Order == 4:
+            mVSCF.Potential[1].append(W)
+        elif W.Order == 5:
+            mVSCF.Potential[2].append(W)
+        elif W.Order == 6:
+            mVSCF.Potential[3].append(W)
     mVSCF.FCs = FCs
     mVSCF.QUniques = QUniques
     mVSCF.QPowers = QPowers
+    mVSCF.Frequencies = Frequencies
+    mVSCF.HamHO = mVSCF.MakeHOHam()
 
 '''
 def GetVEffByMode(mVSCF, Mode):
@@ -567,7 +578,7 @@ class VSCF:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('naphthalene.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
     print(MaxQuanta)
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False)
     mf.SCF(DoDIIS = False)

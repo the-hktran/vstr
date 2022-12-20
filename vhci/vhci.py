@@ -65,7 +65,7 @@ def HCI(mVHCI):
     it = 1
     while (float(NAdded) / float(len(mVHCI.Basis))) > mVHCI.tol:
         NAdded = mVHCI.HCIStep(eps = mVHCI.eps1)
-        print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis))
+        print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
         mVHCI.SparseDiagonalize()
         it += 1
         if it > mVHCI.MaxIter:

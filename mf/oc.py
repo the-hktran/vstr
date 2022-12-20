@@ -83,12 +83,23 @@ def ContractFC(mCO, U):
 
     return FCs
     '''
-    return ContractFCCPP(mCO.VTensor[0].copy(), mCO.VTensor[1].copy(), mCO.VTensor[2].copy(), mCO.VTensor[3].copy(), U, mCO.NModes)
+    N = mCO.NModes
+    FCs = ContractFCCPP(mCO.VTensor[0].copy(), mCO.VTensor[1].copy(), mCO.VTensor[2].copy(), mCO.VTensor[3].copy(), U, mCO.NModes)
+    # Now include the quadratic terms and new frequencies. 
+    W = np.zeros((N, N))
+    np.fill_diagonal(W, mCO.mf.Frequencies)
+    W = U.T @ W @ U
+    Freq = W.diagonal()
+    for i in range(N):
+        for j in range(i + 1, N):
+            if abs(W[i, j]) > 1e-12:
+                FCs.append(FConst(W[i, j], [i, j], False))
+    return Freq, FCs
 
 def E_SCF(mCO, U):
     mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 0)
-    NewPotentialList = mCO.ContractFC(U)
-    mf_tmp.UpdateFC(NewPotentialList)
+    NewFrequencies, NewPotentialList = mCO.ContractFC(U)
+    mf_tmp.UpdateFC(NewFrequencies, NewPotentialList)
     return mf_tmp.kernel()
 
 def E_SCF_ij(mCO, ij, theta):
@@ -140,8 +151,6 @@ def OptE(mCO, t, ij, dt = 1e-2, thr = 1e-6):
     Ep = mCO.E_SCF_ij(ij, t + dt) 
     dE = (Ep - Em) / (2 * dt)
     ddE = (Ep - 2 * E + Em) / (dt * dt)
-    if ij == 2:
-        t = 0
     it = 1
     while abs(dE) > thr:
         t = t - (dE / ddE)
@@ -200,9 +209,8 @@ def MakeOCVSCF(mCO, U = None):
     if U is None:
         U = mCO.U
     mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta)
-    NewPotentialList = mCO.ContractFC(U)
-    mf_tmp.UpdateFC(NewPotentialList)
-    #mf_tmp.HamHO = U.T @ mf_tmp.HamHO @ U
+    NewFrequencies, NewPotentialList = mCO.ContractFC(U)
+    mf_tmp.UpdateFC(NewFrequencies, NewPotentialList)
     mf_tmp.kernel()
     return mf_tmp
 
@@ -225,7 +233,7 @@ class CoordinateOptimizer:
         self.PotentialList = []
         for Wp in self.mf.Potential:
             self.PotentialList += Wp
-        self.p = 3
+        self.p = 5
         self.NModes = mf.NModes
         self.EOpt = mf.ESCF
 
@@ -236,12 +244,16 @@ class CoordinateOptimizer:
     def kernel(self):
         self.InitU()
         self.JacobiSweep()
+        return self.MakeOCVSCF()
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
-    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False)
+    mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.kernel()
+    mf.PrintResults(NStates = 10)
     mCO = CoordinateOptimizer(mf)
-    mCO.kernel()
+    ocmf = mCO.kernel()
+    ocmf.PrintResults(NStates = 10)
+    print(ocmf.Frequencies)
 
