@@ -1763,6 +1763,35 @@ std::vector<std::vector<double>> ContractedAnharmonicPotential(std::vector<Eigen
     return Ys;
 }
 
+std::vector<std::vector<Eigen::MatrixXd>> ContractedAnharmonicPotential(std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &Vs)
+{
+    unsigned int NumP = Vs.size();
+    unsigned int NumM = Cs.size();
+    
+    std::vector<std::vector<Eigen::MatrixXd>> Ys;
+    for (unsigned int m = 0; m < NumM; m++)
+    {
+        std::vector<Eigen::MatrixXd> Ym;
+        for (int p = 0; p < NumP; p++)
+        {
+            Eigen::MatrixXd Y = Cs[m].transpose() * Vs[p] * Cs[m];
+            /*
+            double Y = 0.0;
+            for (int i = 0; i < C1.rows(); i++)
+            {
+                for (int pi = i - p; pi <= i + p; pi += 2)
+                {
+                    if (pi >= 0 && pi < C2.rows()) Y += C1[i] * C2[pi] * Vs[p].coeff(i, pi);
+                }
+            }
+            */
+            Ym.push_back(Y);
+        }
+        Ys.push_back(Ym);
+    }
+    return Ys;
+}
+
 std::vector<Eigen::MatrixXd> GetVEffCPP(std::vector<Eigen::SparseMatrix<double>> &AnharmTensor, std::vector<double> &FCs, std::vector<std::vector<int>> &QUniques, std::vector<std::vector<int>> &QPowers, std::vector<Eigen::MatrixXd> &Cs, std::vector<int> &MaxQuanta, std::vector<int> &ModeOcc1, std::vector<int> &ModeOcc2, bool FirstV)
 {
     std::vector<Eigen::MatrixXd> VEff;
@@ -1855,12 +1884,30 @@ std::vector<double> ContractedHOTerms(std::vector<Eigen::MatrixXd> &Cs, std::vec
     return Xs;
 }
 
+std::vector<Eigen::MatrixXd> ContractedHOTerms(std::vector<Eigen::MatrixXd> &Cs, std::vector<double> &Frequencies)
+{
+    std::vector<Eigen::MatrixXd> Xs;
+    Eigen::MatrixXd I = Eigen::MatrixXd::Identity(Cs[0].rows(), Cs[0].rows());
+    I = 0.5 * I;
+    for (unsigned int i = 0; i < I.rows(); i++) I(i, i) += i;
+    for (unsigned int m = 0; m < Cs.size(); m++)
+    {
+        Eigen::MatrixXd Xm = Cs[m].transpose() * I * Cs[m] ;
+        Xm *= Frequencies[m];
+        Xs.push_back(Xm);
+    }
+    return Xs;
+}
+
 Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV)
 {
     Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
 
     std::vector<int> MaxQuanta;
     for (Eigen::MatrixXd &C : Cs) MaxQuanta.push_back(C.rows());
+    
+    std::vector<std::vector<Eigen::MatrixXd>> Ys = ContractedAnharmonicPotential(Cs, GenericV);
+    std::vector<Eigen::MatrixXd> Xs = ContractedHOTerms(Cs, Frequencies);
 
     #pragma omp parallel for
     for (unsigned int i = 0; i < BasisSet.size(); i++)
@@ -1879,29 +1926,21 @@ Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<
             {
                 if (DiffModes.size() == 0)
                 {
-                    std::vector<double> Xs = ContractedHOTerms(Cs, Frequencies, ModeOccI, ModeOccJ);
                     double HOij = 0.0;
                     for (unsigned int m = 0; m < Xs.size(); m++)
                     {
-                        HOij += Xs[m];
+                        HOij += Xs[m].coeffRef(ModeOccI[m], ModeOccJ[m]);
                     }
                     Vij += HOij;
                 }
                 if (DiffModes.size() == 1)
                 {
-                    Eigen::MatrixXd Cm = Cs[DiffModes[0]];
-                    double Xm = 0.0;
-                    for (unsigned int im = 0; im < Cs[DiffModes[0]].rows(); im++)
-                    {
-                        Xm += Cs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * Cs[DiffModes[0]](im, ModeOccJ[DiffModes[0]]) * (im + 0.5);
-                    }
-                    Xm *= Frequencies[DiffModes[0]];
+                    double Xm = Xs[DiffModes[0]].coeffRef(ModeOccI[DiffModes[0]], ModeOccJ[DiffModes[0]]);
                     Vij += Xm;
                 }
             }
 
             // Anharmonic Part
-            std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(Cs, GenericV, ModeOccI, ModeOccJ);
             for (FConst &FC : FCs)
             {
                 double Vijq = 0.0;
@@ -1910,7 +1949,7 @@ Eigen::MatrixXd VCIHamFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<
                     Vijq = FC.fc;
                     for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                     {
-                        Vijq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                        Vijq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccI[FC.QUnique[m]], ModeOccJ[FC.QUnique[m]]);
                     }
                 }
                 Vij += Vijq;
@@ -2567,6 +2606,9 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<Wav
     std::vector<int> MaxQuanta;
     for (Eigen::MatrixXd &C : Cs) MaxQuanta.push_back(C.rows());
 
+    std::vector<std::vector<Eigen::MatrixXd>> Ys = ContractedAnharmonicPotential(Cs, GenericV);
+    std::vector<Eigen::MatrixXd> Xs = ContractedHOTerms(Cs, Frequencies);
+
     #pragma omp parallel for
     for (unsigned int i = 0; i < BasisSet1.size(); i++)
     {
@@ -2587,28 +2629,20 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<Wav
             {
                 if (DiffModes.size() == 0)
                 {
-                    std::vector<double> Xs = ContractedHOTerms(Cs, Frequencies, ModeOccI, ModeOccJ);
                     double HOij = 0.0;
                     for (unsigned int m = 0; m < Xs.size(); m++)
                     {
-                        HOij += Xs[m];
+                        HOij += Xs[m].coeffRef(ModeOccI[m], ModeOccJ[m]);
                     }
                     Vij += HOij;
                 }
                 if (DiffModes.size() == 1)
                 {
-                    double Xm = 0.0;
-                    for (unsigned int im = 0; im < Cs[DiffModes[0]].rows(); im++)
-                    {
-                        Xm += Cs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * Cs[DiffModes[0]](im, ModeOccJ[DiffModes[0]]) * (im + 0.5);
-                    }
-                    Xm *= Frequencies[DiffModes[0]];
-                    Vij += Xm;
+                    Vij += Xs[DiffModes[0]].coeffRef(ModeOccI[DiffModes[0]], ModeOccJ[DiffModes[0]]);
                 }
             }
 
             // Anharmonic Part
-            std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(Cs, GenericV, ModeOccI, ModeOccJ);
             for (FConst &FC : FCs)
             {
                 double Vijq = 0.0;
@@ -2617,7 +2651,7 @@ SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<Wav
                     Vijq = FC.fc;
                     for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                     {
-                        Vijq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                        Vijq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccI[FC.QUnique[m]], ModeOccJ[FC.QUnique[m]]);
                     }
                 }
                 Vij += Vijq;
@@ -2676,6 +2710,9 @@ std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<
     std::vector<int> MaxQuanta;
     for (Eigen::MatrixXd &C : ModalCs) MaxQuanta.push_back(C.rows());
 
+    std::vector<std::vector<Eigen::MatrixXd>> Ys = ContractedAnharmonicPotential(ModalCs, GenericVs);
+    std::vector<Eigen::MatrixXd> Xs = ContractedHOTerms(ModalCs, Frequencies);
+
     for (unsigned int n = 0; n < N_opt; n++)
     {
         std::vector<WaveFunction> PTBasisSet = AddStatesHBWithMax(BasisSet, AnharmHB, Evecs.col(n), PT2_Eps, MaxQuanta);
@@ -2696,39 +2733,20 @@ std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<
                 std::vector<int> DiffModes = CalcDiffModes(PTBasisSet[a], BasisSet[i]);
                 if (DiffModes.size() == 1)
                 {
-                    double Xm = 0.0;
-                    for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
-                    {
-                        Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
-                    }
-                    Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
+                    double Xm = Xs[DiffModes[0]].coeffRef(ModeOccA[DiffModes[0]], ModeOccI[DiffModes[0]]);
                     HaiCi += Xm * Evecs(i, n);
                 }
 
-                std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccI);
                 for (FConst &FC : AnharmFC)
                 {
                     double Haiq = 0.0;
                 
-                    if (DiffModes.size() == 1)
-                    {
-                        double Xm = 0.0;
-                        for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
-                        {
-                            Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
-                        }
-                        Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
-                        Haiq += Xm;
-                    }
-                    HaiCi += Haiq * Evecs(i, n);
-
-                    Haiq = 0.0;
                     if (VectorContainedIn(DiffModes, FC.QUnique))
                     {
                         Haiq = FC.fc;
                         for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                         {
-                            Haiq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                            Haiq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccA[FC.QUnique[m]], ModeOccI[FC.QUnique[m]]);
                         }
                     }
                     HaiCi += Haiq * Evecs(i, n);
@@ -2738,21 +2756,19 @@ std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<
             double Ea = 0.; //Hii matrix element
             
             // Harmonic Part
-            std::vector<double> Xs = ContractedHOTerms(ModalCs, Frequencies, ModeOccA, ModeOccA);
             for (unsigned int m = 0; m < Xs.size(); m++)
             {
-                Ea += Xs[m];
+                Ea += Xs[m].coeffRef(ModeOccA[m], ModeOccA[m]);
             }
 
             // Anharmonic Part
-            std::vector<std::vector<double>> YAs = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccA);
             for (FConst &FC : AnharmFC)
             {   
                 // All FCs contribute
                 double Eaq = FC.fc;
                 for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                 {
-                    Eaq *= YAs[FC.QUnique[m]][FC.QPowers[m]];
+                    Eaq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccA[FC.QUnique[m]], ModeOccA[FC.QUnique[m]]);
                 }
                 Ea += Eaq;
             }
@@ -2787,6 +2803,9 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
 
     std::vector<int> MaxQuanta;
     for (Eigen::MatrixXd &C : ModalCs) MaxQuanta.push_back(C.rows());
+    
+    std::vector<std::vector<Eigen::MatrixXd>> Ys = ContractedAnharmonicPotential(ModalCs, GenericVs);
+    std::vector<Eigen::MatrixXd> Xs = ContractedHOTerms(ModalCs, Frequencies);
 
     for (unsigned int n = 0; n < N_opt; n++)
     {
@@ -2819,39 +2838,19 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
                     std::vector<int> DiffModes = CalcDiffModes(DetPTBasisSet[a], BasisSet[i]);
                     if (DiffModes.size() == 1)
                     {
-                        double Xm = 0.0;
-                        for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
-                        {
-                            Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
-                        }
-                        Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
+                        double Xm = Xs[DiffModes[0]].coeffRef(ModeOccA[DiffModes[0]], ModeOccI[DiffModes[0]]);
                         HaiCi += Xm * Evecs(i, n);
                     }
 
-                    std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccI);
                     for (FConst &FC : AnharmFC)
                     {
                         double Haiq = 0.0;
-                    
-                        if (DiffModes.size() == 1)
-                        {
-                            double Xm = 0.0;
-                            for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
-                            {
-                                Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
-                            }
-                            Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
-                            Haiq += Xm;
-                        }
-                        HaiCi += Haiq * Evecs(i, n);
-
-                        Haiq = 0.0;
                         if (VectorContainedIn(DiffModes, FC.QUnique))
                         {
                             Haiq = FC.fc;
                             for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                             {
-                                Haiq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                                Haiq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccA[FC.QUnique[m]], ModeOccI[FC.QUnique[m]]);
                             }
                         }
                         HaiCi += Haiq * Evecs(i, n);
@@ -2860,21 +2859,19 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
                 double Ea = 0.; //Hii matrix element
                 
                 // Harmonic Part
-                std::vector<double> Xs = ContractedHOTerms(ModalCs, Frequencies, ModeOccA, ModeOccA);
                 for (unsigned int m = 0; m < Xs.size(); m++)
                 {
-                    Ea += Xs[m];
+                    Ea += Xs[m].coeffRef(ModeOccA[m], ModeOccA[m]);
                 }
 
                 // Anharmonic Part
-                std::vector<std::vector<double>> YAs = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccA);
                 for (FConst &FC : AnharmFC)
                 {   
                     // All FCs contribute
                     double Eaq = FC.fc;
                     for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                     {
-                        Eaq *= YAs[FC.QUnique[m]][FC.QPowers[m]];
+                        Eaq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccA[FC.QUnique[m]], ModeOccA[FC.QUnique[m]]);
                     }
                     Ea += Eaq;
                 }
@@ -2937,39 +2934,19 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
                     std::vector<int> DiffModes = CalcDiffModes(PTBasisSet[a], BasisSet[i]);
                     if (DiffModes.size() == 1)
                     {
-                        double Xm = 0.0;
-                        for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
-                        {
-                            Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
-                        }
-                        Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
+                        double Xm = Xs[DiffModes[0]].coeffRef(ModeOccA[DiffModes[0]], ModeOccI[DiffModes[0]]);
                         Hai += Xm;
                     }
 
-                    std::vector<std::vector<double>> Ys = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccI);
                     for (FConst &FC : AnharmFC)
                     {
                         double Haiq = 0.0;
-                
-                        if (DiffModes.size() == 1)
-                        {
-                            double Xm = 0.0;
-                            for (unsigned int im = 0; im < ModalCs[DiffModes[0]].rows(); im++)
-                            {
-                                Xm += ModalCs[DiffModes[0]](im, ModeOccA[DiffModes[0]]) * ModalCs[DiffModes[0]](im, ModeOccI[DiffModes[0]]) * (im + 0.5);
-                            }
-                            Xm *= BasisSet[i].Modes[DiffModes[0]].Freq;
-                            Haiq += Xm;
-                        }
-                        HaiCi += Haiq * Evecs(i, n);
-
-                        Haiq = 0.0;
                         if (VectorContainedIn(DiffModes, FC.QUnique))
                         {
                             Haiq = FC.fc;
                             for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                             {
-                                Haiq *= Ys[FC.QUnique[m]][FC.QPowers[m]];
+                                Haiq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccA[FC.QUnique[m]], ModeOccI[FC.QUnique[m]]);
                             }
                         }
                         Hai += Haiq;
@@ -2981,21 +2958,19 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
                 double Ea = 0.; //Hii matrix element
         
                 // Harmonic Part
-                std::vector<double> Xs = ContractedHOTerms(ModalCs, Frequencies, ModeOccA, ModeOccA);
                 for (unsigned int m = 0; m < Xs.size(); m++)
                 {
-                    Ea += Xs[m];
+                    Ea += Xs[m].coeffRef(ModeOccA[m], ModeOccA[m]);
                 }
 
                 // Anharmonic Part
-                std::vector<std::vector<double>> YAs = ContractedAnharmonicPotential(ModalCs, GenericVs, ModeOccA, ModeOccA);
                 for (FConst &FC : AnharmFC)
                 {   
                     // All FCs contribute
                     double Eaq = FC.fc;
                     for (unsigned int m = 0; m < FC.QUnique.size(); m++)
                     {
-                        Eaq *= YAs[FC.QUnique[m]][FC.QPowers[m]];
+                        Eaq *= Ys[FC.QUnique[m]][FC.QPowers[m]].coeffRef(ModeOccA[FC.QUnique[m]], ModeOccA[FC.QUnique[m]]);
                     }
                     Ea += Eaq;
                 }
