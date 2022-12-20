@@ -364,16 +364,16 @@ if __name__ == "__main__":
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     #mf.SCF(DoDIIS = False)
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVCI.CHKFile = "chkfile"
-    mVCI.SaveToFile = True
-    mVCI.kernel(doVHCI = True, doPT2 = True, doSPT2 = False, ComparePT2 = False)
-    mVCI.ReadFromFile = True
-    mVCI.kernel(doVCI = False, doVHCI = False, doPT2 = True, ComparePT2 = False)
+    mVCI.kernel(doVHCI = False, doPT2 = False, doSPT2 = False, ComparePT2 = False)
     #mVCI.PrintResults()
 
-    '''
+    #'''
+    t = TIMER(1)
+    t.start(0)
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVHCI.PT2(doStochastic = True)
+    mVHCI.kernel(doVHCI = False, doPT2 = False, doSPT2 = False, ComparePT2 = False)
+    t.stop(0)
+    t.report(['vhci'])
     #mVHCI.PT2(doStochastic = True)
     mVHCI.PrintResults()
-    '''
+    #'''
