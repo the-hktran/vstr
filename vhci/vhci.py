@@ -1,5 +1,5 @@
 import numpy as np
-from vstr import utils
+from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, AddStatesHB, AddStatesHBWithMax, HeatBath_Sort_FC, DoPT2, DoSPT2
@@ -76,7 +76,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.AverageQuanta)
+    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -136,7 +136,6 @@ def SparseDiagonalize(mVHCI):
         if len(mVHCI.NewBasis) != 0:
             HIJ = GenerateSparseHamVOD(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
             HJJ = GenerateSparseHamV(mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
-            np.save("HIJ_test", mVHCI.H.todense())
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
@@ -256,6 +255,7 @@ class VHCI:
             self.MaxQuanta = [MaxQuanta] * self.NModes
         
         self.MaxTotalQuanta = MaxTotalQuanta
+        self._HighestQuanta = [MaxTotalQuanta] * self.NModes
         self.IncludeSqrt = True
         self.H = None
         self.eps1 = 0.1 # HB epsilon
@@ -286,7 +286,7 @@ class VHCI:
         if self.ReadFromFile:
             self.ReadBasisFromFile(self.CHKFile)
         else:
-            self.Basis = utils.init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
+            self.Basis = init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
 
         if doVCI:
             self.Timer.start(0)
@@ -338,6 +338,24 @@ class VHCI:
         else:
             return [0] * self.NModes
 
+    @property
+    def HighestQuanta(self):
+        if self.IncludeSqrt:
+            try:
+                for B in self.NewBasis:
+                    for n in range(self.NModes):
+                        if B.Modes[n].Quanta > self._HighestQuanta[n]:
+                            self._HighestQuanta[n] = B.Modes[n].Quanta
+            except:
+                for B in self.Basis:
+                    for n in range(self.NModes):
+                        if B.Modes[n].Quanta > self._HighestQuanta[n]:
+                            self._HighestQuanta[n] = B.Modes[n].Quanta
+            return self._HighestQuanta
+        else:
+            return [1] * self.NModes
+            
+
 if __name__ == "__main__":
     '''
     V2 = np.asarray([[0, 1], [1, 0]])
@@ -354,8 +372,7 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVHCI.Diagonalize()
-    mVHCI.HCI()
+    mVHCI.kernel()
     #print(mVHCI.E[:NStates])
     #mVHCI.PT2(doStochastic = True)
     #print(mVHCI.E[:NStates])

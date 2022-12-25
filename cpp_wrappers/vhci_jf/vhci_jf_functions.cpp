@@ -1233,6 +1233,7 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
     {
         for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
+    HeatBath_Sort_FC(AnharmHB);
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     int fcmax=0;
@@ -1353,6 +1354,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
     {
         for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
+    HeatBath_Sort_FC(AnharmHB);
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     std::vector<std::vector<double>> DeltaESample;
@@ -2285,7 +2287,7 @@ std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet
 }
 
 
-std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<int> &MaxQuanta, std::vector<double> &AverageQuanta){ // Expand basis via Heat Bath algorithm
+std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<int> &MaxQuanta, std::vector<int> &HighestQuanta){ // Expand basis via Heat Bath algorithm
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
     HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
     for( WaveFunction& wfn : BasisSet){
@@ -2296,9 +2298,10 @@ std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet
     {
         for (int q : FC.QIndices)
         {
-            FC.fc *= sqrt(AverageQuanta[q] + 1);
+            FC.fc *= sqrt(HighestQuanta[q]);
         }
     }
+    HeatBath_Sort_FC(AnharmHB);
 
     std::vector<double> CVec;
     for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
@@ -2321,10 +2324,10 @@ std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet
                                 if (FitsMaxQuanta(tmp, MaxQuanta))
                                 {
                                     HashedNewStates.insert(tmp); // add new state to set
-                                    //if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
-                                    //{
-                                    //    HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
-                                    //}   
+                                    /*if (tmp.Modes[AnharmHB[i].QUnique[0]].Quanta > HighestQuanta[AnharmHB[i].QUnique[0]])
+                                    {
+                                        HighestQuanta[AnharmHB[i].QUnique[0]] = tmp.Modes[AnharmHB[i].QUnique[0]].Quanta;
+                                    }*/  
                                 }
                             }
                         }
@@ -2385,7 +2388,7 @@ std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet
                                             if (tmp.Modes[AnharmHB[i].QUnique[2]].Quanta > HighestQuanta[AnharmHB[i].QUnique[2]])
                                             {
                                                 HighestQuanta[AnharmHB[i].QUnique[2]] = tmp.Modes[AnharmHB[i].QUnique[2]].Quanta;
-                                            }*/ 
+                                            }*/
                                             HashedNewStates.insert(tmp); // add new state
                                         }
                                     }
@@ -2827,6 +2830,7 @@ std::vector<double> DoPT2FromVSCF(MatrixXd& Evecs, VectorXd& Evals, std::vector<
     {
         for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
+    HeatBath_Sort_FC(AnharmHB);
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
 
@@ -2919,6 +2923,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2FromVSCF(MatrixXd& Ev
     {
         for (int q : FC.QIndices) FC.fc *= sqrt(AverageQuanta[q] + 1);
     }
+    HeatBath_Sort_FC(AnharmHB);
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     std::vector<std::vector<double>> DeltaESample;
