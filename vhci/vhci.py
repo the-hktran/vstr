@@ -106,16 +106,16 @@ def PT2(mVHCI, doStochastic = False):
     if doStochastic:
         if mVHCI.eps3 < 0:
             mVHCI.Timer.start(4)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
             mVHCI.Timer.stop(4)
         else:
             mVHCI.Timer.start(5)
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
             mVHCI.Timer.stop(5)
     else:
         mVHCI.Timer.start(3)
-        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates)
+        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates)
         mVHCI.Timer.stop(3)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
@@ -256,7 +256,6 @@ class VHCI:
         
         self.MaxTotalQuanta = MaxTotalQuanta
         self._HighestQuanta = [MaxTotalQuanta] * self.NModes
-        self.IncludeSqrt = True
         self.H = None
         self.eps1 = 0.1 # HB epsilon
         self.eps2 = 0.01 # PT2/SPT2 epsilon
@@ -332,28 +331,19 @@ class VHCI:
 
     @property
     def AverageQuanta(self):
-        if self.IncludeSqrt:
-            SummedQuanta = self.SummedQuanta
-            return [Q / len(self.Basis) for Q in SummedQuanta]
-        else:
-            return [0] * self.NModes
+        SummedQuanta = self.SummedQuanta
+        return [Q / len(self.Basis) for Q in SummedQuanta]
 
     @property
     def HighestQuanta(self):
-        if self.IncludeSqrt:
-            try:
-                for B in self.NewBasis:
-                    for n in range(self.NModes):
-                        if B.Modes[n].Quanta > self._HighestQuanta[n]:
-                            self._HighestQuanta[n] = B.Modes[n].Quanta
-            except:
-                for B in self.Basis:
-                    for n in range(self.NModes):
-                        if B.Modes[n].Quanta > self._HighestQuanta[n]:
-                            self._HighestQuanta[n] = B.Modes[n].Quanta
+        try:
+            for B in self.NewBasis:
+                for n in range(self.NModes):
+                    if B.Modes[n].Quanta > self._HighestQuanta[n]:
+                        self._HighestQuanta[n] = B.Modes[n].Quanta
+        except:
             return self._HighestQuanta
-        else:
-            return [1] * self.NModes
+        return self._HighestQuanta
             
 
 if __name__ == "__main__":
@@ -372,7 +362,7 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVHCI.kernel()
+    mVHCI.kernel(doPT2 = True)
     #print(mVHCI.E[:NStates])
     #mVHCI.PT2(doStochastic = True)
     #print(mVHCI.E[:NStates])
