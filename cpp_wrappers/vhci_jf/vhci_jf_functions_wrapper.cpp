@@ -42,9 +42,12 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("MakeCTensorCPP", MakeCTensorCPP, "Generates the C Tensor given the list of modes.");
     m.def("GetVEffSLOW2CPP", GetVEffSLOW2CPP, "Generates the effective potential for each mode using memory efficient implementation.");
     m.def("GetVEffCPP", GetVEffCPP, "Generates the effective potential for each mode using mode independent memory efficient implementation.");
+    m.def("ContractedAnharmonicPotential", ContractedAnharmonicPotential, "Creates Y matrices.");
+    m.def("ContractedHOTerms", ContractedHOTerms, "Creates X matrices.");
     m.def("VCIHamFromVSCF", VCIHamFromVSCF, "Generates H in the modal basis.");
     m.def("VCISparseHamFromVSCF", VCISparseHamFromVSCF, "Generates H in the modal basis.");
     m.def("AddStatesHBWithMax", AddStatesHBWithMax, "Screens for states above the HB threshold with a maximum on Quanta per mode.");
+    m.def("AddStatesHBFromVSCF", AddStatesHBFromVSCF, "Screens for states above the HB with exact matrix elements in VSCF.");
     m.def("DoPT2FromVSCF", DoPT2FromVSCF, "Runs PT2 corrections in the modal basis.");
     m.def("DoSPT2FromVSCF", DoSPT2FromVSCF, "Runs stochastic PT2 corrections in the modal basis.");
     m.def("ProdU", ProdU, "Multiplies a list of 2 x 2 matrices.");

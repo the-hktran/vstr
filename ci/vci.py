@@ -1,7 +1,7 @@
 import numpy as np
 from vstr import utils
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBWithMax
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBFromVSCF, ContractedAnharmonicPotential, ContractedHOTerms
 from vstr.utils.perf_utils import TIMER
 from functools import reduce
 import itertools
@@ -85,16 +85,12 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.AverageQuanta)
+    UniqueBasis = AddStatesHBFromVSCF(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
     mVHCI.Timer.start(2)
     NewBasis, NAdded = mVHCI.ScreenBasis(Ws = mVHCI.PotentialListFull, C = abs(mVHCI.C[:, :mVHCI.NStates]).max(axis = 1), eps = eps)
-    
-    NewSummedQuanta = mVHCI.SumQuanta(NewBasis)
-    mVHCI.SummedQuanta = [mVHCI.SummedQuanta[i] + NewSummedQuanta[i] for i in range(mVHCI.NModes)]
-    
     mVHCI.Basis += NewBasis
     mVHCI.Timer.stop(2)
     return NAdded, NewBasis
@@ -119,16 +115,16 @@ def PT2(mVHCI, doStochastic = False):
     if doStochastic:
         if mVHCI.eps3 < 0:
             mVHCI.Timer.start(4)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.Ys, mVHCI.Xs, False, mVHCI.eps3)
             mVHCI.Timer.stop(4)
         else:
             mVHCI.Timer.start(5)
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.ModalCs, mVHCI.GenericV, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, mVHCI.Ys, mVHCI.Xs, True, mVHCI.eps3)
             mVHCI.Timer.stop(5)
     else:
         mVHCI.Timer.start(3)
-        mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.AverageQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.ModalCs, mVHCI.GenericV)
+        mVHCI.dE_PT2 = DoPT2FromVSCF(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.eps2, mVHCI.NStates, mVHCI.Ys, mVHCI.Xs)
         mVHCI.Timer.stop(3)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
@@ -301,7 +297,9 @@ class VCI:
             self.ReadBasisFromFile(self.CHKFile)
         else:
             self.Basis = utils.init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
-        self.SummedQuanta = self.SumQuanta()
+
+        self.Ys = ContractedAnharmonicPotential(self.ModalCs, self.GenericV)
+        self.Xs = ContractedHOTerms(self.ModalCs, self.Frequencies)
 
         if doVCI:
             self.Timer.start(0)
@@ -370,8 +368,8 @@ if __name__ == "__main__":
     mVCI.kernel(doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False)
     #mVCI.PrintResults()
 
-    #'''
+    '''
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mVHCI.kernel(doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False)
     #mVHCI.PT2(doStochastic = True)
-    #'''
+    '''
