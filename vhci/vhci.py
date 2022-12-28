@@ -362,10 +362,9 @@ if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mVHCI.kernel(doPT2 = True)
+    mVHCI.kernel(doPT2 = True, ComparePT2 = True)
     #print(mVHCI.E[:NStates])
     #mVHCI.PT2(doStochastic = True)
     #print(mVHCI.E[:NStates])
     #print(mVHCI.dE_PT2)
     #print(mVHCI.E_HCI_PT2)
-    mVHCI.PrintResults()

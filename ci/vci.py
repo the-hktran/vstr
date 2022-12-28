@@ -373,7 +373,7 @@ if __name__ == "__main__":
     #mVCI.CHKFile = "chk"
     #mVCI.ReadFromFile=True
     #mVCI.SaveToFile=True
-    mVCI.kernel(doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False)
+    mVCI.kernel(doVHCI = True, doPT2 = True, doSPT2 = False, ComparePT2 = True)
     #mVCI.PrintResults()
 
     '''
