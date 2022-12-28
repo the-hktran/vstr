@@ -340,6 +340,14 @@ class VCI:
             return [Q / len(self.Basis) for Q in self.SummedQuanta]
         else:
             return [0] * self.NModes
+    @property
+    def HighestQuanta(self):
+        HQ = [0] * self.NModes
+        for B in self.Basis:
+            for n in range(self.NModes):
+                if B.Modes[n].Quanta > HQ[n]:
+                    HQ[n] = B.Modes[n].Quanta
+        return HQ
 
 if __name__ == "__main__":
     '''

@@ -60,3 +60,12 @@ def InitGridBasis(Frequencies, MaxQuanta, ListOnly = False):
     for B in BasisList:
         Basis.append(WaveFunction(B, Frequencies))
     return Basis, BasisList
+
+def PrintBasis(Basis):
+    print("Printing basis set:", flush = True)
+    for B in Basis:
+        BStr = '\t'
+        for n in range(len(B.Modes)):
+            BStr += str(B.Modes[n].Quanta) + ' '
+        print(BStr, flush = True)
+        

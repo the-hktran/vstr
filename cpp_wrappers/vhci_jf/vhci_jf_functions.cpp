@@ -2159,8 +2159,7 @@ std::vector<WaveFunction> AddStatesHBWithMax(std::vector<WaveFunction> &BasisSet
 
     for(int ii = WSortedInd.size() - 1; ii >= 0; ii--){ // Loop over sorted force constants
         unsigned int i = WSortedInd[ii];
-        double SqrtFactorMax = TrueSqrtTerm(BasisSet[CSortedInd[CSortedInd.size() - 1]], AnharmHB[i].QIndices);
-        if (abs(AnharmHB[i].fc * SqrtFactorMax * C[CSortedInd[CSortedInd.size() - 1]]) < eps) break; // means that the largest Cn doesn't meet the criteria so we are done
+        if (abs(WVec[i] * C[CSortedInd[CSortedInd.size() - 1]]) < eps) break; // means that the largest Cn doesn't meet the criteria so we are done
         for (int nn = CSortedInd.size() - 1; nn >= 0; nn--)
         {
             unsigned int n = CSortedInd[nn];
@@ -2469,12 +2468,6 @@ std::vector<WaveFunction> AddStatesHBFromVSCF(std::vector<WaveFunction> &BasisSe
             for (unsigned int n = 0; n < Ys[m][p].cols(); n++)
             {
                 std::vector<long unsigned int> YSorted_mpn = SortIndices((Ys[m][p].col(n)).cwiseAbs());
-                if (m == 0 && p == 2)
-                {
-                    std::cout << Ys[m][p].col(n) << std::endl;
-                    for (auto i : YSorted_mpn) std::cout << i << " ";
-                    std::cout << std::endl;
-                }
                 YSorted_mp.push_back(YSorted_mpn);
             }
             YSorted_m.push_back(YSorted_mp);
@@ -2511,9 +2504,7 @@ std::vector<WaveFunction> AddStatesHBFromVSCF(std::vector<WaveFunction> &BasisSe
             {
                 double Factor = 1.0;
                 std::vector<int> LQuanta = GetQuantaList(BasisSet[n]);
-                
                 std::vector<int> KQuantaInd(AnharmHB[i].QUnique.size(), NModal - 1);
-                std::cout << KQuantaInd.size() << std::endl;
                 bool LoopK = true;
                 while (LoopK)
                 {
@@ -2522,19 +2513,13 @@ std::vector<WaveFunction> AddStatesHBFromVSCF(std::vector<WaveFunction> &BasisSe
                     {
                         KQuanta[AnharmHB[i].QUnique[q]] = YSortedColInd[AnharmHB[i].QUnique[q]][AnharmHB[i].QPowers[q]][LQuanta[AnharmHB[i].QUnique[q]]][KQuantaInd[q]];
                     }
-                    
                     double Factor = HBFactor(Ys, KQuanta, LQuanta, AnharmHB[i].QUnique, AnharmHB[i].QPowers);
-                    for (int k = 0; k < KQuanta.size(); k++) std::cout << KQuanta[k] << "\t";
-                    for (int k = 0; k < KQuantaInd.size(); k++) std::cout << KQuantaInd[k] << "\t";
-                    std::cout << std::endl;
-                    std::cout << Cn << " " << AnharmHB[i].fc << " " << Factor << std::endl;
-                    std::cout << Cn * AnharmHB[i].fc * Factor << std::endl;
-                    getchar();
                     if (abs(Cn * AnharmHB[i].fc * Factor) >= eps)
                     {
                         WaveFunction tmp = BasisSet[n];
                         for (unsigned int m = 0; m < KQuanta.size(); m++) tmp.Modes[m].Quanta = KQuanta[m];
-                        HashedNewStates.insert(tmp);
+                        if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
+                        KQuantaInd[0] = KQuantaInd[0] - 1;
                     }
                     else // Need to increment something
                     {
@@ -2548,8 +2533,9 @@ std::vector<WaveFunction> AddStatesHBFromVSCF(std::vector<WaveFunction> &BasisSe
                             }
                             if (m == KQuantaInd.size() - 1) LoopK = false;
                         }
+                        if (KQuantaInd.size() == 1) LoopK = false;
                     }
-                    KQuantaInd[0] = KQuantaInd[0] - 1;
+
                     for (unsigned int m = 0; m < KQuantaInd.size() - 1; m++)
                     {
                         if (KQuantaInd[m] == -1)
