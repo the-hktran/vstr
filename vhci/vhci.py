@@ -313,7 +313,7 @@ class VHCI:
                 print("")
                 print("===== VHCI+SSPT2 RESULTS =====", flush = True)
                 eps = self.eps2
-                self.eps2 *= 10
+                self.eps2 *= 5
                 self.eps3 = eps
                 self.PT2(doStochastic = True)
                 self.PrintResults()

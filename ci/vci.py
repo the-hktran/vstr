@@ -327,7 +327,7 @@ class VCI:
                 print("")
                 print("===== VSCF-VHCI+SSPT2 RESULTS =====", flush = True)
                 eps = self.eps2
-                self.eps2 *= 10
+                self.eps2 *= 5
                 self.eps3 = eps
                 self.PT2(doStochastic = True)
                 self.PrintResults()
@@ -368,7 +368,7 @@ if __name__ == "__main__":
     #w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('../examples/jf_input/CLO2.inp')
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
-    #mf.SCF(DoDIIS = False)
+    mf.kernel()
     mVCI = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     #mVCI.CHKFile = "chk"
     #mVCI.ReadFromFile=True
