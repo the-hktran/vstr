@@ -1231,7 +1231,7 @@ void FillWalkers(std::map<int, int>& WalkerPopulation, std::vector<double>& C, i
     for (unsigned int i = 0; i < Nd; i++) WalkerPopulation[Distribution(Gen)]++;
 }
 
-std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<int> &HighestQuanta, double PT2_Eps, int NEig)
+std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, /*std::vector<int> &HighestQuanta*/ std::vector<std::vector<Eigen::MatrixXd>> &Ys, double PT2_Eps, int NEig)
 {
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
@@ -1240,7 +1240,39 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
         N_opt = NEig;
     }
 
+    std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> YSortedColInd; // mode, power, column
+    std::vector<std::vector<double>> MaxY; // mode, power
+    for (unsigned int m = 0; m < Ys.size(); m++)
+    {
+        std::vector<std::vector<std::vector<long unsigned int>>> YSorted_m;
+        std::vector<double> YMax_m;
+        for (unsigned int p = 0; p < Ys[m].size(); p++)
+        {
+            YMax_m.push_back((Ys[m][p]).cwiseAbs().maxCoeff());
+            std::vector<std::vector<long unsigned int>> YSorted_mp;
+            for (unsigned int n = 0; n < Ys[m][p].cols(); n++)
+            {
+                std::vector<long unsigned int> YSorted_mpn = SortIndices((Ys[m][p].col(n)).cwiseAbs());
+                YSorted_mp.push_back(YSorted_mpn);
+            }
+            YSorted_m.push_back(YSorted_mp);
+        }
+        YSortedColInd.push_back(YSorted_m);
+        MaxY.push_back(YMax_m);
+    }
+
     std::vector<double> WVec;
+    for (FConst &FC : AnharmHB)
+    {
+        double fc = FC.fc;
+        for (unsigned int q = 0; q < FC.QUnique.size(); q++)
+        {
+            fc *= MaxY[FC.QUnique[q]][FC.QPowers[q]];
+        }
+        WVec.push_back(abs(fc));
+    }
+
+    /*
     for (FConst &FC : AnharmHB)
     {
         double W = FC.fc;
@@ -1248,9 +1280,8 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
         WVec.push_back(abs(W));
     }
     //HeatBath_Sort_FC(AnharmHB);
+    */
     std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
-
-    std::vector<int> MaxQuanta(HighestQuanta.size(), 10000);
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     int fcmax=0;
@@ -1262,7 +1293,7 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
 
     for (unsigned int n = 0; n < N_opt; n++)
     {
-        std::vector<WaveFunction> PTBasisSet = AddStatesHBWithMax2(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, MaxQuanta, HighestQuanta);
+        std::vector<WaveFunction> PTBasisSet = AddStatesHBFromVSCF2(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, Ys, YSortedColInd, MaxY);
         std::cout << " Perturbative space for state " << n << " contains " << PTBasisSet.size() << " basis states." << std::endl;
 
         #pragma omp parallel for
@@ -1358,7 +1389,7 @@ std::vector<double> DoPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunc
     return DeltaE;    
 }
 
-std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<int> &HighestQuanta, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
+std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, VectorXd& Evals, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, /*std::vector<int> &HighestQuanta*/ std::vector<std::vector<Eigen::MatrixXd>> &Ys, double PT2_Eps, int NEig, int Nd, int Ns, bool SemiStochastic = false, double PT2_Eps2 = 0.0)
 {
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
@@ -1367,17 +1398,48 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         N_opt = NEig;
     }
     
+    std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> YSortedColInd; // mode, power, column
+    std::vector<std::vector<double>> MaxY; // mode, power
+    for (unsigned int m = 0; m < Ys.size(); m++)
+    {
+        std::vector<std::vector<std::vector<long unsigned int>>> YSorted_m;
+        std::vector<double> YMax_m;
+        for (unsigned int p = 0; p < Ys[m].size(); p++)
+        {
+            YMax_m.push_back((Ys[m][p]).cwiseAbs().maxCoeff());
+            std::vector<std::vector<long unsigned int>> YSorted_mp;
+            for (unsigned int n = 0; n < Ys[m][p].cols(); n++)
+            {
+                std::vector<long unsigned int> YSorted_mpn = SortIndices((Ys[m][p].col(n)).cwiseAbs());
+                YSorted_mp.push_back(YSorted_mpn);
+            }
+            YSorted_m.push_back(YSorted_mp);
+        }
+        YSortedColInd.push_back(YSorted_m);
+        MaxY.push_back(YMax_m);
+    }
+
     std::vector<double> WVec;
     for (FConst &FC : AnharmHB)
+    {
+        double fc = FC.fc;
+        for (unsigned int q = 0; q < FC.QUnique.size(); q++)
+        {
+            fc *= MaxY[FC.QUnique[q]][FC.QPowers[q]];
+        }
+        WVec.push_back(abs(fc));
+    }
+
+    /*for (FConst &FC : AnharmHB)
     {
         double W = FC.fc;
         for (int q : FC.QIndices) W *= sqrt(HighestQuanta[q] + 1);
         WVec.push_back(abs(W));
     }
-    //HeatBath_Sort_FC(AnharmHB);
+    //HeatBath_Sort_FC(AnharmHB);*/
     std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
 
-    std::vector<int> MaxQuanta(HighestQuanta.size(), 10000);
+    std::vector<int> MaxQuanta(Ys.size(), 10000);
 
     vector<double> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
     std::vector<std::vector<double>> DeltaESample;
@@ -1395,7 +1457,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         std::vector<WaveFunction> DetPTBasisSet;
         if (SemiStochastic)
         {
-            DetPTBasisSet = AddStatesHBWithMax2(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, MaxQuanta, HighestQuanta);
+            DetPTBasisSet = AddStatesHBFromVSCF2(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, Ys, YSortedColInd, MaxY);
             std::cout << "Perturbative space for state " << n << " contains " << DetPTBasisSet.size() << " deterministic basis states." << std::endl;
         }
 
@@ -1515,7 +1577,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
                 for (std::map<int, int>::iterator it = WalkerPopulation.begin(); it != WalkerPopulation.end(); ++it)
                 {
                     int i = it->first;
-                    InternalAddStatesHBWithMax(VarDetBasisSet, PTBasisSetHashed, AnharmHB, WVec, WSortedInd, i, Evecs(i, n), PT2_Eps2, MaxQuanta);
+                    InternalAddStatesHBFromVSCF(VarDetBasisSet, PTBasisSetHashed, AnharmHB, WVec, WSortedInd, i, Evecs(i, n), PT2_Eps2, Ys, YSortedColInd, MaxY);
                 }
             }
             else
@@ -1523,7 +1585,7 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
                 for (std::map<int, int>::iterator it = WalkerPopulation.begin(); it != WalkerPopulation.end(); ++it)
                 {
                     int i = it->first;
-                    InternalAddStatesHBWithMax(BasisSet, PTBasisSetHashed, AnharmHB, WVec, WSortedInd, i, Evecs(i, n), PT2_Eps, MaxQuanta);
+                    InternalAddStatesHBFromVSCF(BasisSet, PTBasisSetHashed, AnharmHB, WVec, WSortedInd, i, Evecs(i, n), PT2_Eps, Ys, YSortedColInd, MaxY);
                 }
             }
             for (const WaveFunction &WF : PTBasisSetHashed) PTBasisSet.push_back(WF);

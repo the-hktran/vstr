@@ -132,6 +132,7 @@ def F(mCO, t, fn, tn):
 def OptF(mCO, fn, tn, thr = 1e-6):
     i = np.argmin(np.asarray(fn))
     t = tn[i]
+    print(t)
     F, dF, ddF = mCO.F(t, fn, tn)
     it = 1
     while abs(dF) > thr:
@@ -175,6 +176,7 @@ def JacobiSweepIteration(mCO):
             fn = []
             for tp in tn:
                 fn.append(mCO.E_SCF_ij(ij, tp))
+            print(fn)
             t0 = mCO.OptF(fn, tn)
             t, ENext = mCO.OptE(t0, ij)
 
@@ -248,7 +250,7 @@ class CoordinateOptimizer:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('water2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.kernel()
     mf.PrintResults(NStates = 10)

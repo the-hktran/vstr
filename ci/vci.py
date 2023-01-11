@@ -1,7 +1,7 @@
 import numpy as np
 from vstr import utils
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHBFromVSCF, ContractedAnharmonicPotential, ContractedHOTerms
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, ContractedAnharmonicPotential, ContractedHOTerms
 from vstr.utils.perf_utils import TIMER
 from functools import reduce
 import itertools
@@ -85,7 +85,13 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis = AddStatesHBFromVSCF(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
+    
+    if mVHCI.HBMethod == 'exact':
+        UniqueBasis = AddStatesHBFromVSCF(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
+    elif mVHCI.HBMethod == 'ho_max':
+        UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
+    elif mVHCI.HBMethod == 'ho_orig':
+        UniqueBasis = AddStatesHB(mVHCI.Basis, Ws, C, eps)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -224,7 +230,22 @@ def PrintResults(mVHCI):
         LCString = mVHCI.LCLine(n)
         Outline += '\t%s' % (LCString)
         print(Outline, flush = True)
-            
+
+def PrintParameters(mVHCI):
+    print("______________________________")
+    print("|                            |")
+    print("|       PARAMETER LIST       |")
+    print("|____________________________|")
+    print("")
+    print("eps_1          :", mVHCI.eps1)
+    print("eps_2          :", mVHCI.eps2)
+    print("eps_3          :", mVHCI.eps3)
+    print("NStates        :", mVHCI.NStates)
+    print("NWalkers       :", mVHCI.NWalkers)
+    print("NSamples       :", mVHCI.NSamples)
+    print("HB Criterion   :", mVHCI.HBMethod)
+    print("", flush = True)
+
 '''
 Class that handles VHCI
 '''
@@ -240,6 +261,7 @@ class VCI:
     InitTruncatedBasis = InitTruncatedBasis
     SumQuanta = SumQuanta
     PrintResults = PrintResults
+    PrintParameters = PrintParameters
     LCLine = LCLine
     SaveBasisToFile = SaveBasisToFile
     ReadBasisFromFile = ReadBasisFromFile
@@ -278,6 +300,7 @@ class VCI:
         self.NSamples = 50
         self.dE_PT2 = None
         self.sE_PT2 = None
+        self.HBMethod = 'exact' # ['ho_orig', 'ho_max', 'exact']
 
         self.CHKFile = None
         self.ReadFromFile = False
@@ -289,7 +312,6 @@ class VCI:
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
 
     def kernel(self, doVCI = True, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
-
         if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)
 
@@ -300,6 +322,8 @@ class VCI:
 
         self.Ys = ContractedAnharmonicPotential(self.ModalCs, self.GenericV)
         self.Xs = ContractedHOTerms(self.ModalCs, self.Frequencies)
+        
+        self.PrintParameters()
 
         if doVCI:
             self.Timer.start(0)
@@ -321,14 +345,17 @@ class VCI:
             self.PrintResults()
             print("")
             if ComparePT2:
+                '''
                 print("===== VSCF-VHCI+SPT2 RESULTS =====", flush = True)
                 self.PT2(doStochastic = True)
                 self.PrintResults()
                 print("")
+                '''
                 print("===== VSCF-VHCI+SSPT2 RESULTS =====", flush = True)
                 eps = self.eps2
                 self.eps2 *= 5
                 self.eps3 = eps
+                self.PrintParameters()
                 self.PT2(doStochastic = True)
                 self.PrintResults()
                 print("")

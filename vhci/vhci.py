@@ -2,7 +2,7 @@ import numpy as np
 from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, AddStatesHB, AddStatesHBWithMax, HeatBath_Sort_FC, DoPT2, DoSPT2
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2
 from functools import reduce
 import itertools
 import math
@@ -30,6 +30,37 @@ def SaveBasisToFile(mVHCI, FileName):
 
     np.save(mVHCI.CHKFile + "_E", mVHCI.E)
     np.save(mVHCI.CHKFile + "_C", mVHCI.C)
+
+def MakeAnharmTensor(mVHCI, PotentialList = None):
+    if PotentialList is None:
+        PotentialList = mVHCI.PotentialList
+    AnharmTensor = []
+    
+    MaxQ = [mVHCI.MaxQuanta[0]]
+    Freq = [1.0]
+    GenericBasis = init_funcs.InitGridBasis(Freq, MaxQ)[0]
+
+    AnharmTensor.append(np.zeros((0,0)))
+    for p in range(1, 7):
+        W = FConst(1.0, [0] * p, False)
+        W = [W]
+        W.append(FConst(0.0, [0] * 6, False))
+        CubicFC = []
+        QuarticFC = []
+        QuinticFC = []
+        SexticFC = []
+        if p == 1 or p == 3:
+            CubicFC = W.copy()
+        elif p == 2 or p == 4:
+            QuarticFC = W.copy()
+        elif p == 5:
+            QuinticFC = W.copy()
+        elif p == 6:
+            SexticFC = W.copy()
+        H = GenerateHamAnharmV(GenericBasis, Freq, W, CubicFC, QuarticFC, QuinticFC, SexticFC)
+        AnharmTensor.append(H)
+    AnharmTensor[0] = AnharmTensor[1]
+    return AnharmTensor
 
 def FormW(mVHCI, V):
     Ws = []
@@ -76,7 +107,13 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
-    UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
+
+    if mVHCI.HBMethod == 'orig':
+        UniqueBasis = AddStatesHB(mVHCI.Basis, Ws, C, eps)
+    elif mVHCI.HBMethod == 'max':
+        UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
+    elif mVHCI.HBMethod == 'exact':
+        UniqueBasis = AddStatesHBFromVSCF(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -106,16 +143,16 @@ def PT2(mVHCI, doStochastic = False):
     if doStochastic:
         if mVHCI.eps3 < 0:
             mVHCI.Timer.start(4)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
             mVHCI.Timer.stop(4)
         else:
             mVHCI.Timer.start(5)
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
             mVHCI.Timer.stop(5)
     else:
         mVHCI.Timer.start(3)
-        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.HighestQuanta, mVHCI.eps2, mVHCI.NStates)
+        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStates)
         mVHCI.Timer.stop(3)
     mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
 
@@ -213,13 +250,29 @@ def PrintResults(mVHCI):
         LCString = mVHCI.LCLine(n)
         Outline += '\t%s' % (LCString)
         print(Outline)
-            
+         
+def PrintParameters(mVHCI):
+    print("______________________________")
+    print("|                            |")
+    print("|       PARAMETER LIST       |")
+    print("|____________________________|")
+    print("")
+    print("eps_1          :", mVHCI.eps1)
+    print("eps_2          :", mVHCI.eps2)
+    print("eps_3          :", mVHCI.eps3)
+    print("NStates        :", mVHCI.NStates)
+    print("NWalkers       :", mVHCI.NWalkers)
+    print("NSamples       :", mVHCI.NSamples)
+    print("HB Criterion   :", mVHCI.HBMethod)
+    print("", flush = True)
+  
 '''
 Class that handles VHCI
 '''
 class VHCI:
     FormW = FormW
     FormWSD = FormWSD
+    MakeAnharmTensor = MakeAnharmTensor
     HCI = HCI
     Diagonalize = Diagonalize
     SparseDiagonalize = SparseDiagonalize
@@ -229,6 +282,7 @@ class VHCI:
     InitTruncatedBasis = InitTruncatedBasis
     PrintResults = PrintResults
     LCLine = LCLine
+    PrintParameters = PrintParameters
     ReadBasisFromFile = ReadBasisFromFile
     SaveBasisToFile = SaveBasisToFile
 
@@ -267,6 +321,7 @@ class VHCI:
         self.NSamples = 50
         self.dE_PT2 = None
         self.sE_PT2 = None
+        self.HBMethod = 'exact' #['orig', 'max', 'exact']
 
         self.CHKFile = None
         self.ReadFromFile = False
@@ -278,6 +333,13 @@ class VHCI:
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
 
     def kernel(self, doVCI = True, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
+        assert(self.HBMethod in ['orig', 'max', 'exact'])
+        if self.HBMethod == 'exact':
+            self.Ys = [self.MakeAnharmTensor()] * self.NModes
+            #Is = []
+            #for n in self.MaxQuanta:
+            #    Is.append(np.eye(n))
+            #self.Xs = ContractedHOTerms(Is, self.Frequencies)
 
         if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)
@@ -286,6 +348,8 @@ class VHCI:
             self.ReadBasisFromFile(self.CHKFile)
         else:
             self.Basis = init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
+
+        self.PrintParameters()
 
         if doVCI:
             self.Timer.start(0)
@@ -315,6 +379,7 @@ class VHCI:
                 eps = self.eps2
                 self.eps2 *= 5
                 self.eps3 = eps
+                self.PrintParameters()
                 self.PT2(doStochastic = True)
                 self.PrintResults()
                 print("")
