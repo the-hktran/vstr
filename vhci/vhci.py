@@ -130,6 +130,8 @@ def HCI(mVHCI):
         NAdded, mVHCI.NewBasis = mVHCI.HCIStep(eps = mVHCI.eps1)
         print("VHCI Iteration", it, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
         mVHCI.SparseDiagonalize()
+        if mVHCI.PrintHCISteps:
+            mVHCI.PrintResults()
         if mVHCI.SaveToFile:
             mVHCI.SaveBasisToFile(mVHCI.CHKFile)
         it += 1
@@ -326,6 +328,7 @@ class VHCI:
         self.CHKFile = None
         self.ReadFromFile = False
         self.SaveToFile = False
+        self.PrintHCISteps = False
 
         self.__dict__.update(kwargs)
 
