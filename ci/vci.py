@@ -146,11 +146,11 @@ def Diagonalize(mVHCI):
 def SparseDiagonalize(mVHCI):
     mVHCI.Timer.start(1)
     if mVHCI.H is None:
-        mVHCI.H = VCISparseHamFromVSCF(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, True)
+        mVHCI.H = VCISparseHamFromVSCF(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Ys, mVHCI.Xs, True)
     else:
         if len(mVHCI.NewBasis) != 0:
-            HIJ = VCISparseHamFromVSCF(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, False)
-            HJJ = VCISparseHamFromVSCF(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.ModalCs, mVHCI.GenericV, True)
+            HIJ = VCISparseHamFromVSCF(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Ys, mVHCI.Xs, False)
+            HJJ = VCISparseHamFromVSCF(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Ys, mVHCI.Xs, True)
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
@@ -339,26 +339,25 @@ class VCI:
             self.PrintResults()
             print("")
 
-        if doPT2 or doSPT2:
+        if doPT2:
             print("===== VSCF-VHCI+PT2 RESULTS =====", flush = True)
-            self.PT2(doStochastic = doSPT2)
+            self.PT2(doStochastic = False)
             self.PrintResults()
             print("")
-            if ComparePT2:
-                '''
-                print("===== VSCF-VHCI+SPT2 RESULTS =====", flush = True)
-                self.PT2(doStochastic = True)
-                self.PrintResults()
-                print("")
-                '''
-                print("===== VSCF-VHCI+SSPT2 RESULTS =====", flush = True)
-                eps = self.eps2
-                self.eps2 *= 5
-                self.eps3 = eps
-                self.PrintParameters()
-                self.PT2(doStochastic = True)
-                self.PrintResults()
-                print("")
+        if doSPT2:
+            print("===== VSCF-VHCI+SPT2 RESULTS =====", flush = True)
+            self.PT2(doStochastic = True)
+            self.PrintResults()
+            print("")
+        if ComparePT2:
+            print("===== VSCF-VHCI+SSPT2 RESULTS =====", flush = True)
+            eps = self.eps2
+            self.eps2 *= 10
+            self.eps3 = eps
+            self.PrintParameters()
+            self.PT2(doStochastic = True)
+            self.PrintResults()
+            print("")
         self.Timer.report(self.TimerNames)
 
     @property
@@ -400,7 +399,7 @@ if __name__ == "__main__":
     #mVCI.CHKFile = "chk"
     #mVCI.ReadFromFile=True
     #mVCI.SaveToFile=True
-    mVCI.kernel(doVHCI = True, doPT2 = True, doSPT2 = False, ComparePT2 = True)
+    mVCI.kernel(doVHCI = True, doPT2 = True, doSPT2 = True, ComparePT2 = True)
     #mVCI.PrintResults()
 
     '''

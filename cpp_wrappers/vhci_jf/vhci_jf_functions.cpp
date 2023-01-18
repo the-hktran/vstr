@@ -3220,16 +3220,13 @@ void InternalAddStatesHBWithMax(std::vector<WaveFunction> &BasisSet, HashedState
 }
 
 
-SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<Eigen::MatrixXd> &Cs, std::vector<Eigen::SparseMatrix<double>> &GenericV, bool DiagonalBlock)
+SpMat VCISparseHamFromVSCF(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<FConst> &FCs, std::vector<std::vector<Eigen::MatrixXd>> &Ys, std::vector<Eigen::MatrixXd> &Xs, bool DiagonalBlock)
 {
     SpMat H(BasisSet1.size(), BasisSet2.size());
     std::vector<Trip> HTrip;
 
     std::vector<int> MaxQuanta;
-    for (Eigen::MatrixXd &C : Cs) MaxQuanta.push_back(C.rows());
-
-    std::vector<std::vector<Eigen::MatrixXd>> Ys = ContractedAnharmonicPotential(Cs, GenericV);
-    std::vector<Eigen::MatrixXd> Xs = ContractedHOTerms(Cs, Frequencies);
+    for (Eigen::MatrixXd &X : Xs) MaxQuanta.push_back(X.rows());
 
     #pragma omp parallel for
     for (unsigned int i = 0; i < BasisSet1.size(); i++)

@@ -365,24 +365,25 @@ class VHCI:
             self.PrintResults()
             print("")
 
-        if doPT2 or doSPT2:
+        if doPT2:
             print("===== VHCI+PT2 RESULTS =====", flush = True)
-            self.PT2(doStochastic = doSPT2)
+            self.PT2(doStochastic = False)
             self.PrintResults()
             print("")
-            if ComparePT2:
-                print("===== VHCI+SPT2 RESULTS =====", flush = True)
-                self.PT2(doStochastic = True)
-                self.PrintResults()
-                print("")
-                print("===== VHCI+SSPT2 RESULTS =====", flush = True)
-                eps = self.eps2
-                self.eps2 *= 5
-                self.eps3 = eps
-                self.PrintParameters()
-                self.PT2(doStochastic = True)
-                self.PrintResults()
-                print("")
+        if doSPT2:
+            print("===== VHCI+SPT2 RESULTS =====", flush = True)
+            self.PT2(doStochastic = True)
+            self.PrintResults()
+            print("")
+        if ComparePT2:
+            print("===== VHCI+SSPT2 RESULTS =====", flush = True)
+            eps = self.eps2
+            self.eps2 *= 10
+            self.eps3 = eps
+            self.PrintParameters()
+            self.PT2(doStochastic = True)
+            self.PrintResults()
+            print("")
         self.Timer.report(self.TimerNames)
 
 

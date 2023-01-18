@@ -97,10 +97,11 @@ def ContractFC(mCO, U):
     return Freq, FCs
 
 def E_SCF(mCO, U):
-    mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 0)
+    mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 1)
     NewFrequencies, NewPotentialList = mCO.ContractFC(U)
     mf_tmp.UpdateFC(NewFrequencies, NewPotentialList)
-    return mf_tmp.kernel()
+    print(U.T @ U)
+    return mf_tmp.kernel(C0s = mCO.C0s)
 
 def E_SCF_ij(mCO, ij, theta):
     NewUs = mCO.Us.copy()
@@ -232,6 +233,7 @@ class CoordinateOptimizer:
 
     def __init__(self, mf, **kwargs):
         self.mf = mf
+        self.C0s = mf.Cs
         self.PotentialList = []
         for Wp in self.mf.Potential:
             self.PotentialList += Wp
@@ -250,7 +252,7 @@ class CoordinateOptimizer:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('water2.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.kernel()
     mf.PrintResults(NStates = 10)
