@@ -96,12 +96,11 @@ def ContractFC(mCO, U):
                 FCs.append(FConst(W[i, j], [i, j], False))
     return Freq, FCs
 
-def E_SCF(mCO, U):
-    mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 1)
+def E_SCF(mCO, U, C0s = None):
+    mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 0)
     NewFrequencies, NewPotentialList = mCO.ContractFC(U)
     mf_tmp.UpdateFC(NewFrequencies, NewPotentialList)
-    print(U.T @ U)
-    return mf_tmp.kernel(C0s = mCO.C0s)
+    return mf_tmp.kernel(C0s = C0s)
 
 def E_SCF_ij(mCO, ij, theta):
     NewUs = mCO.Us.copy()
@@ -133,7 +132,6 @@ def F(mCO, t, fn, tn):
 def OptF(mCO, fn, tn, thr = 1e-6):
     i = np.argmin(np.asarray(fn))
     t = tn[i]
-    print(t)
     F, dF, ddF = mCO.F(t, fn, tn)
     it = 1
     while abs(dF) > thr:
@@ -175,11 +173,15 @@ def JacobiSweepIteration(mCO):
     for i in range(mCO.mf.NModes):
         for j in range(i + 1, mCO.mf.NModes):
             fn = []
+            #try:
             for tp in tn:
                 fn.append(mCO.E_SCF_ij(ij, tp))
-            print(fn)
             t0 = mCO.OptF(fn, tn)
+
             t, ENext = mCO.OptE(t0, ij)
+            #except:
+            #    ij += 1
+            #    continue
 
             # In case the energy increases, just skip this Uij
             if ENext < mCO.EOpt:
@@ -215,6 +217,7 @@ def MakeOCVSCF(mCO, U = None):
     NewFrequencies, NewPotentialList = mCO.ContractFC(U)
     mf_tmp.UpdateFC(NewFrequencies, NewPotentialList)
     mf_tmp.kernel()
+    mf_tmp.PrintPotential(Normalized = False)
     return mf_tmp
 
 class CoordinateOptimizer:
@@ -237,7 +240,7 @@ class CoordinateOptimizer:
         self.PotentialList = []
         for Wp in self.mf.Potential:
             self.PotentialList += Wp
-        self.p = 5
+        self.p = 2
         self.NModes = mf.NModes
         self.EOpt = mf.ESCF
 
@@ -252,12 +255,16 @@ class CoordinateOptimizer:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.kernel()
-    mf.PrintResults(NStates = 10)
+    mf.PrintResults(NStates = NStates)
+    from vstr.ci.vci import VCI
+    mci = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
+    mci.kernel(doVHCI=False)
+
     mCO = CoordinateOptimizer(mf)
     ocmf = mCO.kernel()
-    ocmf.PrintResults(NStates = 10)
-    print(ocmf.Frequencies)
+    occi = VCI(ocmf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
+    occi.kernel(doVHCI = False)
 

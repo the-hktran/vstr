@@ -9,6 +9,7 @@
 * SciPy
 * Pybind11
 * Eigen
+* PySCF and its dependencies
 
 ### C++ Dependencies
 * Eigen
@@ -20,6 +21,8 @@
 * Vibrational Self-Consistent Field (**VSCF**)
 * Vibrational Heat-Bath Configuration Interaction (**VHCI**) in harmonic oscillator product bases and VSCF modal bases.
 * Epstein-Nesbet Pertubation Theory of Second Order on top of VHCI solutions (**VHCI+PT2**)
+* Optimized Coordinates for VSCF (**OC-VSCF**)
+* Numerical PES derivatives computed at various levels of theory.
 
 ## Author
 

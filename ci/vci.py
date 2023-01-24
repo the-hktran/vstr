@@ -200,7 +200,7 @@ def TranslateBasisToString(B):
 '''
 This function prints the linear combination of the most important product states
 '''
-def LCLine(mVHCI, n, thr = 1e-2):
+def LCLine(mVHCI, n, thr = 2.5e-1):
     def BasisToString(B):
         BString = '|'
         for HO in B.Modes:

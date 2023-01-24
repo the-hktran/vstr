@@ -133,7 +133,7 @@ def UpdateFC(mVSCF, Frequencies, PotentialList):
     QUniques = []
     QPowers = []
     
-    mVSCF.Potential = [[]] * 4
+    mVSCF.Potential = [[], [], [], []]
     for W in PotentialList:
         FCs.append(W.fc)
         QUniques.append(W.QUnique)
@@ -146,6 +146,7 @@ def UpdateFC(mVSCF, Frequencies, PotentialList):
             mVSCF.Potential[2].append(W)
         elif W.Order == 6:
             mVSCF.Potential[3].append(W)
+
     mVSCF.FCs = FCs
     mVSCF.QUniques = QUniques
     mVSCF.QPowers = QPowers
@@ -395,7 +396,7 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
     mVSCF.Converged = True
 
-def LCLine(mVSCF, ModeOcc, thr = 1e-2):
+def LCLine(mVSCF, ModeOcc, thr = 2.5e-1):
     def BasisToString(B):
         BString = '|'
         for Q in B:
@@ -485,7 +486,31 @@ def AnalyzeModals(mVSCF):
         for Line in Lines:
             print(Line, flush = True)
         print("")
-            
+    
+def PrintPotential(mVSCF, Normalized = True):
+    print("|*****************************************|")
+    print("|********** Printing  Potential **********|", flush = True)
+    print("|*****************************************|")
+    print("")
+
+    print("Normal Mode Frequencies:")
+    for w in mVSCF.Frequencies:
+        print(w)
+    print("")
+    print("Potential:")
+    for FCp in mVSCF.Potential:
+        for FC in FCp:
+            V = FC.fc
+            if Normalized:
+                V *= np.sqrt(pow(2.0, FC.Order))
+                for q in FC.QPowers:
+                    V *= np.math.factorial(q)
+            FCLine = str(FC.Order) + " "
+            for q in FC.QIndices:
+                FCLine += (str(q) + " ")
+            FCLine += str(V)
+            print(FCLine, flush = True)
+
 class VSCF:
     InitCs = InitCs
     GetModalSlices = GetModalSlices
@@ -505,6 +530,7 @@ class VSCF:
     PrintResults = PrintResults
     LCLine = LCLine
     AnalyzeModals = AnalyzeModals
+    PrintPotential = PrintPotential
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
@@ -513,7 +539,7 @@ class VSCF:
         self.Timer.set_overhead(self.Timer.estimate_overhead())
         self.TimerNames = ["Basis Init", "Anharm Pot Init", "Fock Generation", "DIIS", "Solve Fock"]
 
-        self.Potential = [[]] * 4
+        self.Potential = [[], [], [], []]
         for V in UnscaledPotential:
             Wp = FormW(V)
             self.Potential[Wp[0].Order - 3] = Wp
