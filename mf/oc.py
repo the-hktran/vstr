@@ -12,14 +12,12 @@ def FCToTensors(mCO):
     VTensor = [VTensor3, VTensor4, VTensor5, VTensor6]
 
     for FC in mCO.PotentialList:
-        print(FC.fc)
         W = FC.fc * np.sqrt(pow(2.0, FC.Order))
         for i in FC.QPowers:
             W *= np.math.factorial(i)
         for i in FC.QIndices:
             W *= np.sqrt(mCO.mf.Frequencies[i])
         # W is the raw derivative
-        print(W)
 
         Is = list(permutations(FC.QIndices))
         for I in Is:
@@ -99,26 +97,28 @@ def ContractFC(mCO, U):
     W = np.zeros((N, N))
     np.fill_diagonal(W, mCO.mf.Frequencies**2)
     W = U.T @ W @ U
-    Freq = np.sqrt(W.diagonal())
+    Freq = np.sqrt((W).diagonal())
     for i in range(N):
         for j in range(i + 1, N):
             if abs(W[i, j]) > 1e-12:
-                FCs.append(FConst(W[i, j] / np.sqrt(Freq[i] * Freq[j]), [i, j], False))
+                FCs.append(FConst(W[i, j], [i, j], False))
     for FC in FCs:
-        print(FC.fc)
         FC.fc /= np.sqrt(pow(2.0, FC.Order))
         for i in FC.QIndices:
             FC.fc /= np.sqrt(Freq[i])
         for i in FC.QPowers:
             FC.fc /= np.math.factorial(i)
-        print(FC.fc)
     return Freq, FCs
 
 def E_SCF(mCO, U, C0s = None):
     mf_tmp = VSCF(mCO.mf.Frequencies, [], MaxQuanta = mCO.mf.MaxQuanta, verbose = 0)
     NewFrequencies, NewPotentialList = mCO.ContractFC(U)
     mf_tmp.UpdateFC(NewFrequencies, NewPotentialList)
-    return mf_tmp.kernel(C0s = C0s)
+    if C0s is None:
+        C0s = mCO.C0s
+    E = mf_tmp.kernel(C0s = C0s)
+    mCO.C0sCurrent = mf_tmp.Cs
+    return E
 
 def E_SCF_ij(mCO, ij, theta):
     NewUs = mCO.Us.copy()
@@ -190,13 +190,15 @@ def JacobiSweepIteration(mCO):
     # ij = (i - 2) (i - 1) / 2 + j
     for i in range(mCO.mf.NModes):
         for j in range(i + 1, mCO.mf.NModes):
+            if ij in mCO.SkipIJ:
+                ij += 1
+                continue
             fn = []
-            print(" == Jacobi Sweep for Mode", i, "and", j, flush = True)
+            print("-= Jacobi Sweep for Mode", i, "and", j, flush = True)
             try:
                 for tp in tn:
                     fn.append(mCO.E_SCF_ij(ij, tp))
                 t0 = mCO.OptF(fn, tn)
-                print(fn)
 
                 t, ENext = mCO.OptE(t0, ij)
             except:
@@ -209,13 +211,17 @@ def JacobiSweepIteration(mCO):
                 mCO.Us[ij] = U
                 mCO.U = ProdU(mCO.Us, mCO.NModes)
                 mCO.EOpt = ENext
-            
+                mCO.C0s = mCO.C0sCurrent.copy()
+            else:
+                mCO.SkipIJ.append(ij)
+
             ij += 1
 
 def JacobiSweep(mCO, thr = 1e-6):
     Ei = 0
     Ef = mCO.mf.ESCF
     it = 1
+    mCO.SkipIJ = []
     while abs(Ef - Ei) > 1e-6:
         Ei = Ef
         mCO.JacobiSweepIteration()
@@ -277,10 +283,11 @@ class CoordinateOptimizer:
     def __init__(self, mf, **kwargs):
         self.mf = mf
         self.C0s = mf.Cs
+        self.C0sCurrent = None
         self.PotentialList = []
         for Wp in self.mf.Potential:
             self.PotentialList += Wp
-        self.p = 0
+        self.p = 3
         self.NModes = mf.NModes
         self.EOpt = mf.ESCF
 
@@ -295,16 +302,20 @@ class CoordinateOptimizer:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('water2.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('water.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.kernel()
     mf.PrintResults(NStates = NStates)
-    mf.PrintPotential()
+    mf.PrintPotential(Normalized=True)
     from vstr.ci.vci import VCI
     mci = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
-    mci.kernel(doVHCI=False)
+    mci.kernel(doVHCI=True)
 
     mCO = CoordinateOptimizer(mf)
+    #mCO.InitU()
+    #mCO.Us[0] = SetUij(0.8);
+    #mCO.U = ProdU(mCO.Us, mCO.NModes)
+    #ocmf = mCO.MakeOCVSCF()
     ocmf = mCO.kernel()
     occi = VCI(ocmf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     occi.kernel(doVHCI = False)
