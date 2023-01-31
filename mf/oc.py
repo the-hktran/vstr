@@ -12,9 +12,19 @@ def FCToTensors(mCO):
     VTensor = [VTensor3, VTensor4, VTensor5, VTensor6]
 
     for FC in mCO.PotentialList:
+        print(FC.fc)
+        W = FC.fc * np.sqrt(pow(2.0, FC.Order))
+        for i in FC.QPowers:
+            W *= np.math.factorial(i)
+        for i in FC.QIndices:
+            W *= np.sqrt(mCO.mf.Frequencies[i])
+        # W is the raw derivative
+        print(W)
+
         Is = list(permutations(FC.QIndices))
         for I in Is:
-            VTensor[FC.Order - 3][I] = FC.fc
+            VTensor[FC.Order - 3][I] = W
+            
     #return VTensor
     # This part converges the tensors into lists so that they can be intepreted as arrays in C++
     VTensor[0] = VTensor[0].reshape(N * N * N)#.tolist()
@@ -87,13 +97,21 @@ def ContractFC(mCO, U):
     FCs = ContractFCCPP(mCO.VTensor[0].copy(), mCO.VTensor[1].copy(), mCO.VTensor[2].copy(), mCO.VTensor[3].copy(), U, mCO.NModes)
     # Now include the quadratic terms and new frequencies. 
     W = np.zeros((N, N))
-    np.fill_diagonal(W, mCO.mf.Frequencies)
+    np.fill_diagonal(W, mCO.mf.Frequencies**2)
     W = U.T @ W @ U
-    Freq = W.diagonal()
+    Freq = np.sqrt(W.diagonal())
     for i in range(N):
         for j in range(i + 1, N):
             if abs(W[i, j]) > 1e-12:
-                FCs.append(FConst(W[i, j], [i, j], False))
+                FCs.append(FConst(W[i, j] / np.sqrt(Freq[i] * Freq[j]), [i, j], False))
+    for FC in FCs:
+        print(FC.fc)
+        FC.fc /= np.sqrt(pow(2.0, FC.Order))
+        for i in FC.QIndices:
+            FC.fc /= np.sqrt(Freq[i])
+        for i in FC.QPowers:
+            FC.fc /= np.math.factorial(i)
+        print(FC.fc)
     return Freq, FCs
 
 def E_SCF(mCO, U, C0s = None):
@@ -173,18 +191,20 @@ def JacobiSweepIteration(mCO):
     for i in range(mCO.mf.NModes):
         for j in range(i + 1, mCO.mf.NModes):
             fn = []
-            #try:
-            for tp in tn:
-                fn.append(mCO.E_SCF_ij(ij, tp))
-            t0 = mCO.OptF(fn, tn)
+            print(" == Jacobi Sweep for Mode", i, "and", j, flush = True)
+            try:
+                for tp in tn:
+                    fn.append(mCO.E_SCF_ij(ij, tp))
+                t0 = mCO.OptF(fn, tn)
+                print(fn)
 
-            t, ENext = mCO.OptE(t0, ij)
-            #except:
-            #    ij += 1
-            #    continue
+                t, ENext = mCO.OptE(t0, ij)
+            except:
+                ij += 1
+                continue
 
             # In case the energy increases, just skip this Uij
-            if ENext < mCO.EOpt:
+            if ENext < mCO.EOpt and ENext > 0:
                 U = SetUij(t)
                 mCO.Us[ij] = U
                 mCO.U = ProdU(mCO.Us, mCO.NModes)
@@ -210,6 +230,25 @@ def InitU(mCO):
             mCO.Us.append(np.eye(2))
     mCO.U = np.eye(mCO.NModes)
 
+def SweepModes(mCO):
+    mCO.InitU()
+    
+    tn = []
+    for n in range(-mCO.p, mCO.p + 1):
+        tn.append(n * np.pi / (2 * (2 * mCO.p + 1)))
+
+    N = mCO.mf.NModes
+    ij = 0
+    for i in range(N):
+        for j in range(i + 1, N):
+            fn = []
+            for tp in tn:
+                fn.append(mCO.E_SCF_ij(ij, tp))
+            print("Mode", i, "and", j)
+            for k in range(len(tn)):
+                print(tn[k], "\t", fn[k])
+            ij += 1
+
 def MakeOCVSCF(mCO, U = None):
     if U is None:
         U = mCO.U
@@ -217,7 +256,7 @@ def MakeOCVSCF(mCO, U = None):
     NewFrequencies, NewPotentialList = mCO.ContractFC(U)
     mf_tmp.UpdateFC(NewFrequencies, NewPotentialList)
     mf_tmp.kernel()
-    mf_tmp.PrintPotential(Normalized = False)
+    mf_tmp.PrintPotential(Normalized = True)
     return mf_tmp
 
 class CoordinateOptimizer:
@@ -229,6 +268,7 @@ class CoordinateOptimizer:
     F = F
     E_SCF_ij = E_SCF_ij
     E_SCF = E_SCF
+    SweepModes = SweepModes
     ContractFC = ContractFC
     FCToTensors = FCToTensors
 
@@ -240,7 +280,7 @@ class CoordinateOptimizer:
         self.PotentialList = []
         for Wp in self.mf.Potential:
             self.PotentialList += Wp
-        self.p = 2
+        self.p = 0
         self.NModes = mf.NModes
         self.EOpt = mf.ESCF
 
@@ -255,10 +295,11 @@ class CoordinateOptimizer:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('water2.inp')
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates)
     mf.kernel()
     mf.PrintResults(NStates = NStates)
+    mf.PrintPotential()
     from vstr.ci.vci import VCI
     mci = VCI(mf, MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
     mci.kernel(doVHCI=False)
