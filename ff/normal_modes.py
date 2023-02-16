@@ -23,10 +23,8 @@ def GetNumHessian(mf, Coords = None, Method = 'rhf', dx = 1e-2, MassWeight = Tru
     Mass = mf.mol.atom_mass_list(isotope_avg=isotope_avg)
     NCoords = Coords.shape[1]
     X0 = AtomToCoord(mf)
-    print(X0)
     atom0 = mf.mol._atom.copy()
     H = np.zeros((NCoords, NCoords))
-    mf.kernel()
     E0 = mf.e_tot
     for i in range(NCoords):
         X0pipi = X0 + 2 * Coords[:, i] * dx
@@ -112,11 +110,12 @@ def GetNumHessian(mf, Coords = None, Method = 'rhf', dx = 1e-2, MassWeight = Tru
 
     return H
 
-def GetHessian(mf, Method = 'rhf', isotope_avg=True):
+def GetHessian(mf, Method = 'rhf', MassWeighted = False, isotope_avg=True):
     mass = mf.mol.atom_mass_list(isotope_avg=isotope_avg)
     if Method == 'rhf':
         HRaw = hessian.RHF(mf).kernel()
-        H = np.einsum('pqxy,p,q->pqxy', HRaw, mass**-0.5, mass**-0.5)
+        if MassWeighted:
+            H = np.einsum('pqxy,p,q->pqxy', HRaw, mass**-0.5, mass**-0.5)
         H = H.transpose(0, 2, 1, 3).reshape(mf.mol.natm * 3, mf.mol.natm * 3)
         '''
         H = np.zeros((mf.mol.natm * 3, mf.mol.natm * 3))
@@ -132,7 +131,7 @@ def GetHessian(mf, Method = 'rhf', isotope_avg=True):
 
 def GetNormalModes(mf, H = None, Method = 'rhf', tol = 1e-1):
     if H is None:
-        H = GetHessian(mf, Method = Method)
+        H = GetHessian(mf, Method = Method, MassWeighted = True)
     w, C = np.linalg.eigh(H)
     print(w)
     C = C[:, np.where(w > tol)[0]]
