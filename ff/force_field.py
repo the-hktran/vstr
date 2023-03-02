@@ -1,6 +1,6 @@
 import numpy as np
 from pyscf import gto, scf, hessian
-from vstr.ff.normal_modes import AtomToCoord, CoordToAtom, GetHessian
+from vstr.ff.normal_modes import AtomToCoord, CoordToAtom, GetHessian, GetNumHessian
 from vstr.utils import constants
 
 '''
@@ -28,6 +28,7 @@ def CoordToHessian(X, atom0, mol, Method = 'rhf'):
 def PerturbHessian(X0, Modes, Coords, dx, atom0, mol, Method = 'rhf'):
     X = PerturbCoord(X0, Modes, Coords, dx)
     H = CoordToHessian(X, atom0, mol, Method = Method)
+    print(Coords.T @ H @ Coords)
     return Coords.T @ H @ Coords
 
 '''
@@ -41,7 +42,7 @@ def ScaleFC(FC, Freqs, Modes):
         ScaledFC = ScaledFC / np.sqrt(Freqs[i])
     return ScaledFC
 
-def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-2, tol = 1e-4):
+def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1e-4):
     V = []
     NCoord = Coords.shape[1]
     X0 = AtomToCoord(mf) # in Bohr
@@ -233,7 +234,7 @@ if __name__ == "__main__":
 
     mol = gto.M()
     mol.fromfile("h2o.xyz")
-    mol.basis='sto-3g'
+    mol.basis='cc-pvdz'
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()

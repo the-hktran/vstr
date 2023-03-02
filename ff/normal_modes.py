@@ -1,7 +1,53 @@
-from pyscf import gto, scf, hessian
+from pyscf import gto, scf, hessian, cc
 import numpy as np
 #from pyscf.data import nist
 from vstr.utils import constants
+
+def PerturbCoord(X0, Modes, Coords, dx):
+    X = X0.copy()
+    for M in Modes:
+        X += M[1] * Coords[:, M[0]] * dx
+    return X
+
+def CoordToCCSDGrad(X, atom0, mol):
+    atom = CoordToAtom(atom0, X)
+    mol.atom = atom
+    mol.unit = 'B'
+    mol.build()
+    new_mf = scf.RHF(mol)
+    new_mf.kernel(verbose = 0)
+    new_mcc = cc.CCSD(new_mf)
+    new_mcc.kernel()
+    g = new_mcc.nuc_grad_method().run()
+    return g.grad().reshape(3 * mol.natm)
+
+def PerturbCCSDGrad(X0, Modes, Coords, dx, atom0, mol):
+    X = PerturbCoord(X0, Modes, Coords, dx)
+    return CoordToCCSDGrad(X, atom0, mol)
+
+def CCSDHessian(mf, dx = 1e-4, MassWeighted = True):
+    N = mf.mol.natm * 3
+    Coords = np.eye(N)
+    H = np.zeros((N, N))
+    X0 = AtomToCoord(mf)
+    atom0 = mf.mol._atom.copy()
+    new_mol = mf.mol.copy()
+    new_mol.unit = 'B'
+
+    for i in range(N):
+        Gp = PerturbCCSDGrad(X0, [[i, 1]], Coords, dx, atom0, new_mol)
+        Gm = PerturbCCSDGrad(X0, [[i, -1]], Coords, dx, atom0, new_mol)
+        Gi = (Gp - Gm) / (2 * dx)
+        H[:, i] = Gi
+
+    if MassWeighted:
+        mass = mf.mol.atom_mass_list(isotope_avg = True)
+        for i in range(mf.mol.natm):
+            I = list(range(3 * i, 3 * i + 3))
+            for j in range(mf.mol.natm):
+                J = list(range(3 * j, 3 * j + 3))
+                H[np.ix_(I, J)] /= np.sqrt(mass[i] * mass[j])
+    return H
 
 def AtomToCoord(mf):
     '''
@@ -18,7 +64,7 @@ def CoordToAtom(atom, X):
         atom_new[i] = (atom_new[i][0], list(X[i*3:i*3 + 3]))
     return atom_new
 
-def GetNumHessian(mf, Coords = None, Method = 'rhf', dx = 1e-2, MassWeighted = True, isotope_avg = True):
+def GetNumHessian(mf, Coords = None, Method = 'rhf', dx = 1e-4, MassWeighted = True, isotope_avg = True):
     if Coords is None:
         Coords = np.eye(mf.mol.natm * 3)
     Mass = mf.mol.atom_mass_list(isotope_avg=isotope_avg)
@@ -130,9 +176,9 @@ def GetNormalModes(mf, H = None, Method = 'rhf', tol = 1e-1):
     if H is None:
         H = GetHessian(mf, Method = Method, MassWeighted = True)
     w, C = np.linalg.eigh(H)
-    print(w)
     C = C[:, np.where(w > tol)[0]]
     w = w[np.where(w > tol)[0]]
+    print(w)
     w = np.sqrt(w / constants.AMU_TO_ME) / (2 * np.pi * constants.C_AU * constants.BOHR_TO_CM)
 
     # Need to mass weight C
@@ -148,26 +194,15 @@ if __name__ == '__main__':
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()
-
-    #pyH = GetHessian(mf)# hessian.RHF(mf).kernel()
-    #myH = GetNumHessian(mf)
-    #print(pyH)
-    #print(myH)
-
-    w, C = GetNormalModes(mf)
     
-    HA = GetHessian(mf, MassWeighted = True)
-    #HN = GetNumHessian(mf, MassWeight=True)
-    #print(HA-HN)
-    #print(((HA-HN)**2).sum())
-    #w, C = GetNormalModes(mf, H = HN)
-    #CMW = C.copy()
-    #for j in range(mf.mol.natm):
-    #    CMW[(3 * j):(3 * j + 3),:] /= np.sqrt(mf.mol.atom_mass_list(isotope_avg=True)[j])
-    HN = GetNumHessian(mf, Coords = C, MassWeighted = False)
-    #print(HA)
-    #Htest = GetNumHessian(mf, Coords = C, MassWeight=False)
-    #print(C.T @ HA @ C)
-    print(HN)
-    #print(C.T @ HN @ C)
-    #print(Htest)
+    w, C = GetNormalModes(mf)
+
+    HMF = GetHessian(mf, MassWeighted = False)
+    H = CCSDHessian(mf, MassWeighted = False)
+    print(HMF)
+    print(H)
+
+    w, C = GetNormalModes(mf, H = HMF)
+    print(w)
+    w, C = GetNormalModes(mf, H = H)
+    print(w)
