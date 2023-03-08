@@ -169,6 +169,8 @@ def GetHessian(mf, Method = 'rhf', MassWeighted = False, isotope_avg=True):
                 H[np.ix_(I, J)] = (HRaw[i, j] / (np.sqrt(mass[i] * mass[j])))
         '''
         return H
+    elif Method == 'ccsd':
+        return CCSDHessian(mf, MassWeighted = MassWeighted)
     else:
         raise ValueError("No hessian method available for that method")
 
@@ -189,20 +191,29 @@ def GetNormalModes(mf, H = None, Method = 'rhf', tol = 1e-1):
 
 if __name__ == '__main__':
     mol = gto.M()
-    mol.fromfile("h2o.xyz")
+    #mol.fromfile("h2o.xyz")
+    mol.atom = '''
+    O
+    H 1 0.958
+    H 1 0.958 2 104.5
+    '''
     mol.basis='sto-3g'
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()
     
     w, C = GetNormalModes(mf)
-
-    HMF = GetHessian(mf, MassWeighted = False)
-    H = CCSDHessian(mf, MassWeighted = False)
-    print(HMF)
-    print(H)
-
-    w, C = GetNormalModes(mf, H = HMF)
     print(w)
-    w, C = GetNormalModes(mf, H = H)
-    print(w)
+
+    HN = GetNumHessian(mf, Coords = C, MassWeighted = False)
+    print(HN)
+
+    #HMF = GetHessian(mf, MassWeighted = True)
+    #H = CCSDHessian(mf, MassWeighted = True)
+    #print(HMF)
+    #print(H)
+
+    #w, C = GetNormalModes(mf, H = HMF)
+    #print(w)
+    #w, C = GetNormalModes(mf, H = H)
+    #print(w)

@@ -145,18 +145,18 @@ def PT2(mVHCI, doStochastic = False):
     if doStochastic:
         if mVHCI.eps3 < 0:
             mVHCI.Timer.start(4)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStatesPT2, mVHCI.NWalkers, mVHCI.NSamples, False, mVHCI.eps3)
             mVHCI.Timer.stop(4)
         else:
             mVHCI.Timer.start(5)
             assert (mVHCI.eps3 < mVHCI.eps2)
-            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStates, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
+            mVHCI.dE_PT2, mVHCI.sE_PT2 = DoSPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStatesPT2, mVHCI.NWalkers, mVHCI.NSamples, True, mVHCI.eps3)
             mVHCI.Timer.stop(5)
     else:
         mVHCI.Timer.start(3)
-        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStates)
+        mVHCI.dE_PT2 = DoPT2(mVHCI.C, mVHCI.E, mVHCI.Basis, mVHCI.PotentialListFull, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3], mVHCI.Ys, mVHCI.eps2, mVHCI.NStatesPT2)
         mVHCI.Timer.stop(3)
-    mVHCI.E_HCI_PT2 = mVHCI.E_HCI + mVHCI.dE_PT2
+    mVHCI.E_HCI_PT2 = mVHCI.E_HCI[:mVHCI.NStatesPT2] + mVHCI.dE_PT2
 
 def Diagonalize(mVHCI):
     mVHCI.Timer.start(1)
@@ -319,6 +319,7 @@ class VHCI:
         self.tol = 0.01
         self.MaxIter = 1000
         self.NStates = NStates
+        self.NStatesPT2 = NStates
         self.NWalkers = 200
         self.NSamples = 50
         self.dE_PT2 = None
@@ -430,7 +431,7 @@ if __name__ == "__main__":
 
     from vstr.utils.read_jf_input import Read
     w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
-    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates)
+    mVHCI = VHCI(np.asarray(w), Vs, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, eps1 = eps1, eps2 = eps2, eps3 = eps3, NWalkers = NWalkers, NSamples = NSamples, NStates = NStates, NStatesPT2 = 2)
     mVHCI.kernel(doPT2 = True, ComparePT2 = True)
     #print(mVHCI.E[:NStates])
     #mVHCI.PT2(doStochastic = True)

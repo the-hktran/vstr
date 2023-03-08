@@ -28,8 +28,17 @@ def CoordToHessian(X, atom0, mol, Method = 'rhf'):
 def PerturbHessian(X0, Modes, Coords, dx, atom0, mol, Method = 'rhf'):
     X = PerturbCoord(X0, Modes, Coords, dx)
     H = CoordToHessian(X, atom0, mol, Method = Method)
-    print(Coords.T @ H @ Coords)
     return Coords.T @ H @ Coords
+
+def PerturbEnergy(X0, Modes, Coords, dx, atom0, mol, Method = 'rhf'):
+    X = PerturbCoord(X0, Modes, Coords, dx)
+    atom = CoordToAtom(atom0, X)
+    mol.atom = atom
+    mol.build()
+    new_mf = scf.RHF(mol)
+    new_mf.kernel(verbose = 0)
+    return new_mf.e_tot
+
 
 '''
 Scales force field constant to wavenumbers: Assumes energy in hartrees, mass weighted normal modes in bohr * sqrt(amu)
@@ -42,7 +51,7 @@ def ScaleFC(FC, Freqs, Modes):
         ScaledFC = ScaledFC / np.sqrt(Freqs[i])
     return ScaledFC
 
-def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1e-4):
+def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
     V = []
     NCoord = Coords.shape[1]
     X0 = AtomToCoord(mf) # in Bohr
@@ -61,7 +70,9 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1e-4):
         for i in range(NCoord):
             Hpi = PerturbHessian(X0, [[i, 1]], Coords, dx, atom0, new_mol, Method = Method)
             Hmi = PerturbHessian(X0, [[i, -1]], Coords, dx, atom0, new_mol, Method = Method)
-
+            Epi = PerturbEnergy(X0, [[i, 1]], Coords, dx, atom0, new_mol, Method = Method)
+            Emi = PerturbEnergy(X0, [[i, -1]], Coords, dx, atom0, new_mol, Method = Method)
+            E0 = mf.e_tot
             dHdxi = (Hpi - Hmi) / (2 * dx)
 
             for j in range(i, NCoord):
@@ -73,6 +84,7 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1e-4):
             if Order >= 4:
                 # Can do iijk here as well
                 d2Hdxidxi = (Hpi + Hmi - 2 * H0) / (dx * dx)
+                print('diag', (Epi + Emi - 2 * E0) / (dx * dx))
                 for j in range(i, NCoord):
                     for k in range(j, NCoord):
                         Hiijk = ScaleFC(d2Hdxidxi[j, k], Freqs, [i, i, j, k])
@@ -233,13 +245,17 @@ if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
 
     mol = gto.M()
-    mol.fromfile("h2o.xyz")
-    mol.basis='cc-pvdz'
+    mol.atom = '''
+    O
+    H 1 0.958
+    H 1 0.958 2 104.5
+    '''
+    mol.basis='sto-3g'
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()
 
-    w, C = GetNormalModes(mf)
+    w, C = GetNormalModes(mf, Method = 'rhf')
     print(w, C)
-    V = GetFF(mf, C, w)
+    V = GetFF(mf, C, w, Method = 'rhf')
     print(V)
