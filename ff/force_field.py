@@ -46,17 +46,17 @@ and frequencies in cm-1
 '''
 def ScaleFC(FC, Freqs, Modes):
     n = len(Modes)
-    ScaledFC = FC / (constants.AMU_TO_ME**(n / 2) * constants.C_AU**(n / 2 + 1) * constants.BOHR_TO_CM**(n / 2 + 1))
+    ScaledFC = FC / ((2 * np.pi)**(n / 2) * constants.AMU_TO_ME**(n / 2) * constants.C_AU**(n / 2) * constants.BOHR_TO_CM**(n / 2)) * constants.HARTREE_TO_INVCM #/ constants.C_AU**((n-1)/4)
     for i in Modes:
         ScaledFC = ScaledFC / np.sqrt(Freqs[i])
     return ScaledFC
 
-def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
+def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1e-4):
     V = []
     NCoord = Coords.shape[1]
     X0 = AtomToCoord(mf) # in Bohr
     atom0 = mf.mol._atom.copy()
-    H0 = GetHessian(mf, Method = Method, MassWeighted = True)
+    H0 = GetHessian(mf, Method = Method, MassWeighted = False)
     H0 = Coords.T @ H0 @ Coords
     new_mol = mf.mol.copy()
     new_mol.unit = 'B'
@@ -70,9 +70,6 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
         for i in range(NCoord):
             Hpi = PerturbHessian(X0, [[i, 1]], Coords, dx, atom0, new_mol, Method = Method)
             Hmi = PerturbHessian(X0, [[i, -1]], Coords, dx, atom0, new_mol, Method = Method)
-            Epi = PerturbEnergy(X0, [[i, 1]], Coords, dx, atom0, new_mol, Method = Method)
-            Emi = PerturbEnergy(X0, [[i, -1]], Coords, dx, atom0, new_mol, Method = Method)
-            E0 = mf.e_tot
             dHdxi = (Hpi - Hmi) / (2 * dx)
 
             for j in range(i, NCoord):
@@ -84,7 +81,6 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
             if Order >= 4:
                 # Can do iijk here as well
                 d2Hdxidxi = (Hpi + Hmi - 2 * H0) / (dx * dx)
-                print('diag', (Epi + Emi - 2 * E0) / (dx * dx))
                 for j in range(i, NCoord):
                     for k in range(j, NCoord):
                         Hiijk = ScaleFC(d2Hdxidxi[j, k], Freqs, [i, i, j, k])
@@ -122,8 +118,8 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
             for j in range(i, NCoord):
                 for k in range(j, NCoord):
                     Hiiijk = ScaleFC(Hiii[j, k], Freqs, [i, i, i, j, k])
-                    if abs(Hiiikl) > tol:
-                        V5.append((Hiiikl, [i, i, i, j, k]))
+                    if abs(Hiiijk) > tol:
+                        V5.append((Hiiijk, [i, i, i, j, k]))
 
             # Handle sextic iiiijk terms here
             if Order >= 6:
@@ -166,7 +162,7 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
                     Hijk = (Hpipjpk - Hpipjmk - Hpimjpk - Hmipjpk + Hmimjpk + Hmipjmk + Hpimjmk - Hmimjmk) / (8 * dx * dx * dx)
                     for l in range(k, NCoord):
                         for p in range(l, NCoord):
-                            Hijklp = ScaleFC(Hijklp, Freqs, [i, j, k, l, p])
+                            Hijklp = ScaleFC(Hijk[l, p], Freqs, [i, j, k, l, p])
                             if abs(Hijklp) > tol:
                                 V5.append((Hijklp, [i, j, k, l, p]))
         V.append(V5)
@@ -188,7 +184,7 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
                 Hiiij = (Hpipipipj - 3 * Hpipj + 3 * Hmipj - Hmimimipj - Hpipipimj + 3 * Hpimj - 3 * Hmipj + Hmimimimj) / (16 * dx**4)
                 for k in range(j, NCoord):
                     for l in range(k, NCoord):
-                        Hiiijkl = ScaleFC(Hiiijkl, Freqs, [i, i, i, j, k, l])
+                        Hiiijkl = ScaleFC(Hiiij[k, l], Freqs, [i, i, i, j, k, l])
                         if abs(Hiiijkl) > tol:
                             V6.append((Hiiijkl, [i, i, i, j, k, l]))
 
@@ -241,6 +237,22 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-1, tol = 1e-4):
     
     return V
 
+def MakeMatrix(VList, N):
+    V3 = np.zeros((N, N, N))
+    for v in VList[0]:
+        I = v[1]
+        from itertools import permutations
+        Is = list(permutations(I))
+        for i in Is:
+            V3[i] = v[0]
+    V4 = np.zeros((N, N, N, N))
+    for v in VList[1]:
+        I = v[1]
+        Is = list(permutations(I))
+        for i in Is:
+            V4[i] = v[0]
+    return V3, V4
+
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
 
@@ -257,5 +269,22 @@ if __name__ == "__main__":
 
     w, C = GetNormalModes(mf, Method = 'rhf')
     print(w, C)
-    V = GetFF(mf, C, w, Method = 'rhf')
+    '''
+    I = np.eye(mol.natm * 3)
+    V = GetFF(mf, I, w, Order = 5, Method = 'rhf')
+    #print(V)
+    V3, V4 = MakeMatrix(V, mol.natm * 3)
+    V3NM = np.einsum('ijk,ia,jb,kc->abc', V3, C, C, C)
+    V4NM = np.einsum('ijkl,ia,jb,kc,ld->abcd', V4, C, C, C, C)
+    print(V3NM)
+    print(V4NM)
+    '''
+
+    V = GetFF(mf, C, w, Order = 6, dx = 1e-1, Method = 'rhf')
+    print(V) 
+    V = GetFF(mf, C, w, Order = 6, dx = 1e-2, Method = 'rhf')
+    print(V)
+    V = GetFF(mf, C, w, Order = 6, dx = 1e-3, Method = 'rhf')
+    print(V)
+    V = GetFF(mf, C, w, Order = 6, dx = 1e-4, Method = 'rhf')
     print(V)

@@ -205,8 +205,8 @@ if __name__ == '__main__':
     w, C = GetNormalModes(mf)
     print(w)
 
-    HN = GetNumHessian(mf, Coords = C, MassWeighted = False)
-    print(HN)
+    HN = GetHessian(mf, MassWeighted = False)
+    print(C.T @ HN @ C)
 
     #HMF = GetHessian(mf, MassWeighted = True)
     #H = CCSDHessian(mf, MassWeighted = True)
