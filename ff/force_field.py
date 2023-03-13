@@ -20,9 +20,10 @@ def PerturbCoord(X0, Modes, Coords, dx):
 def CoordToHessian(X, atom0, mol, Method = 'rhf'):
     atom = CoordToAtom(atom0, X)
     mol.atom = atom
+    mol.verbose = 0
     mol.build()
     new_mf = scf.RHF(mol)
-    new_mf.kernel(verbose = 0)
+    new_mf.kernel()
     return GetHessian(new_mf, Method = Method, MassWeighted = False)
 
 def PerturbHessian(X0, Modes, Coords, dx, atom0, mol, Method = 'rhf'):
@@ -51,7 +52,7 @@ def ScaleFC(FC, Freqs, Modes):
         ScaledFC = ScaledFC / np.sqrt(Freqs[i])
     return ScaledFC
 
-def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1e-4):
+def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0):
     V = []
     NCoord = Coords.shape[1]
     X0 = AtomToCoord(mf) # in Bohr
@@ -253,22 +254,50 @@ def MakeMatrix(VList, N):
             V4[i] = v[0]
     return V3, V4
 
+def MakeInputFile(Vs, Freqs, InpFile):
+    f = open(InpFile, "w")
+    f.write("Comment:\n")
+    f.write("HCI_Eps: 0.1\n")
+    f.write("NStates: 100\n")
+    f.write("PT2: 1\n")
+    f.write("PT2_Eps: 0.001\n")
+    f.write("SPT2_Eps: -1 100 50\n")
+    f.write("Max_quanta: 8\n")
+    f.write("Modes: " + str(Freqs.shape[0]) + "\n")
+    for i, w in enumerate(Freqs):
+        f.write(str(i) + " " + str(w) + " " + str(20) + "\n")
+    FCNum = 0
+    for V in Vs:
+        FCNum += len(V)
+    f.write("Force_constants: " + str(FCNum) + "\n")
+    for V in Vs:
+        for v in V:
+            Qs = " "
+            for j in v[1]:
+                Qs += str(j) + " "
+            f.write(str(len(v[1])) + Qs + str(v[0]) + "\n")
+
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
 
     mol = gto.M()
     mol.atom = '''
-    O
-    H 1 0.958
-    H 1 0.958 2 104.5
+    C     
+    H  1 1.121896     
+    O  1 1.212288 2 120.679502     
+    C  1 1.514668 2 114.798218 3 -179.988745 0     
+    H  4 1.101458 1 110.154420 2 -180.000000 0     
+    H  4 1.105672 1 109.602564 2 -58.727388 0     
+    H  4 1.105673 1 109.602602 2 58.729508 0   
     '''
-    mol.basis='sto-3g'
+    mol.basis='cc-pVDZ'
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()
 
-    w, C = GetNormalModes(mf, Method = 'rhf')
+    w, C = GetNormalModes(mf, Method = 'ccsd')
     print(w, C)
+    np.save("normal_modes", C)
     '''
     I = np.eye(mol.natm * 3)
     V = GetFF(mf, I, w, Order = 5, Method = 'rhf')
@@ -280,11 +309,12 @@ if __name__ == "__main__":
     print(V4NM)
     '''
 
-    V = GetFF(mf, C, w, Order = 6, dx = 1e-1, Method = 'rhf')
+    V = GetFF(mf, C, w, Order = 4, dx = 1e-3, Method = 'ccsd')
     print(V) 
-    V = GetFF(mf, C, w, Order = 6, dx = 1e-2, Method = 'rhf')
-    print(V)
-    V = GetFF(mf, C, w, Order = 6, dx = 1e-3, Method = 'rhf')
-    print(V)
-    V = GetFF(mf, C, w, Order = 6, dx = 1e-4, Method = 'rhf')
-    print(V)
+    MakeInputFile(V, w, "ch3cho.inp")
+    #V = GetFF(mf, C, w, Order = 6, dx = 1e-2, Method = 'rhf')
+    #print(V)
+    #V = GetFF(mf, C, w, Order = 6, dx = 1e-3, Method = 'rhf')
+    #print(V)
+    #V = GetFF(mf, C, w, Order = 6, dx = 1e-4, Method = 'rhf')
+    #print(V)

@@ -154,6 +154,7 @@ def GetNumHessian(mf, Coords = None, Method = 'rhf', dx = 1e-4, MassWeighted = T
 def GetHessian(mf, Method = 'rhf', MassWeighted = False, isotope_avg=True):
     mass = mf.mol.atom_mass_list(isotope_avg=isotope_avg)
     if Method == 'rhf':
+        mf.verbose = 0
         HRaw = hessian.RHF(mf).kernel()
         if MassWeighted:
             H = np.einsum('pqxy,p,q->pqxy', HRaw, mass**-0.5, mass**-0.5)
@@ -174,13 +175,13 @@ def GetHessian(mf, Method = 'rhf', MassWeighted = False, isotope_avg=True):
     else:
         raise ValueError("No hessian method available for that method")
 
-def GetNormalModes(mf, H = None, Method = 'rhf', tol = 1e-1):
+def GetNormalModes(mf, H = None, Method = 'rhf', tol = 1e-4):
+    N = mf.mol.natm * 3 - 6
     if H is None:
         H = GetHessian(mf, Method = Method, MassWeighted = True)
     w, C = np.linalg.eigh(H)
-    C = C[:, np.where(w > tol)[0]]
-    w = w[np.where(w > tol)[0]]
-    print(w)
+    C = C[:, -N:]
+    w = w[-N:]
     w = np.sqrt(w / constants.AMU_TO_ME) / (2 * np.pi * constants.C_AU * constants.BOHR_TO_CM)
 
     # Need to mass weight C
