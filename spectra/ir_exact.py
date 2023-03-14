@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF
 from vstr.spectra.dipole import GetDipoleSurface
 from scipy import sparse
 import matplotlib.pyplot as plt
@@ -8,8 +8,17 @@ def GetTransitionDipoleMatrix(mIR):
     mIR.D = GenerateHamAnharmV(mIR.Basis, list(mIR.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
     mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
 
+def GetTransitionDipoleMatrixFromVSCF(mIR):
+    X0 = []
+    for X in mIR.Xs:
+        X0.append(np.zeros(X.shape))
+    mIR.D = VCISparseHamFromVSCF(mIR.Basis, mIR.Basis, mIR.Frequencies, mIR.DipoleSurfaceList, mIR.Ys, X0, True).todense()
+    mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
+
 def GetSpectralIntensities(mIR):
     CDC = mIR.C[:, 0].T @ mIR.D @ mIR.C[:, 1:]
+    if CDC.ndim == 2:
+        CDC = np.asarray(CDC).ravel()
     mIR.Intensities = CDC**2
     mIR.Excitations = []
     for w in mIR.E[1:]:
@@ -79,6 +88,16 @@ class IRSpectra:
         self.GetTransitionDipoleMatrix()
         self.GetSpectralIntensities()
 
+class VSCFIRSpectra(IRSpectra):
+    GetTransitionDipoleMatrix = GetTransitionDipoleMatrixFromVSCF
+
+    def __init__(self, mf, mVHCI, NormalModes = None, **kwargs):
+        IRSpectra.__init__(self, mf, mVHCI, NormalModes = NormalModes)
+        self.__dict__.update(kwargs)
+
+        self.Ys = mVHCI.Ys
+        self.Xs = mVHCI.Xs
+
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
     from vstr.ff.force_field import GetFF
@@ -108,3 +127,15 @@ if __name__ == "__main__":
     print(mIR.Intensities)
     print(mIR.Excitations)
     mIR.PlotSpectrum("water_spectrum.png")
+
+    from vstr.mf.vscf import VSCF
+    from vstr.ci.vci import VCI
+    vmf = VSCF(w, V, MaxQuanta = 10, NStates = 10)
+    vmf.kernel()
+
+    mVCI = VCI(vmf, 3, eps1 = 10, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
+    mVCI.kernel()
+    mVSCFIR = VSCFIRSpectra(mf, mVCI, NormalModes = NormalModes)
+    mVSCFIR.kernel()
+    print(mVSCFIR.Intensities)
+    print(mVSCFIR.Excitations)
