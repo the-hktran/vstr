@@ -137,7 +137,7 @@ def HCI(mVHCI):
         it += 1
         if it > mVHCI.MaxIter:
             raise RuntimeError("VHCI did not converge.")
-    mVHCI.H = None
+    #mVHCI.H = None
     mVHCI.NewBasis = None
 
 def PT2(mVHCI, doStochastic = False):

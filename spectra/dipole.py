@@ -2,6 +2,14 @@ import numpy as np
 from pyscf import gto, scf, hessian
 from vstr.ff.force_field import PerturbCoord
 from vstr.ff.normal_modes import CoordToAtom, AtomToCoord
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import FConst
+
+def MakeDipoleList(mu_raw):
+    DipoleSurface = []
+    for m in mu_raw:
+        d = FConst(m[0], m[1], False)
+        DipoleSurface.append(d)
+    return DipoleSurface
 
 def DipoleNorm(mf):
     return np.sqrt((mf.dip_moment()**2).sum())

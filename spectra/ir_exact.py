@@ -1,6 +1,6 @@
 import numpy as np
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF
-from vstr.spectra.dipole import GetDipoleSurface
+from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
 
@@ -23,13 +23,6 @@ def GetSpectralIntensities(mIR):
     mIR.Excitations = []
     for w in mIR.E[1:]:
         mIR.Excitations.append(w - mIR.E[0])
-
-def MakeDipoleList(mu_raw):
-    DipoleSurface = []
-    for m in mu_raw:
-        d = FConst(m[0], m[1], False)
-        DipoleSurface.append(d)
-    return DipoleSurface
 
 def Lorentzian(x, x0, L):
     return 0.5 * L / (np.pi * ((x - x0)**2 + 0.25 * L**2))
