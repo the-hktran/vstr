@@ -27,9 +27,11 @@ def GetSpectralIntensities(mIR):
 def Lorentzian(x, x0, L):
     return 0.5 * L / (np.pi * ((x - x0)**2 + 0.25 * L**2))
 
-def PlotSpectrum(mIR, PlotName, NPoints = 1000, L = 100, XLabel = "Frequency", YLabel = "Intensity", Title = "IR Spectrum"):
-    XMin = 0
-    XMax = mIR.Excitations[-1] + 100
+def PlotSpectrum(mIR, PlotName, NPoints = 1000, L = 100, XLabel = "Frequency", YLabel = "Intensity", Title = "IR Spectrum", XMin = None, XMax = None):
+    if XMin is None:
+        XMin = 0
+    if XMax is None:
+        XMax = mIR.Excitations[-1] + 100
     X = np.linspace(XMin, XMax, num = NPoints)
     Y = []
     for x in X:
@@ -37,7 +39,7 @@ def PlotSpectrum(mIR, PlotName, NPoints = 1000, L = 100, XLabel = "Frequency", Y
         for n in range(len(mIR.Excitations)):
             y += mIR.Intensities[n] * Lorentzian(x, mIR.Excitations[n], L = L)
         Y.append(y)
-    plt.scatter(X, Y)
+    plt.plot(X, Y, linestyle = '-', marker = None)
     plt.xlabel(XLabel)
     plt.ylabel(YLabel)
     plt.title(Title)
@@ -112,15 +114,20 @@ if __name__ == "__main__":
 
     V = GetFF(mf, NormalModes, w, Order = 4)
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 3, eps1 = 10, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 100, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()
+    from scipy import sparse
+    mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
+    mVHCI.E_HCI = mVHCI.E
+    mVHCI.PrintResults(thr=0)
 
-    mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes)
+    mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes, Order = 4)
     mIR.kernel()
     print(mIR.Intensities)
     print(mIR.Excitations)
     mIR.PlotSpectrum("water_spectrum.png")
 
+    '''
     from vstr.mf.vscf import VSCF
     from vstr.ci.vci import VCI
     vmf = VSCF(w, V, MaxQuanta = 10, NStates = 10)
@@ -132,3 +139,4 @@ if __name__ == "__main__":
     mVSCFIR.kernel()
     print(mVSCFIR.Intensities)
     print(mVSCFIR.Excitations)
+    '''

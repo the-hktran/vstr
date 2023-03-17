@@ -237,7 +237,7 @@ def LCLine(mVHCI, n, thr = 2.5e-1):
     return LC[:-3]
     
 
-def PrintResults(mVHCI):
+def PrintResults(mVHCI, thr = 2.5e-1):
     if mVHCI.dE_PT2 is None:
         FinalE = mVHCI.E_HCI
     else:
@@ -249,7 +249,7 @@ def PrintResults(mVHCI):
         if mVHCI.sE_PT2 is not None:
             Outline += '+/- {:.8E}\t'.format(mVHCI.sE_PT2[n])
         Outline += '\t%s' % (BString)
-        LCString = mVHCI.LCLine(n)
+        LCString = mVHCI.LCLine(n, thr = thr)
         Outline += '\t%s' % (LCString)
         print(Outline)
          

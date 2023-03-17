@@ -7,7 +7,7 @@ from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import FConst
 def MakeDipoleList(mu_raw):
     DipoleSurface = []
     for m in mu_raw:
-        d = FConst(m[0], m[1], False)
+        d = FConst(m[0], m[1], True)
         DipoleSurface.append(d)
     return DipoleSurface
 
@@ -23,7 +23,7 @@ def PerturbDipole(X0, Modes, Coords, dx, atom0, mol, Method = 'rhf'):
     new_mf.kernel(verbose = 0)
     return DipoleNorm(new_mf)
 
-def GetDipoleSurface(mf, Coords, Order = 1, dx = 1e-4):
+def GetDipoleSurface(mf, Coords, Order = 1, dx = 1e-1):
     Dipole = []
     NCoord = Coords.shape[1]
     X0 = AtomToCoord(mf) # in Bohr
@@ -36,6 +36,8 @@ def GetDipoleSurface(mf, Coords, Order = 1, dx = 1e-4):
 
     mu1 = []
     mu2 = []
+    mu3 = []
+    mu4 = []
 
     if Order >= 1:
         for i in range(NCoord):
@@ -48,6 +50,16 @@ def GetDipoleSurface(mf, Coords, Order = 1, dx = 1e-4):
             if Order >= 2:
                 mu_ii = (mu_p + mu_m - 2 * mu0) / (dx * dx)
                 mu2.append((mu_ii, [i, i]))
+
+            if Order >= 3:
+                mu_pp = PerturbDipole(X0, [[i, 2]], Coords, dx, atom0, new_mol)
+                mu_mm = PerturbDipole(X0, [[i, -2]], Coords, dx, atom0, new_mol)
+                mu_iii = (mu_pp - 2 * mu_p + 2 * mu_m - mu_mm) / (2 * dx * dx * dx)
+                mu3.append((mu_iii, [i, i, i]))
+                if Order >= 4:
+                    mu_iiii = (mu_pp - 4 * mu_p + 6 * mu0 - 4 * mu_m + mu_mm) / (dx**4)
+                    mu4.append((mu_iiii, [i, i, i, i]))
+
         Dipole.append(mu1)
     
     if Order >= 2:
@@ -60,7 +72,85 @@ def GetDipoleSurface(mf, Coords, Order = 1, dx = 1e-4):
                 mu_ij = (mu_pp + mu_mm - mu_pm - mu_mp) / (4 * dx * dx)
                 mu2.append((mu_ij, [i, j]))
         Dipole.append(mu2)
-    
+
+    if Order >= 3:
+        for i in range(NCoord):
+            # iii done before
+            for j in range(i + 1, NCoord):
+                mu_ppp = PerturbDipole(X0, [[i, 2], [j, 1]], Coords, dx, atom0, new_mol)
+                mu_mmp = PerturbDipole(X0, [[i, -2], [j, 1]], Coords, dx, atom0, new_mol)
+                mu_00p = PerturbDipole(X0, [[j, 1]], Coords, dx, atom0, new_mol)
+                mu_ppm = PerturbDipole(X0, [[i, 2], [j, -1]], Coords, dx, atom0, new_mol)
+                mu_mmm = PerturbDipole(X0, [[i, -2], [j, -1]], Coords, dx, atom0, new_mol)
+                mu_00m = PerturbDipole(X0, [[j, -1]], Coords, dx, atom0, new_mol)
+                mu_iij = (mu_ppp + mu_mmp - 2 * mu_00p - mu_ppm - mu_mmm + 2 * mu_00m) / (8 * dx**3)
+                mu3.append((mu_iij, [i, i, j]))
+                for k in range(j + 1, NCoord):
+                    mu_ppp = PerturbDipole(X0, [[i, 1], [j, 1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_ppm = PerturbDipole(X0, [[i, 1], [j, 1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_pmp = PerturbDipole(X0, [[i, 1], [j, -1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_pmm = PerturbDipole(X0, [[i, 1], [j, -1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_mpp = PerturbDipole(X0, [[i, -1], [j, 1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_mpm = PerturbDipole(X0, [[i, -1], [j, 1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_mmp = PerturbDipole(X0, [[i, -1], [j, -1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_mmm = PerturbDipole(X0, [[i, -1], [j, -1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_ijk = (mu_ppp - mu_ppm - mu_pmp - mu_mpp + mu_mmp + mu_mpm + mu_pmm - mu_mmm) / (8 * dx**3)
+                    mu3.append((mu_ijk, [i, j, k]))
+        Dipole.append(mu3)
+
+    if Order >= 4:
+        for i in range(NCoord):
+        # iiii terms done in linear part
+            for j in range(i + 1, NCoord):
+                #iiij terms
+                mu_pppp = PerturbDipole(X0, [[i, 3], [j, 1]], Coords, dx, atom0, new_mol)
+                mu_p00p = PerturbDipole(X0, [[i, 1], [j, 1]], Coords, dx, atom0, new_mol)
+                mu_mmmp = PerturbDipole(X0, [[i, -3], [j, 1]], Coords, dx, atom0, new_mol)
+                mu_m00p = PerturbDipole(X0, [[i, -1], [j, 1]], Coords, dx, atom0, new_mol)
+                mu_pppm = PerturbDipole(X0, [[i, 3], [j, -1]], Coords, dx, atom0, new_mol)
+                mu_p00m = PerturbDipole(X0, [[i, 1], [j, -1]], Coords, dx, atom0, new_mol)
+                mu_mmmm = PerturbDipole(X0, [[i, -3], [j, -1]], Coords, dx, atom0, new_mol)
+                mu_m00m = PerturbDipole(X0, [[i, -1], [j, -1]], Coords, dx, atom0, new_mol)
+                mu_iiij = (mu_pppp - 3 * mu_p00p + 3 * mu_m00p - mu_mmmp - mu_pppm + 3 * mu_p00m - 3 * mu_m00m + mu_mmmm) / (16 * dx**4)
+                mu4.append((mu_iiij, [i, i, i, j]))
+                for k in range(j + 1, NCoord):
+                    #iijk terms
+                    mu_pppp = PerturbDipole(X0, [[i, 2], [j, 1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_mmpp = PerturbDipole(X0, [[i, -2], [j, 1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_00pp = PerturbDipole(X0, [[j, 1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_ppmp = PerturbDipole(X0, [[i, 2], [j, -1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_mmmp = PerturbDipole(X0, [[i, -2], [j, -1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_00mp = PerturbDipole(X0, [[j, -1], [k, 1]], Coords, dx, atom0, new_mol)
+                    mu_pppm = PerturbDipole(X0, [[i, 2], [j, 1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_mmpm = PerturbDipole(X0, [[i, -2], [j, 1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_00pm = PerturbDipole(X0, [[j, 1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_ppmm = PerturbDipole(X0, [[i, 2], [j, -1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_mmmm = PerturbDipole(X0, [[i, -2], [j, -1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_00mm = PerturbDipole(X0, [[j, -1], [k, -1]], Coords, dx, atom0, new_mol)
+                    mu_iijk = (mu_pppp + mu_mmpp - 2 * mu_00pp - mu_ppmp - mu_mmmp + 2 * mu_00mp - mu_pppm - mu_mmpm + 2 * mu_00pm + mu_ppmm + mu_mmmm - 2 * mu_00mm) / (16 * dx**4)
+                    mu4.append((mu_iijk, [i, i, j, k]))
+                    for l in range(k + 1, NCoord):
+                        #ijkl terms
+                        mu_pppp = PerturbDipole(X0, [[i, 1], [j, 1], [k, 1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_mppp = PerturbDipole(X0, [[i, -1], [j, 1], [k, 1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_pmpp = PerturbDipole(X0, [[i, 1], [j, -1], [k, 1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_mmpp = PerturbDipole(X0, [[i, -1], [j, -1], [k, 1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_ppmp = PerturbDipole(X0, [[i, 1], [j, 1], [k, -1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_mpmp = PerturbDipole(X0, [[i, -1], [j, 1], [k, -1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_pmmp = PerturbDipole(X0, [[i, 1], [j, -1], [k, -1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_mmmp = PerturbDipole(X0, [[i, -1], [j, -1], [k, -1], [l, 1]], Coords, dx, atom0, new_mol)
+                        mu_pppm = PerturbDipole(X0, [[i, 1], [j, 1], [k, 1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_mppm = PerturbDipole(X0, [[i, -1], [j, 1], [k, 1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_pmpm = PerturbDipole(X0, [[i, 1], [j, -1], [k, 1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_mmpm = PerturbDipole(X0, [[i, -1], [j, -1], [k, 1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_ppmm = PerturbDipole(X0, [[i, 1], [j, 1], [k, -1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_mpmm = PerturbDipole(X0, [[i, -1], [j, 1], [k, -1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_pmmm = PerturbDipole(X0, [[i, 1], [j, -1], [k, -1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_mmmm = PerturbDipole(X0, [[i, -1], [j, -1], [k, -1], [l, -1]], Coords, dx, atom0, new_mol)
+                        mu_ijkl = (mu_pppp - mu_mppp - mu_pmpp + mu_mmpp - mu_ppmp + mu_mpmp + mu_pmmp - mu_mmmp - mu_pppm + mu_mppm + mu_pmpm - mu_mmpm + mu_ppmm - mu_mpmm - mu_pmmm + mu_mmmm) / (16 * dx**4)
+                        mu4.append((mu_ijkl, [i, j, k, l]))
+        Dipole.append(mu4)
+
     return Dipole
 
 if __name__ == "__main__":

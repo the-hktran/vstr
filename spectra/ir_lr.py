@@ -4,16 +4,18 @@ from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
 
-def GetTransitionDipoleMatrix(mIR):
+def GetTransitionDipoleMatrix(mIR, IncludeZeroth = True):
     mIR.D = GenerateHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
-    mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
+    if IncludeZeroth:
+        mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
 
-def GetTransitionDipoleMatrixFromVSCF(mIR):
+def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = True):
     X0 = []
     for X in mIR.Xs:
         X0.append(np.zeros(X.shape))
     mIR.D = VCISparseHamFromVSCF(mIR.Basis, mIR.Basis, mIR.Frequencies, mIR.DipoleSurfaceList, mIR.Ys, X0, True).todense()
-    mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
+    if IncludeZeroth:
+        mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
 
 def GetAb(mIR, w, Basis = None):
     if Basis is None:
@@ -35,20 +37,37 @@ def Intensity(mIR, w):
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object
     A, b = mIR.GetAb(w)
     x = SolveAxb(A, b)
-    return (1.j * np.dot(b, x)).imag
+    return (1.j * np.dot(b, x)).real / np.pi
+    #return (np.dot(b, x)).imag
 
 def PlotSpectrum(mIR, PlotName, XLabel = "Frequency", YLabel = "Intensity", Title = "IR Spectrum"):
-    plt.scatter(mIR.ws, mIR.Is)
+    plt.plot(mIR.ws, mIR.Is, linestyle = '-', marker = None)
     plt.xlabel(XLabel)
     plt.ylabel(YLabel)
     plt.title(Title)
     plt.savefig(PlotName)
+
+def TestPowerSeries(mIR):
+    H = mIR.mVCI.H.todense()
+    n = H.shape[0]
+    for w in [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]:
+        D = np.eye(n) * (w + mIR.mVCI.E[0] + mIR.eta * 1.j)
+        DInv = np.linalg.inv(D)
+        AInvX = np.linalg.inv(D - H)
+        AInvP = DInv + DInv @ H @ DInv
+        np.save("AInvX", AInvX)
+        np.save("AInvP", AInvP)
+        dA = AInvX - AInvP
+        err = (dA.conj() * dA).sum()
+        print("err", w, err.real)
 
 class LinearResponseIR:
     GetAb = GetAb
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrix
     Intensity = Intensity
     PlotSpectrum = PlotSpectrum
+
+    TestPowerSeries = TestPowerSeries
 
     def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, **kwargs):
         self.mf = mf
@@ -69,7 +88,8 @@ class LinearResponseIR:
     def kernel(self):
         # Make dipole surface
         if self.DipoleSurface is None:
-            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Order = self.Order)
+            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Order = self.Order, dx = 1e-1)
+            print(mu_raw)
             self.DipoleSurface = []
             self.DipoleSurface.append(mu_raw[0][0])
             for n in range(1, self.Order + 1):
@@ -86,7 +106,8 @@ class LinearResponseIR:
         self.DipoleSurface[4] += self.DipoleSurface[2]
         self.DipoleSurfaceList.append(FConst(0.0, [0] * 6, False))
 
-        self.GetTransitionDipoleMatrix()
+        self.GetTransitionDipoleMatrix(IncludeZeroth = False)
+        np.fill_diagonal(self.D, 0)
 
         self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
         I = []
@@ -115,11 +136,10 @@ if __name__ == "__main__":
 
     V = GetFF(mf, NormalModes, w, Order = 4)
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 3, eps1 = 10, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 100, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()
 
-    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = NormalModes)
+    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eta = 100, NormalModes = NormalModes, Order = 4)
     mIR.kernel()
-    print(mIR.ws)
-    print(mIR.Is)
     mIR.PlotSpectrum("water_spectrum_lr.png")
+    mIR.TestPowerSeries()
