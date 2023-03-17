@@ -1,4 +1,5 @@
 from pyscf import gto, scf, hessian, cc
+from pyscf.grad import ccsd_t as ccsd_t_grad
 import numpy as np
 #from pyscf.data import nist
 from vstr.utils import constants
@@ -9,7 +10,7 @@ def PerturbCoord(X0, Modes, Coords, dx):
         X += M[1] * Coords[:, M[0]] * dx
     return X
 
-def CoordToCCSDGrad(X, atom0, mol):
+def CoordToCCSDGrad(X, atom0, mol, _T = False):
     atom = CoordToAtom(atom0, X)
     mol.atom = atom
     mol.unit = 'B'
@@ -18,12 +19,16 @@ def CoordToCCSDGrad(X, atom0, mol):
     new_mf.kernel(verbose = 0)
     new_mcc = cc.CCSD(new_mf)
     new_mcc.kernel()
-    g = new_mcc.nuc_grad_method().run()
-    return g.grad().reshape(3 * mol.natm)
+    if not _T:
+        G = new_mcc.nuc_grad_method().run()
+        g = G.grad()
+    else:
+        g = ccsd_t_grad.Gradients(new_mcc).kernel()
+    return g.reshape(3 * mol.natm)
 
-def PerturbCCSDGrad(X0, Modes, Coords, dx, atom0, mol):
+def PerturbCCSDGrad(X0, Modes, Coords, dx, atom0, mol, _T = False):
     X = PerturbCoord(X0, Modes, Coords, dx)
-    return CoordToCCSDGrad(X, atom0, mol)
+    return CoordToCCSDGrad(X, atom0, mol, _T = _T)
 
 def CCSDHessian(mf, dx = 1e-4, MassWeighted = True):
     N = mf.mol.natm * 3
@@ -37,6 +42,30 @@ def CCSDHessian(mf, dx = 1e-4, MassWeighted = True):
     for i in range(N):
         Gp = PerturbCCSDGrad(X0, [[i, 1]], Coords, dx, atom0, new_mol)
         Gm = PerturbCCSDGrad(X0, [[i, -1]], Coords, dx, atom0, new_mol)
+        Gi = (Gp - Gm) / (2 * dx)
+        H[:, i] = Gi
+
+    if MassWeighted:
+        mass = mf.mol.atom_mass_list(isotope_avg = True)
+        for i in range(mf.mol.natm):
+            I = list(range(3 * i, 3 * i + 3))
+            for j in range(mf.mol.natm):
+                J = list(range(3 * j, 3 * j + 3))
+                H[np.ix_(I, J)] /= np.sqrt(mass[i] * mass[j])
+    return H
+
+def CCSD_THessian(mf, dx = 1e-4, MassWeighted = True):
+    N = mf.mol.natm * 3
+    Coords = np.eye(N)
+    H = np.zeros((N, N))
+    X0 = AtomToCoord(mf)
+    atom0 = mf.mol._atom.copy()
+    new_mol = mf.mol.copy()
+    new_mol.unit = 'B'
+
+    for i in range(N):
+        Gp = PerturbCCSDGrad(X0, [[i, 1]], Coords, dx, atom0, new_mol, _T = True)
+        Gm = PerturbCCSDGrad(X0, [[i, -1]], Coords, dx, atom0, new_mol, _T = True)
         Gi = (Gp - Gm) / (2 * dx)
         H[:, i] = Gi
 
@@ -170,8 +199,19 @@ def GetHessian(mf, Method = 'rhf', MassWeighted = False, isotope_avg=True):
                 H[np.ix_(I, J)] = (HRaw[i, j] / (np.sqrt(mass[i] * mass[j])))
         '''
         return H
+    elif Method == 'rks':
+        mf.verbose = 0
+        HRaw = hessian.rks.Hessian(mf).kernel()
+        if MassWeighted:
+            H = np.einsum('pqxy,p,q->pqxy', HRaw, mass**-0.5, mass**-0.5)
+        else:
+            H = HRaw
+        H = H.transpose(0, 2, 1, 3).reshape(mf.mol.natm * 3, mf.mol.natm * 3)
+        return H
     elif Method == 'ccsd':
         return CCSDHessian(mf, MassWeighted = MassWeighted)
+    elif Method == 'ccsd_t' or 'ccsd(t)':
+        return CCSD_THessian(mf, MassWeighted = MassWeighted)
     else:
         raise ValueError("No hessian method available for that method")
 
@@ -203,11 +243,17 @@ if __name__ == '__main__':
     mf = scf.RHF(mol)
     mf.kernel()
     
-    w, C = GetNormalModes(mf)
+    w, C = GetNormalModes(mf, Method = 'ccsd_t')
     print(w)
 
-    HN = GetHessian(mf, MassWeighted = False)
-    print(C.T @ HN @ C)
+    mdft = mol.KS()
+    mdft.xc = 'b3lyp'
+    mdft.kernel()
+    w, C = GetNormalModes(mdft, Method = 'rks')
+    print(w)
+
+    #HN = GetHessian(mf, MassWeighted = False)
+    #print(C.T @ HN @ C)
 
     #HMF = GetHessian(mf, MassWeighted = True)
     #H = CCSDHessian(mf, MassWeighted = True)
