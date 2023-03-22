@@ -63,7 +63,7 @@ class IRSpectra:
 
     def kernel(self):
         # Make dipole surface
-        mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Order = self.Order)
+        mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order)
         self.DipoleSurface = []
         self.DipoleSurface.append(mu_raw[0][0])
         for n in range(1, self.Order + 1):

@@ -8,6 +8,8 @@ def GetTransitionDipoleMatrix(mIR, IncludeZeroth = True):
     mIR.D = GenerateHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
     if IncludeZeroth:
         mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
+    else:
+        np.fill_diagonal(mIR.D, 0)
 
 def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = True):
     X0 = []
@@ -33,12 +35,29 @@ def GetAb(mIR, w, Basis = None):
 def SolveAxb(A, b):
     return np.linalg.solve(A, b)
 
+def ApproximateAInv(mIR, w, Order = 1):
+    HOD = mIR.mVCI.H.todense()
+    D = np.asarray(HOD.diagonal().copy() + (w + mIR.mVCI.E[0] + 1.j * mIR.eta)).ravel()
+    DInv = D**(-1)
+    np.fill_diagonal(HOD, 0)
+    
+    AInv = np.diag(DInv) + np.einsum('ij,i,j->ij', HOD, DInv, DInv, optimize = True)
+    if Order >= 2:
+        HDH = np.einsum('ij,j,jk->ik', HOD, DInv, HOD, optimize = True)
+        AInv += 0.5 * np.einsum('ij,i,j->ij', HDH, DInv, DInv, optimize = True)
+    return AInv
+
 def Intensity(mIR, w):
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object
     A, b = mIR.GetAb(w)
     x = SolveAxb(A, b)
+    #AInv = mIR.ApproximateAInv(w)
+    #AInvX = np.linalg.inv(A)
+    #print(w, ((AInv - AInvX).conj() * (AInv - AInvX)).sum().real)
+    #x = AInv @ b
+    x = np.asarray(x).ravel()
+    b = np.asarray(b).ravel()
     return (1.j * np.dot(b, x)).real / np.pi
-    #return (np.dot(b, x)).imag
 
 def PlotSpectrum(mIR, PlotName, XLabel = "Frequency", YLabel = "Intensity", Title = "IR Spectrum"):
     plt.plot(mIR.ws, mIR.Is, linestyle = '-', marker = None)
@@ -50,13 +69,16 @@ def PlotSpectrum(mIR, PlotName, XLabel = "Frequency", YLabel = "Intensity", Titl
 def TestPowerSeries(mIR):
     H = mIR.mVCI.H.todense()
     n = H.shape[0]
-    for w in [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]:
-        D = np.eye(n) * (w + mIR.mVCI.E[0] + mIR.eta * 1.j)
+    for w in (mIR.mVCI.E - mIR.mVCI.E[0]): #range(1000,16000,1):
+        D = np.diag(H.diagonal().copy()) + np.eye(H.shape[0]) * (w + mIR.mVCI.E[0] + mIR.eta * 1.j)
+        np.fill_diagonal(H, 0)
         DInv = np.linalg.inv(D)
         AInvX = np.linalg.inv(D - H)
         AInvP = DInv + DInv @ H @ DInv
-        np.save("AInvX", AInvX)
-        np.save("AInvP", AInvP)
+        #print(AInvP)
+        #print(AInvX)
+        #np.save("AInvP", AInvP)
+        #np.save("AInvX", AInvX)
         dA = AInvX - AInvP
         err = (dA.conj() * dA).sum()
         print("err", w, err.real)
@@ -65,6 +87,7 @@ class LinearResponseIR:
     GetAb = GetAb
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrix
     Intensity = Intensity
+    ApproximateAInv = ApproximateAInv
     PlotSpectrum = PlotSpectrum
 
     TestPowerSeries = TestPowerSeries
@@ -88,7 +111,7 @@ class LinearResponseIR:
     def kernel(self):
         # Make dipole surface
         if self.DipoleSurface is None:
-            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Order = self.Order, dx = 1e-1)
+            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)
             print(mu_raw)
             self.DipoleSurface = []
             self.DipoleSurface.append(mu_raw[0][0])
@@ -138,6 +161,8 @@ if __name__ == "__main__":
     
     mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 100, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()
+    mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
+    mVHCI.E_HCI = mVHCI.E
 
     mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eta = 100, NormalModes = NormalModes, Order = 4)
     mIR.kernel()

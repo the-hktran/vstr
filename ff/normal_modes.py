@@ -201,7 +201,7 @@ def GetHessian(mf, Method = 'rhf', MassWeighted = False, isotope_avg=True):
         return H
     elif Method == 'rks':
         mf.verbose = 0
-        HRaw = hessian.rks.Hessian(mf).kernel()
+        HRaw = mf.Hessian().kernel() #hessian.rks.Hessian(mf).kernel()
         if MassWeighted:
             H = np.einsum('pqxy,p,q->pqxy', HRaw, mass**-0.5, mass**-0.5)
         else:
@@ -243,8 +243,8 @@ if __name__ == '__main__':
     mf = scf.RHF(mol)
     mf.kernel()
     
-    w, C = GetNormalModes(mf, Method = 'ccsd_t')
-    print(w)
+    #w, C = GetNormalModes(mf, Method = 'ccsd_t')
+    #print(w)
 
     mdft = mol.KS()
     mdft.xc = 'b3lyp'
