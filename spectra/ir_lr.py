@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
@@ -47,6 +47,20 @@ def ApproximateAInv(mIR, w, Order = 1):
         AInv += 0.5 * np.einsum('ij,i,j->ij', HDH, DInv, DInv, optimize = True)
     return AInv
 
+def SpectralScreenBasis(mIR, Type = 'ignore_H', eps = 0.01, InitState = None):
+    if InitState is None:
+        InitState = mIR.InitState
+    return mIR.mVCI.ScreenBasis(Ws = mIR.DipoleSurfaceList, C = abs(mIR.mVCI.C[:, InitState]), eps = eps)
+
+def SpectralHCIStep(mIR, w, eps = 0.01, InitState = 0):
+    NewBasis, NAdded = mIR.SpectralScreenBasis(eps = eps, InitState = InitState)
+    # This new basis set is pruned for all basis sets giving small denominators
+    
+def SpectralHCI(mIR, w):
+    # This ignores the numerator
+    # First, get new basis based on the dipole operator
+
+
 def Intensity(mIR, w):
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object
     A, b = mIR.GetAb(w)
@@ -77,10 +91,17 @@ def TestPowerSeries(mIR):
         AInvP = DInv + DInv @ H @ DInv
         #print(AInvP)
         #print(AInvX)
-        #np.save("AInvP", AInvP)
-        #np.save("AInvX", AInvX)
+        np.save("AInvP", AInvP)
+        np.save("AInvX", AInvX)
         dA = AInvX - AInvP
+        dA2 = (dA.conj() * dA).real
+        plt.clf()
+        plt.imshow(dA2, interpolation='nearest')
+        plt.colorbar()
+        plt.savefig("dA")
         err = (dA.conj() * dA).sum()
+        if w > 1000:
+            break
         print("err", w, err.real)
 
 class LinearResponseIR:
@@ -100,6 +121,7 @@ class LinearResponseIR:
         self.Frequencies = mVHCI.Frequencies
         self.Basis = mVHCI.Basis
         self.NormalModes = NormalModes
+        self.InitState = 0
         self.FreqRange = FreqRange
         self.NPoints = NPoints
         self.eta = eta
@@ -128,6 +150,7 @@ class LinearResponseIR:
         self.DipoleSurface[3] += self.DipoleSurface[1]
         self.DipoleSurface[4] += self.DipoleSurface[2]
         self.DipoleSurfaceList.append(FConst(0.0, [0] * 6, False))
+        self.DipoleSurfaceList = HeatBath_Sort_FC(self.DipoleSurfaceList)
 
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
         np.fill_diagonal(self.D, 0)
@@ -159,10 +182,10 @@ if __name__ == "__main__":
 
     V = GetFF(mf, NormalModes, w, Order = 4)
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 100, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 1, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 3)
     mVHCI.kernel()
-    mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
-    mVHCI.E_HCI = mVHCI.E
+    #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
+    #mVHCI.E_HCI = mVHCI.E
 
     mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eta = 100, NormalModes = NormalModes, Order = 4)
     mIR.kernel()

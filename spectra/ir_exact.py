@@ -114,12 +114,12 @@ if __name__ == "__main__":
 
     V = GetFF(mf, NormalModes, w, Order = 4)
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 100, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 1, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 3)
     mVHCI.kernel()
-    from scipy import sparse
-    mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
-    mVHCI.E_HCI = mVHCI.E
-    mVHCI.PrintResults(thr=0)
+    #from scipy import sparse
+    #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
+    #mVHCI.E_HCI = mVHCI.E
+    m#VHCI.PrintResults(thr=0)
 
     mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes, Order = 4)
     mIR.kernel()

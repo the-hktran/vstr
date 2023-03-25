@@ -3981,3 +3981,64 @@ std::vector<FConst> ContractFCCPP(double V3[], double V4[], double V5[], double 
 
     return ContractedFCs;
 }
+
+/*************************************************************************************
+**********************************Spectral Functions *********************************
+*************************************************************************************/
+
+void AnharmHamDiag(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+{
+    for (unsigned int a = 0; a < BasisSet.size(); a++)
+    {
+        double Ea = 0.; //Hii matrix element
+        for (unsigned int j = 0; j < BasisSet[a].M; j++)
+        {
+          //Calculate partial energies
+          double Ej = 0.5;
+          Ej += BasisSet[a].Modes[j].Quanta;
+          Ej *= BasisSet[a].Modes[j].Freq;
+          //Update matrix element
+          Ea += Ej;
+        }
+        vector<int> zerodiffvec(BasisSet[0].M,0);
+        int qdiff=0;
+        int mchange=0;
+        for (unsigned int k = 0; k < QuarticFC.size(); k++) // Only even-ordered fc can affect this
+        {
+            if (ScreenState(qdiff, mchange, zerodiffvec, QuarticFC[k]))
+            {
+                // Screen force constants that cannot connect basis states a and a
+                //Add anharmonic matrix elements
+                Ea += AnharmPot(BasisSet[a], BasisSet[a], QuarticFC[k]);
+            }
+        }
+        for (unsigned int k = 0; k < SexticFC.size(); k++) // Only even-ordered fc can affect this
+        {    
+            if (ScreenState(qdiff, mchange, zerodiffvec, SexticFC[k]))
+            {
+                // Screen force constants that cannot connect basis states a and a
+                //Add anharmonic matrix elements
+                Ea += AnharmPot(BasisSet[a], BasisSet[a], SexticFC[k]);
+            }
+        }
+    H(a, a) += Ea;
+    }
+    return;
+};
+
+std::vector<WaveFunction> SpectralFrequencyPrune(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys){
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
+    //for( WaveFunction& wfn : BasisSet){
+    //    HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    //}
+
+    // Begin by sorting the columns of Y
+    }
+    std::vector<WaveFunction> NewBasis;
+    for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
+    //return std::make_tuple(NewBasis, HighestQuanta);
+    return NewBasis;
+}
+
+
