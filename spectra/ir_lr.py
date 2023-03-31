@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
@@ -52,17 +52,36 @@ def SpectralScreenBasis(mIR, Type = 'ignore_H', eps = 0.01, InitState = None):
         InitState = mIR.InitState
     return mIR.mVCI.ScreenBasis(Ws = mIR.DipoleSurfaceList, C = abs(mIR.mVCI.C[:, InitState]), eps = eps)
 
-def SpectralHCIStep(mIR, w, eps = 0.01, InitState = 0):
+def SpectralHCIStep(mIR, w, eps = 0.01, eps_denom = 1.0, InitState = 0):
     NewBasis, NAdded = mIR.SpectralScreenBasis(eps = eps, InitState = InitState)
     # This new basis set is pruned for all basis sets giving small denominators
-    
-def SpectralHCI(mIR, w):
-    # This ignores the numerator
-    # First, get new basis based on the dipole operator
+    NewBasis = SpectralFrequencyPrune(w, mIR.E[0], mIR.eta, NewBasis, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], eps_denom)
+    NAdded = len(NewBasis)
+    return NewBasis, NAdded
 
+def SpectralHCI(mIR, w):
+    # First, get new basis based on the dipole operator
+    NAdded = len(mIR.mVCI.Basis)
+    it = 1
+    while (float(NAdded) / float(len(mVHCI.Basis))) > mIR.mVCI.tol:
+        Nadded, mIR.mVCI.NewBasis = mIR.(SpectralHCIStep(eps = mIR.mVCI.eps1)
+        print("VHCI Iteration", it, "for w =", w, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
+        mIR.mVCI.SparseDiagonalize()
+        it += 1
+        if it > mIR.mVCI.MaxIter:
+            raise RuntimeError("VHCI did not converge")
+    mIR.mVCI.NewBasis = None
+
+def ResetVCI(mIR):
+    mIR.mVCI.Basis = mIR.Basis0.copy()
+    mIR.mVCI.H = mIR.H0.copy()
+    mIR.mVCI.C = mIR.C0
+    mIR.mVCI.E = mIR.E0
 
 def Intensity(mIR, w):
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object
+    mIR.SpectralHCI(w)
+    # Solve for intensity using updated VCI object
     A, b = mIR.GetAb(w)
     x = SolveAxb(A, b)
     #AInv = mIR.ApproximateAInv(w)
@@ -71,6 +90,8 @@ def Intensity(mIR, w):
     #x = AInv @ b
     x = np.asarray(x).ravel()
     b = np.asarray(b).ravel()
+    # Reset VCI object
+    mIR.ResetVCI()
     return (1.j * np.dot(b, x)).real / np.pi
 
 def PlotSpectrum(mIR, PlotName, XLabel = "Frequency", YLabel = "Intensity", Title = "IR Spectrum"):
@@ -107,6 +128,10 @@ def TestPowerSeries(mIR):
 class LinearResponseIR:
     GetAb = GetAb
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrix
+    SpectralScreenBasis = SpectralScreenBasis
+    SpectralHCIStep = SpectralHCIStep
+    SpectralHCI = SpectralHCI
+    ResetVCI = ResetVCI
     Intensity = Intensity
     ApproximateAInv = ApproximateAInv
     PlotSpectrum = PlotSpectrum
@@ -116,8 +141,10 @@ class LinearResponseIR:
     def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, **kwargs):
         self.mf = mf
         self.mVCI = mVCI
-        self.C = mVHCI.C
-        self.E = mVHCI.E
+        self.Basis0 = mVCI.Basis.copy()
+        self.H0 = mVCI.H.copy()
+        self.C0 = mVCI.C.copy()
+        self.E0 = mVCI.E.copy()
         self.Frequencies = mVHCI.Frequencies
         self.Basis = mVHCI.Basis
         self.NormalModes = NormalModes

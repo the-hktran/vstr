@@ -335,3 +335,5 @@ Eigen::MatrixXd ProdU(std::vector<Eigen::MatrixXd> &Us, int NModes);
 Eigen::Matrix2d SetUij(double &theta);
 std::vector<Eigen::Matrix2d> SetUs(std::vector<double> &thetas);
 std::vector<FConst> ContractFCCPP(double V3[], double V4[], double V5[], double V6[], Eigen::MatrixXd &U, int N);
+
+std::vector<WaveFunction> SpectralFrequencyPrune(double w, double E0, double eta, std::vector<WaveFunction> &BasisSet, std::vector<double> Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double eps);

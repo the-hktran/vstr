@@ -4026,18 +4026,20 @@ void AnharmHamDiag(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std:
     return;
 };
 
-std::vector<WaveFunction> SpectralFrequencyPrune(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys){
-    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
-    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
-    //for( WaveFunction& wfn : BasisSet){
-    //    HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
-    //}
-
-    // Begin by sorting the columns of Y
-    }
+std::vector<WaveFunction> SpectralFrequencyPrune(double w, double E0, double eta, std::vector<WaveFunction> &BasisSet, std::vector<double> Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double eps)
+{
     std::vector<WaveFunction> NewBasis;
-    for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
-    //return std::make_tuple(NewBasis, HighestQuanta);
+    // TODO: Store this as a vector instead of a matrix.
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
+    ZerothHam(H, BasisSet);
+    AnharmHamDiag(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+
+    for (unsigned int i = 0; i < BasisSet.size(); i++)
+    {
+        double D = pow(w + E0 - H.coeffRef(i, i), 2) + eta * eta;
+        if (D < eps) NewBasis.push_back(BasisSet[i]);
+    }
+
     return NewBasis;
 }
 
