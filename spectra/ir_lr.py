@@ -15,7 +15,7 @@ def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = True):
     X0 = []
     for X in mIR.Xs:
         X0.append(np.zeros(X.shape))
-    mIR.D = VCISparseHamFromVSCF(mIR.Basis, mIR.Basis, mIR.Frequencies, mIR.DipoleSurfaceList, mIR.Ys, X0, True).todense()
+    mIR.D = VCISparseHamFromVSCF(mIR.mVCI.Basis, mIR.mVCI.Basis, mIR.Frequencies, mIR.DipoleSurfaceList, mIR.Ys, X0, True).todense()
     if IncludeZeroth:
         mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
 
@@ -50,37 +50,45 @@ def ApproximateAInv(mIR, w, Order = 1):
 def SpectralScreenBasis(mIR, Type = 'ignore_H', eps = 0.01, InitState = None):
     if InitState is None:
         InitState = mIR.InitState
-    return mIR.mVCI.ScreenBasis(Ws = mIR.DipoleSurfaceList, C = abs(mIR.mVCI.C[:, InitState]), eps = eps)
+    #return mIR.mVCI.ScreenBasis(Ws = mIR.DipoleSurfaceList, C = abs(mIR.mVCI.C[:, InitState]), eps = eps)
+    return mIR.mVCI.ScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(mIR.mVCI.C[:, InitState]), eps = eps)
 
-def SpectralHCIStep(mIR, w, eps = 0.01, eps_denom = 1.0, InitState = 0):
-    NewBasis, NAdded = mIR.SpectralScreenBasis(eps = eps, InitState = InitState)
+def SpectralHCIStep(mIR, w, eps = 0.01, eps_denom = 1e-3, InitState = 0):
+    ScreenedResults, NAdded = mIR.SpectralScreenBasis(eps = eps, InitState = InitState)
+    NewBasis = ScreenedResults[0]
+    NewCoupling = ScreenedResults[1]
     # This new basis set is pruned for all basis sets giving small denominators
-    NewBasis = SpectralFrequencyPrune(w, mIR.E[0], mIR.eta, NewBasis, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], eps_denom)
+    NewBasis = SpectralFrequencyPrune(w, mIR.mVCI.E[0], mIR.eta, NewBasis, NewCoupling, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], eps_denom)
     NAdded = len(NewBasis)
+    mIR.mVCI.Basis += NewBasis
     return NewBasis, NAdded
 
 def SpectralHCI(mIR, w):
     # First, get new basis based on the dipole operator
     NAdded = len(mIR.mVCI.Basis)
     it = 1
-    while (float(NAdded) / float(len(mVHCI.Basis))) > mIR.mVCI.tol:
-        Nadded, mIR.mVCI.NewBasis = mIR.(SpectralHCIStep(eps = mIR.mVCI.eps1)
-        print("VHCI Iteration", it, "for w =", w, "complete with", NAdded, "new configurations and a total of", len(mVHCI.Basis), flush = True)
+    while (float(NAdded) / float(len(mIR.mVCI.Basis))) > mIR.mVCI.tol:
+        mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, eps = mIR.eps1, eps_denom = mIR.epsD)
+        #print("VHCI Iteration", it, "for w =", w, "complete with", NAdded, "new configurations and a total of", len(mIR.mVCI.Basis), flush = True)
         mIR.mVCI.SparseDiagonalize()
         it += 1
         if it > mIR.mVCI.MaxIter:
             raise RuntimeError("VHCI did not converge")
+    print("VHCI converaged for w =", w, "with a total of", len(mIR.mVCI.Basis), "configurations.", flush = True)
+    #from vstr.utils.init_funcs import PrintBasis
+    #PrintBasis(mIR.mVCI.Basis)
     mIR.mVCI.NewBasis = None
 
 def ResetVCI(mIR):
     mIR.mVCI.Basis = mIR.Basis0.copy()
     mIR.mVCI.H = mIR.H0.copy()
-    mIR.mVCI.C = mIR.C0
-    mIR.mVCI.E = mIR.E0
+    mIR.mVCI.C = mIR.C0.copy()
+    mIR.mVCI.E = mIR.E0.copy()
 
 def Intensity(mIR, w):
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object
     mIR.SpectralHCI(w)
+    mIR.GetTransitionDipoleMatrix(IncludeZeroth = False)
     # Solve for intensity using updated VCI object
     A, b = mIR.GetAb(w)
     x = SolveAxb(A, b)
@@ -141,12 +149,14 @@ class LinearResponseIR:
     def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, **kwargs):
         self.mf = mf
         self.mVCI = mVCI
+        self.mVCI.HBMethod = 'coupling'
         self.Basis0 = mVCI.Basis.copy()
         self.H0 = mVCI.H.copy()
         self.C0 = mVCI.C.copy()
         self.E0 = mVCI.E.copy()
         self.Frequencies = mVHCI.Frequencies
-        self.Basis = mVHCI.Basis
+        self.eps1 = mVCI.eps1 / 100
+        self.epsD = 1e-3
         self.NormalModes = NormalModes
         self.InitState = 0
         self.FreqRange = FreqRange
@@ -208,13 +218,14 @@ if __name__ == "__main__":
     w, NormalModes = GetNormalModes(mf)
 
     V = GetFF(mf, NormalModes, w, Order = 4)
+    print(V)
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 1, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 3)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 1000, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
 
-    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eta = 100, NormalModes = NormalModes, Order = 4)
+    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.1, epsD = 1e-1, eta = 100, NormalModes = NormalModes, Order = 4)
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum_lr.png")
-    mIR.TestPowerSeries()
+    #mIR.TestPowerSeries()

@@ -3986,7 +3986,128 @@ std::vector<FConst> ContractFCCPP(double V3[], double V4[], double V5[], double 
 **********************************Spectral Functions *********************************
 *************************************************************************************/
 
-void AnharmHamDiag(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
+std::tuple<std::vector<WaveFunction>, std::vector<double>> AddStatesHBStoreCoupling(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys){ // Expand basis via Heat Bath algorithm
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
+    for( WaveFunction& wfn : BasisSet){
+        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    }
+
+    std::vector<double> Coupling;
+
+    // Begin by sorting the columns of Y
+    unsigned int NModes = Ys.size();
+    unsigned int NPower = Ys[0].size();
+    unsigned int NModal = Ys[0][3].rows();
+    std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> YSortedColInd; // mode, power, column
+    std::vector<std::vector<double>> MaxY; // mode, power
+    for (unsigned int m = 0; m < Ys.size(); m++)
+    {
+        std::vector<std::vector<std::vector<long unsigned int>>> YSorted_m;
+        std::vector<double> YMax_m;
+        for (unsigned int p = 0; p < Ys[m].size(); p++)
+        {
+            YMax_m.push_back((Ys[m][p]).cwiseAbs().maxCoeff());
+            std::vector<std::vector<long unsigned int>> YSorted_mp;
+            for (unsigned int n = 0; n < Ys[m][p].cols(); n++)
+            {
+                std::vector<long unsigned int> YSorted_mpn = SortIndices((Ys[m][p].col(n)).cwiseAbs());
+                YSorted_mp.push_back(YSorted_mpn);
+            }
+            YSorted_m.push_back(YSorted_mp);
+        }
+        YSortedColInd.push_back(YSorted_m);
+        MaxY.push_back(YMax_m);
+    }
+
+    std::vector<double> WVec;
+    for (FConst &FC : AnharmHB)
+    {
+        double fc = FC.fc;
+        for (unsigned int q = 0; q < FC.QUnique.size(); q++)
+        {
+            fc *= MaxY[FC.QUnique[q]][FC.QPowers[q]];
+        }
+        WVec.push_back(abs(fc));
+    }
+    std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
+
+    std::vector<double> CVec;
+    for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
+    std::vector<long unsigned int> CSortedInd = SortIndices(CVec);
+
+
+    for(int ii = WSortedInd.size() - 1; ii >= 0; ii--){ // Loop over sorted force constants
+        unsigned int i = WSortedInd[ii];
+        if (abs(WVec[i] * C[CSortedInd[CSortedInd.size() - 1]]) < eps) break; // means that the largest Cn doesn't meet the criteria so we are done
+        for (int nn = CSortedInd.size() - 1; nn >= 0; nn--)
+        {
+            unsigned int n = CSortedInd[nn];
+            double Cn = C[n];
+            if(abs(Cn * WVec[i]) >= eps) // States connected by fc will be added if |fc*Cn| >= eps
+            {
+                double Factor = 1.0;
+                std::vector<int> LQuanta = GetQuantaList(BasisSet[n]);
+                std::vector<int> KQuantaInd(AnharmHB[i].QUnique.size(), NModal - 1);
+                bool LoopK = true;
+                while (LoopK)
+                {
+                    std::vector<int> KQuanta = LQuanta;
+                    for (unsigned int q = 0; q < KQuantaInd.size(); q++)
+                    {
+                        KQuanta[AnharmHB[i].QUnique[q]] = YSortedColInd[AnharmHB[i].QUnique[q]][AnharmHB[i].QPowers[q]][LQuanta[AnharmHB[i].QUnique[q]]][KQuantaInd[q]];
+                    }
+                    double Factor = HBFactor(Ys, KQuanta, LQuanta, AnharmHB[i].QUnique, AnharmHB[i].QPowers);
+                    if (abs(Cn * AnharmHB[i].fc * Factor) >= eps)
+                    {
+                        WaveFunction tmp = BasisSet[n];
+                        for (unsigned int m = 0; m < KQuanta.size(); m++) tmp.Modes[m].Quanta = KQuanta[m];
+                        if (HashedBasisInit.count(tmp) == 0) 
+                        {
+                            HashedNewStates.insert(tmp);
+                            Coupling.push_back(AnharmHB[i].fc);
+                        }
+                        KQuantaInd[0] = KQuantaInd[0] - 1;
+                    }
+                    else // Need to increment something
+                    {
+                        for (unsigned int m = 1; m < KQuantaInd.size(); m++)
+                        {
+                            if ((KQuantaInd[m - 1] != (NModal - 1)))
+                            {
+                                KQuantaInd[m] = KQuantaInd[m] - 1;
+                                KQuantaInd[m - 1] = NModal - 1;
+                                continue;
+                            }
+                            if (m == KQuantaInd.size() - 1) LoopK = false;
+                        }
+                        if (KQuantaInd.size() == 1) LoopK = false;
+                    }
+
+                    for (unsigned int m = 0; m < KQuantaInd.size() - 1; m++)
+                    {
+                        if (KQuantaInd[m] == -1)
+                        {
+                            KQuantaInd[m] = NModal - 1;
+                            KQuantaInd[m + 1] = KQuantaInd[m + 1] - 1;
+                        }
+                    }
+                    if (KQuantaInd[KQuantaInd.size() - 1] == -1) LoopK = false;
+                }
+                        
+            }
+            else{break;}// break loop if you've reached element < eps, since all future elements will be smaller (HB sorting)
+        }
+    }
+    std::vector<WaveFunction> NewBasis;
+    for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
+    //return std::make_tuple(NewBasis, HighestQuanta);
+    return std::make_tuple(NewBasis, Coupling);
+}
+
+
+
+void HamDiag(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC)
 {
     for (unsigned int a = 0; a < BasisSet.size(); a++)
     {
@@ -4026,18 +4147,18 @@ void AnharmHamDiag(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std:
     return;
 };
 
-std::vector<WaveFunction> SpectralFrequencyPrune(double w, double E0, double eta, std::vector<WaveFunction> &BasisSet, std::vector<double> Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double eps)
+std::vector<WaveFunction> SpectralFrequencyPrune(double w, double E0, double eta, std::vector<WaveFunction> &BasisSet, std::vector<double> &Coupling, std::vector<double> Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double eps)
 {
     std::vector<WaveFunction> NewBasis;
     // TODO: Store this as a vector instead of a matrix.
     Eigen::MatrixXd H = Eigen::MatrixXd::Zero(BasisSet.size(), BasisSet.size());
-    ZerothHam(H, BasisSet);
-    AnharmHamDiag(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
+    //ZerothHam(H, BasisSet);
+    HamDiag(H, BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC);
 
     for (unsigned int i = 0; i < BasisSet.size(); i++)
     {
-        double D = pow(w + E0 - H.coeffRef(i, i), 2) + eta * eta;
-        if (D < eps) NewBasis.push_back(BasisSet[i]);
+        double D = sqrt(pow(w + E0 - H.coeffRef(i, i), 2) + eta * eta);
+        if (abs(Coupling[i] / D) > eps) NewBasis.push_back(BasisSet[i]);
     }
 
     return NewBasis;

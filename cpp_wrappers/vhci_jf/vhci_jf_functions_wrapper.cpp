@@ -62,5 +62,6 @@ PYBIND11_MODULE(vhci_jf_functions, m)
 
             return ContractFCCPP(static_cast<double*>(info3.ptr),static_cast<double*>(info4.ptr),static_cast<double*>(info5.ptr),static_cast<double*>(info6.ptr), U, N);
         });
+    m.def("AddStatesHBStoreCoupling", AddStatesHBStoreCoupling, "Add states based on HB but keeps coupling elements too");
     m.def("SpectralFrequencyPrune", SpectralFrequencyPrune, "Prunes basis based on how close w is to Hnn-E0");
 }
