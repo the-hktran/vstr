@@ -281,7 +281,7 @@ if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
 
     mol = gto.M()
-    mol.atom = '''
+    mol.atom ='''
     C     
     H  1 1.121896     
     O  1 1.212288 2 120.679502     
@@ -290,14 +290,14 @@ if __name__ == "__main__":
     H  4 1.105672 1 109.602564 2 -58.727388 0     
     H  4 1.105673 1 109.602602 2 58.729508 0   
     '''
-    mol.basis='cc-pVDZ'
+    mol.basis='sto-3g'
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()
 
-    w, C = GetNormalModes(mf, Method = 'ccsd')
+    w, C = GetNormalModes(mf, Method = 'rhf')
     print(w, C)
-    np.save("normal_modes", C)
+    #np.save("normal_modes", C)
     '''
     I = np.eye(mol.natm * 3)
     V = GetFF(mf, I, w, Order = 5, Method = 'rhf')
@@ -309,7 +309,7 @@ if __name__ == "__main__":
     print(V4NM)
     '''
 
-    V = GetFF(mf, C, w, Order = 4, dx = 1e-3, Method = 'ccsd')
+    V = GetFF(mf, C, w, Order = 4, dx = 1e-1, Method = 'rhf')
     print(V) 
     MakeInputFile(V, w, "ch3cho.inp")
     #V = GetFF(mf, C, w, Order = 6, dx = 1e-2, Method = 'rhf')
@@ -318,3 +318,6 @@ if __name__ == "__main__":
     #print(V)
     #V = GetFF(mf, C, w, Order = 6, dx = 1e-4, Method = 'rhf')
     #print(V)
+    #from vstr.vhci.vhci import VHCI
+    #mVCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 4, eps1=1.0, Nstates = 10)
+    #mVCI.kernel()
