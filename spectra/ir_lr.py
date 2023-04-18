@@ -154,7 +154,7 @@ class LinearResponseIR:
         self.H0 = mVCI.H.copy()
         self.C0 = mVCI.C.copy()
         self.E0 = mVCI.E.copy()
-        self.Frequencies = mVHCI.Frequencies
+        self.Frequencies = mVCI.Frequencies
         self.eps1 = mVCI.eps1 / 100
         self.epsD = 1e-3
         self.NormalModes = NormalModes
@@ -163,6 +163,8 @@ class LinearResponseIR:
         self.NPoints = NPoints
         self.eta = eta
         self.Order = 1
+        if DipoleSurface is not None:
+            self.Order = len(DipoleSurface) - 1
         self.DipoleSurface = DipoleSurface
 
         self.__dict__.update(kwargs)
@@ -177,13 +179,13 @@ class LinearResponseIR:
             for n in range(1, self.Order + 1):
                 Dn = MakeDipoleList(mu_raw[n])
                 self.DipoleSurface.append(Dn)
-            for n in range(self.Order + 1, 7):
-                self.DipoleSurface.append([])
+        for n in range(self.Order + 1, 7):
+            self.DipoleSurface.append([])
         self.DipoleSurfaceList = []
         for Dn in self.DipoleSurface[1:]:
             self.DipoleSurfaceList += Dn
 
-        # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest linear order, so we will make sure that happens here
+        # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest even order, so we will make sure that happens here
         self.DipoleSurface[3] += self.DipoleSurface[1]
         self.DipoleSurface[4] += self.DipoleSurface[2]
         self.DipoleSurfaceList.append(FConst(0.0, [0] * 6, False))

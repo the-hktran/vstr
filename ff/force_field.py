@@ -52,7 +52,7 @@ def ScaleFC(FC, Freqs, Modes):
         ScaledFC = ScaledFC / np.sqrt(Freqs[i])
     return ScaledFC
 
-def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0):
+def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0, QuarticMin = None):
     V = []
     NCoord = Coords.shape[1]
     X0 = AtomToCoord(mf) # in Bohr
@@ -86,6 +86,9 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0):
                     for k in range(j, NCoord):
                         Hiijk = ScaleFC(d2Hdxidxi[j, k], Freqs, [i, i, j, k])
                         if abs(Hiijk) > tol:
+                            if QuarticMin is not None:
+                                if Hiijk < QuarticMin:
+                                    continue
                             V4.append((Hiijk, [i, i, j, k]))
         V.append(V3)
 
@@ -104,6 +107,9 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0):
                     for l in range(k, NCoord):
                         Hijkl = ScaleFC(Hij[k, l], Freqs, [i, j, k, l])
                         if abs(Hijkl) > tol:
+                            if QuarticMin is not None:
+                                if Hijkl < QuarticMin:
+                                    continue
                             V4.append((Hijkl, [i, j, k, l]))
         V.append(V4)
 
