@@ -1,7 +1,7 @@
 import numpy as np
 from vstr import utils
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, ContractedAnharmonicPotential, ContractedHOTerms
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import HeatBath_Sort_FC, DoPT2FromVSCF, DoSPT2FromVSCF, VCIHamFromVSCF, VCISparseHamFromVSCF, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, AddStatesHBStoreCoupling, ContractedAnharmonicPotential, ContractedHOTerms
 from vstr.utils.perf_utils import TIMER
 from functools import reduce
 import itertools
@@ -92,6 +92,9 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
     elif mVHCI.HBMethod == 'ho_orig':
         UniqueBasis = AddStatesHB(mVHCI.Basis, Ws, C, eps)
+    elif mVHCI.HBMethod == 'coupling':
+        UniqueBasis = AddStatesHBStoreCoupling(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
+        return UniqueBasis, len(UniqueBasis[0])
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):

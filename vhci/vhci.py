@@ -254,7 +254,7 @@ def PrintResults(mVHCI, thr = 2.5e-1):
         Outline += '\t%s' % (BString)
         LCString = mVHCI.LCLine(n, thr = thr)
         Outline += '\t%s' % (LCString)
-        print(Outline)
+        print(Outline, flush = True)
          
 def PrintParameters(mVHCI):
     print("______________________________")

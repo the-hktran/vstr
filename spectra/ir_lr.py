@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
@@ -32,6 +32,19 @@ def GetAb(mIR, w, Basis = None):
     b = mIR.D @ C[:, 0]
     return A, b
 
+def GetAbFromVSCF(mIR, w, Basis = None):
+    if Basis is None:
+        H = mIR.mVCI.H
+        C = mIR.mVCI.C
+        E = mIR.mVCI.E
+    else:
+        H = VCISparseHamFromVSCF(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.Ys, mIR.Xs, True)
+        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
+
+    A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
+    b = np.asarray(mIR.D @ C[:, 0]).T
+    return A, b
+
 def SolveAxb(A, b):
     return np.linalg.solve(A, b)
 
@@ -59,6 +72,16 @@ def SpectralHCIStep(mIR, w, eps = 0.01, eps_denom = 1e-3, InitState = 0):
     NewCoupling = ScreenedResults[1]
     # This new basis set is pruned for all basis sets giving small denominators
     NewBasis = SpectralFrequencyPrune(w, mIR.mVCI.E[0], mIR.eta, NewBasis, NewCoupling, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], eps_denom)
+    NAdded = len(NewBasis)
+    mIR.mVCI.Basis += NewBasis
+    return NewBasis, NAdded
+
+def SpectralHCIStepFromVSCF(mIR, w, eps = 0.01, eps_denom = 1e-3, InitState = 0):
+    ScreenedResults, NAdded = mIR.SpectralScreenBasis(eps = eps, InitState = InitState)
+    NewBasis = ScreenedResults[0]
+    NewCoupling = ScreenedResults[1]
+    # This new basis set is pruned for all basis sets giving small denominators
+    NewBasis = SpectralFrequencyPruneFromVSCF(w, mIR.mVCI.E[0], mIR.eta, NewBasis, NewCoupling, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.Xs, eps_denom)
     NAdded = len(NewBasis)
     mIR.mVCI.Basis += NewBasis
     return NewBasis, NAdded
@@ -173,7 +196,6 @@ class LinearResponseIR:
         # Make dipole surface
         if self.DipoleSurface is None:
             mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)
-            print(mu_raw)
             self.DipoleSurface = []
             self.DipoleSurface.append(mu_raw[0][0])
             for n in range(1, self.Order + 1):
@@ -199,6 +221,19 @@ class LinearResponseIR:
         for w in self.ws:
             I.append(self.Intensity(w))
         self.Is = np.asarray(I)
+
+class VSCFLinearResponseIR(LinearResponseIR):
+    GetTransitionDipoleMatrix = GetTransitionDipoleMatrixFromVSCF
+    GetAb = GetAbFromVSCF
+    SpectralHCIStep = SpectralHCIStepFromVSCF
+
+    def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, **kwargs):
+        LinearResponseIR.__init__(self, mf, mVCI, FreqRange = FreqRange, NPoints = NPoints, eta = eta, NormalModes = NormalModes, DipoleSurface = DipoleSurface)
+
+        self.Ys = mVCI.Ys
+        self.Xs = mVCI.Xs
+
+        self.__dict__.update(kwargs)
 
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
@@ -227,7 +262,18 @@ if __name__ == "__main__":
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
 
-    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.1, epsD = 1e-1, eta = 100, NormalModes = NormalModes, Order = 4)
+    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.1, epsD = 1e-1, eta = 100, NormalModes = NormalModes, Order = 2)
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum_lr.png")
     #mIR.TestPowerSeries()
+
+    from vstr.ci.vci import VCI
+    from vstr.mf.vscf import VSCF
+    vmf = VSCF(w, V, MaxQuanta = 10, NStates = 1)
+    vmf.kernel()
+    mVCI = VCI(vmf, MaxTotalQuanta = 1, eps1 = 1000, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
+    mVCI.kernel()
+
+    mVSCFIR = VSCFLinearResponseIR(mf, mVCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.1, epsD = 1e-1, eta = 100, NormalModes = NormalModes, Order = 2)
+    mVSCFIR.kernel()
+    mVSCFIR.PlotSpectrum("water_spectrum_vscf_lr.png")

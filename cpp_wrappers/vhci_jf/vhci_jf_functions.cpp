@@ -770,6 +770,7 @@ void AnharmHam(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vec
             fcmax = AnharmFC[k].fcpow.size();
         }
     }
+
     #pragma omp parallel for
     for (unsigned int i=0;i<BasisSet.size();i++)
     {
@@ -4147,6 +4148,19 @@ void HamDiag(Eigen::MatrixXd &H, std::vector<WaveFunction> &BasisSet, std::vecto
     return;
 };
 
+std::vector<double> HamDiagFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<Eigen::MatrixXd> &Xs)
+{
+    std::vector<double> HDiag;
+
+    for (unsigned int i = 0; i < BasisSet.size(); i++)
+    {
+        double Hii = 0;
+        for (unsigned int m = 0; m < Xs.size(); m++) Hii += Xs[m].coeffRef(BasisSet[i].Modes[m].Quanta, BasisSet[i].Modes[m].Quanta); 
+        HDiag.push_back(Hii);
+    }
+    return HDiag;
+}
+
 std::vector<WaveFunction> SpectralFrequencyPrune(double w, double E0, double eta, std::vector<WaveFunction> &BasisSet, std::vector<double> &Coupling, std::vector<double> Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, double eps)
 {
     std::vector<WaveFunction> NewBasis;
@@ -4164,4 +4178,16 @@ std::vector<WaveFunction> SpectralFrequencyPrune(double w, double E0, double eta
     return NewBasis;
 }
 
+std::vector<WaveFunction> SpectralFrequencyPruneFromVSCF(double w, double E0, double eta, std::vector<WaveFunction> &BasisSet, std::vector<double> &Coupling, std::vector<double> Frequencies, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<Eigen::MatrixXd> &Xs, double eps)
+{
+    std::vector<WaveFunction> NewBasis;
+    std::vector<double> Hd = HamDiagFromVSCF(BasisSet, Frequencies, AnharmFC, CubicFC, QuarticFC, QuinticFC, SexticFC, Xs);
 
+    for (unsigned int i = 0; i < BasisSet.size(); i++)
+    {
+        double D = sqrt(pow(w + E0 - Hd[i], 2) + eta * eta);
+        if (abs(Coupling[i] / D) > eps) NewBasis.push_back(BasisSet[i]);
+    }
+
+    return NewBasis;
+}

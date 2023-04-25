@@ -50,7 +50,7 @@ class IRSpectra:
     GetSpectralIntensities = GetSpectralIntensities
     PlotSpectrum = PlotSpectrum
 
-    def __init__(self, mf, mVHCI, NormalModes = None, **kwargs):
+    def __init__(self, mf, mVHCI, NormalModes = None, DipoleSurface = None, **kwargs):
         self.mf = mf
         self.C = mVHCI.C
         self.E = mVHCI.E
@@ -58,17 +58,22 @@ class IRSpectra:
         self.Basis = mVHCI.Basis
         self.NormalModes = NormalModes
         self.Order = 1
+        self.DipoleSurface = DipoleSurface
         
         self.__dict__.update(kwargs)
 
     def kernel(self):
-        # Make dipole surface
-        mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order)
-        self.DipoleSurface = []
-        self.DipoleSurface.append(mu_raw[0][0])
-        for n in range(1, self.Order + 1):
-            Dn = MakeDipoleList(mu_raw[n])
-            self.DipoleSurface.append(Dn)
+        if self.DipoleSurface is None:
+            # Make dipole surface
+            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order)
+            self.DipoleSurface = []
+            self.DipoleSurface.append(mu_raw[0][0])
+            for n in range(1, self.Order + 1):
+                Dn = MakeDipoleList(mu_raw[n])
+                self.DipoleSurface.append(Dn)
+        else:
+            self.Order = len(self.DipoleSurface) - 1
+
         for n in range(self.Order + 1, 7):
             self.DipoleSurface.append([])
         self.DipoleSurfaceList = []
@@ -76,8 +81,8 @@ class IRSpectra:
             self.DipoleSurfaceList += Dn
 
         # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest linear order, so we will make sure that happens here
-        self.DipoleSurface[3] += self.DipoleSurface[1]
-        self.DipoleSurface[4] += self.DipoleSurface[2]
+        self.DipoleSurface[3] = self.DipoleSurface[1] + self.DipoleSurface[3]
+        self.DipoleSurface[4] = self.DipoleSurface[2] + self.DipoleSurface[4]
         self.DipoleSurfaceList.append(FConst(0.0, [0] * 6, False))
 
         self.GetTransitionDipoleMatrix()
