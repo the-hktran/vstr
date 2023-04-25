@@ -86,8 +86,9 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0, Qu
                     for k in range(j, NCoord):
                         Hiijk = ScaleFC(d2Hdxidxi[j, k], Freqs, [i, i, j, k])
                         if abs(Hiijk) > tol:
+                            # We want to screen terms like iiii and iijk but we are okay with terms like iijj
                             if QuarticMin is not None:
-                                if Hiijk < QuarticMin:
+                                if Hiijk < QuarticMin and (j != k or (i == j and j == k)):
                                     continue
                             V4.append((Hiijk, [i, i, j, k]))
         V.append(V3)

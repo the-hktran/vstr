@@ -132,6 +132,12 @@ def PlotSpectrum(mIR, PlotName, XLabel = "Frequency", YLabel = "Intensity", Titl
     plt.title(Title)
     plt.savefig(PlotName)
 
+def SaveSpectrum(mIR, SaveName):
+    A = np.zeros((mIR.ws.shape[0], 2))
+    A[:, 0] = mIR.ws
+    A[:, 1] = mIR.Is
+    np.savetxt(SaveName + ".csv", A, delimiter=",")
+
 def TestPowerSeries(mIR):
     H = mIR.mVCI.H.todense()
     n = H.shape[0]
@@ -166,6 +172,7 @@ class LinearResponseIR:
     Intensity = Intensity
     ApproximateAInv = ApproximateAInv
     PlotSpectrum = PlotSpectrum
+    SaveSpectrum = SaveSpectrum
 
     TestPowerSeries = TestPowerSeries
 

@@ -39,16 +39,25 @@ def PlotSpectrum(mIR, PlotName, NPoints = 1000, L = 100, XLabel = "Frequency", Y
         for n in range(len(mIR.Excitations)):
             y += mIR.Intensities[n] * Lorentzian(x, mIR.Excitations[n], L = L)
         Y.append(y)
+    mIR.ws = X
+    mIR.Is = np.asarray(Y)
     plt.plot(X, Y, linestyle = '-', marker = None)
     plt.xlabel(XLabel)
     plt.ylabel(YLabel)
     plt.title(Title)
     plt.savefig(PlotName)
 
+def SaveSpectrum(mIR, SaveName):
+    A = np.zeros((mIR.ws.shape[0], 2))
+    A[:, 0] = mIR.ws
+    A[:, 1] = mIR.Is
+    np.savetxt(SaveName + ".csv", A, delimiter=",")
+
 class IRSpectra:
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrix
     GetSpectralIntensities = GetSpectralIntensities
     PlotSpectrum = PlotSpectrum
+    SaveSpectrum = SaveSpectrum
 
     def __init__(self, mf, mVHCI, NormalModes = None, DipoleSurface = None, **kwargs):
         self.mf = mf
