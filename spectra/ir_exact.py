@@ -1,19 +1,23 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, VCISparseHamFromVSCF
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
 
-def GetTransitionDipoleMatrix(mIR):
-    mIR.D = GenerateHamAnharmV(mIR.Basis, list(mIR.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
-    mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
+def GetTransitionDipoleMatrix(mIR, IncludeZeroth = False):
+    mIR.D = GenerateSparseHamAnharmV(mIR.Basis, list(mIR.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
+    if IncludeZeroth:
+        for i in range(mIR.D.shape[0]):
+            mIR.D[i, i] += mIR.DipoleSurface[0][0]
 
-def GetTransitionDipoleMatrixFromVSCF(mIR):
+def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = False):
     X0 = []
     for X in mIR.Xs:
         X0.append(np.zeros(X.shape))
     mIR.D = VCISparseHamFromVSCF(mIR.Basis, mIR.Basis, mIR.Frequencies, mIR.DipoleSurfaceList, mIR.Ys, X0, True).todense()
-    mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
+    if IncludeZeroth:
+        for i in range(mIR.D.shape[0]):
+            mIR.D[i, i] += mIR.DipoleSurface[0][0]
 
 def GetSpectralIntensities(mIR):
     CDC = mIR.C[:, 0].T @ mIR.D @ mIR.C[:, 1:]
@@ -41,7 +45,8 @@ def PlotSpectrum(mIR, PlotName, NPoints = 1000, L = 100, XLabel = "Frequency", Y
         Y.append(y)
     mIR.ws = X
     mIR.Is = np.asarray(Y)
-    plt.plot(X, Y, linestyle = '-', marker = None)
+    mIR.Is = mIR.Is / max(mIR.Is) 
+    plt.plot(mIR.ws, mIR.Is, linestyle = '-', marker = None)
     plt.xlabel(XLabel)
     plt.ylabel(YLabel)
     plt.title(Title)
@@ -133,7 +138,7 @@ if __name__ == "__main__":
     #from scipy import sparse
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
-    m#VHCI.PrintResults(thr=0)
+    #mVHCI.PrintResults(thr=0)
 
     mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes, Order = 4)
     mIR.kernel()
