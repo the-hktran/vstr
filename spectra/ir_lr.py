@@ -1,17 +1,17 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
 
-def GetTransitionDipoleMatrix(mIR, IncludeZeroth = True):
-    mIR.D = GenerateHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
+def GetTransitionDipoleMatrix(mIR, IncludeZeroth = False):
+    mIR.D = GenerateSparseHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
     if IncludeZeroth:
         mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
     else:
-        np.fill_diagonal(mIR.D, 0)
+        mIR.D.setdiag(0)
 
-def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = True):
+def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = False):
     X0 = []
     for X in mIR.Xs:
         X0.append(np.zeros(X.shape))
@@ -195,7 +195,7 @@ class LinearResponseIR:
 
     TestPowerSeries = TestPowerSeries
 
-    def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, SpectralHBMethod = 2, **kwargs):
+    def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, SpectralHBMethod = 1, **kwargs):
         self.mf = mf
         self.mVCI = mVCI
         #self.mVCI.HBMethod = 'coupling'
@@ -243,7 +243,6 @@ class LinearResponseIR:
         self.DipoleSurfaceList = HeatBath_Sort_FC(self.DipoleSurfaceList)
 
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
-        np.fill_diagonal(self.D, 0)
 
         self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
         I = []

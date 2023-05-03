@@ -236,6 +236,13 @@ def PrintResults(mVHCI):
         Outline += '\t%s' % (LCString)
         print(Outline, flush = True)
 
+def InitBasisAndC(mVHCI):
+    mVHCI.Basis = utils.init_funcs.InitTruncatedBasis(mVHCI.NModes, mVHCI.Frequencies, mVHCI.MaxQuanta, MaxTotalQuanta = mVHCI.MaxTotalQuanta)
+    mVHCI.C = np.eye(len(mVHCI.Basis))
+    mVHCI.E = mVHCI.mVSCF.E[:len(mVHCI.Basis)]
+    mVHCI.Ys = ContractedAnharmonicPotential(mVHCI.ModalCs, mVHCI.GenericV)
+    mVHCI.Xs = ContractedHOTerms(mVHCI.ModalCs, mVHCI.Frequencies)
+
 def PrintParameters(mVHCI):
     print("______________________________")
     print("|                            |")
@@ -270,6 +277,7 @@ class VCI:
     LCLine = LCLine
     SaveBasisToFile = SaveBasisToFile
     ReadBasisFromFile = ReadBasisFromFile
+    InitBasisAndC = InitBasisAndC
 
     def __init__(self, mVSCF, MaxTotalQuanta = 2, NStates = 10, **kwargs):
         self.mVSCF = mVSCF

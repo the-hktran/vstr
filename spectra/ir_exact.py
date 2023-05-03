@@ -124,7 +124,7 @@ if __name__ == "__main__":
     H 1 0.95
     H 1 0.95 2 104
     '''
-    mol.basis = 'sto-3g'
+    mol.basis = 'cc-pvdz'
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()
@@ -133,25 +133,42 @@ if __name__ == "__main__":
 
     V = GetFF(mf, NormalModes, w, Order = 4)
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 1, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 3)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 3, eps1 = 0.1, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
     mVHCI.kernel()
     #from scipy import sparse
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
     #mVHCI.PrintResults(thr=0)
 
-    mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes, Order = 4)
+    mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes, Order = 2)
     mIR.kernel()
     print(mIR.Intensities)
     print(mIR.Excitations)
-    mIR.PlotSpectrum("water_spectrum.png")
+    mIR.PlotSpectrum("water_spectrum.png", XMin = 0, XMax = 5000)
 
-    '''
     from vstr.mf.vscf import VSCF
     from vstr.ci.vci import VCI
-    vmf = VSCF(w, V, MaxQuanta = 10, NStates = 10)
+    vmf = VSCF(w, V, MaxQuanta = 2, NStates = 4)
     vmf.kernel()
+    vmf.MakeCoeffMatrix(NStates = 4)
+    print(vmf.BasisList)
+    vmf.PrintResults(NStates = 4)
+    print(vmf.E)
+    print(vmf.C)
 
+    mIR = IRSpectra(mf, vmf, NormalModes = NormalModes, Order = 2)
+    mIR.kernel()
+    mIR.PlotSpectrum("water_spectrum.png", XMin = 0, XMax = 5000)
+    print(mIR.C.T @ mIR.D @ mIR.C)
+
+    mVCI = VCI(vmf, 1, NStates = 4)
+    mVCI.InitBasisAndC()
+    mIR = VSCFIRSpectra(mf, mVCI, NormalModes = NormalModes, Order = 2)
+    mIR.kernel()
+    mIR.PlotSpectrum("water_spectrum.png", XMin = 0, XMax = 5000)
+    print(mIR.D)
+
+    '''
     mVCI = VCI(vmf, 3, eps1 = 10, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
     mVCI.kernel()
     mVSCFIR = VSCFIRSpectra(mf, mVCI, NormalModes = NormalModes)

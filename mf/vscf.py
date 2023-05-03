@@ -439,6 +439,40 @@ def LowestStates(mVSCF, NStates, MaxQuanta = None):
         LStates.append(BSave)
     return LStates
 
+def MakeCoeffMatrix(mVSCF, NStates = None):
+    if NStates is None:
+        NStates = np.prod(mVSCF.MaxQuanta)
+    mVSCF.BasisList = mVSCF.LowestStates(NStates - 1, MaxQuanta = mVSCF.MaxQuanta)
+    mVSCF.Basis = []
+    for B in mVSCF.BasisList:
+        WF = WaveFunction(B, mVSCF.Frequencies)
+        mVSCF.Basis.append(WF)
+
+    mVSCF.C = np.ones((len(mVSCF.BasisList), NStates))
+    for n in range(NStates):
+        for b in range(len(mVSCF.BasisList)):
+            for i in range(mVSCF.NModes):
+                mVSCF.C[b, n] *= mVSCF.Cs[i][mVSCF.BasisList[b][i], mVSCF.BasisList[n][i]]
+        '''     
+        Cn = mVSCF.Cs[0][:, mVSCF.BasisList[n][0]]
+        for i in range(1, mVSCF.NModes):
+            Cn = np.kron(mVSCF.Cs[i][:, mVSCF.BasisList[n][i]], Cn)
+        mVSCF.C[:, n] = Cn
+        '''
+    
+    E = []
+    for B in mVSCF.BasisList:
+        E.append(mVSCF.CalcESCF(ModeOcc = B))
+        if len(E) == NStates:
+            break
+    E = np.asarray(E)
+    SortedInd = np.argsort(E)
+    mVSCF.E = E[SortedInd]
+    mVSCF.C = mVSCF.C[:, SortedInd]
+        
+
+def MakeBasisList(mVSCF):
+    mVSCF.Basis, mVSCF.BasisList = InitGridBasis(mVSCF.Frequencies, mVSCF.MaxQuanta)
 
 def PrintResults(mVSCF, NStates = None, PrintLC = False):
     FinalE = []
@@ -531,6 +565,9 @@ class VSCF:
     LCLine = LCLine
     AnalyzeModals = AnalyzeModals
     PrintPotential = PrintPotential
+
+    MakeBasisList = MakeBasisList
+    MakeCoeffMatrix = MakeCoeffMatrix
     def __init__(self, Frequencies, UnscaledPotential, MaxQuanta = 2, NStates = 10, **kwargs):
         self.Frequencies = Frequencies
         self.NModes = self.Frequencies.shape[0]
@@ -604,12 +641,14 @@ class VSCF:
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
-    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('test.inp')
+    w, MaxQuanta, MaxTotalQuanta, Vs, eps1, eps2, eps3, NWalkers, NSamples, NStates = Read('CLO2.inp')
     print(MaxQuanta)
     mf = VSCF(w, Vs, MaxQuanta = MaxQuanta, NStates = NStates, SlowV = False)
     mf.SCF(DoDIIS = False)
     mf.AnalyzeModals()
     mf.PrintResults(NStates = 10)
+    mf.MakeCoeffMatrix()
+    '''
     mo = [0]*48
     #mo[-1]=2
     #print(mf.CalcESCF(ModeOcc = mo))
@@ -618,3 +657,4 @@ if __name__ == "__main__":
     mf.ModeOcc = mo
     mf.SCF(DoDIIS=False)
     mf.PrintResults(NStates = 10)#mf.AnalyzeModals()
+    '''
