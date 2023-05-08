@@ -203,11 +203,15 @@ used to form the contracted "h" part of the Fock matrix.
 '''
 def MakeHOHam(mVSCF):
     HamHO = []
+    mVSCF.Es = []
     for Mode in range(mVSCF.NModes):
+        E = []
         hM = np.zeros((mVSCF.MaxQuanta[Mode], mVSCF.MaxQuanta[Mode]))
         for i in range(mVSCF.MaxQuanta[Mode]):
             hM[i, i] = (i + 0.5) * mVSCF.Frequencies[Mode]
+            E.append(hM[i, i])
         HamHO.append(hM)
+        mVSCF.Es.append(E)
     return HamHO
 
 '''
@@ -442,35 +446,38 @@ def LowestStates(mVSCF, NStates, MaxQuanta = None):
 def MakeCoeffMatrix(mVSCF, NStates = None):
     if NStates is None:
         NStates = np.prod(mVSCF.MaxQuanta)
-    mVSCF.BasisList = mVSCF.LowestStates(NStates - 1, MaxQuanta = mVSCF.MaxQuanta)
-    mVSCF.Basis = []
-    for B in mVSCF.BasisList:
-        WF = WaveFunction(B, mVSCF.Frequencies)
-        mVSCF.Basis.append(WF)
+
+    mVSCF.MakeBasisList()
+
+    VSCFBasis0 = mVSCF.LowestStates(NStates - 1, MaxQuanta = mVSCF.MaxQuanta)
+    
+    E = []
+    for B in VSCFBasis0:
+        E.append(mVSCF.CalcESCF(ModeOcc = B))
+        if len(E) == NStates:
+            break
+    E = np.asarray(E)
+    '''
+    SortedInd = np.argsort(E)
+    mVSCF.E = E[SortedInd]
+    VSCFBasis = []
+    for i in SortedInd:
+        VSCFBasis.append(VSCFBasis0[i])
+    '''
+    VSCFBasis = VSCFBasis0
+    mVSCF.E = E
 
     mVSCF.C = np.ones((len(mVSCF.BasisList), NStates))
     for n in range(NStates):
-        for b in range(len(mVSCF.BasisList)):
-            for i in range(mVSCF.NModes):
-                mVSCF.C[b, n] *= mVSCF.Cs[i][mVSCF.BasisList[b][i], mVSCF.BasisList[n][i]]
-        '''     
+        for i, B in enumerate(mVSCF.BasisList):
+            for m in range(mVSCF.NModes):
+                mVSCF.C[i, n] *= mVSCF.Cs[m][B[m], VSCFBasis[n][m]]
+        '''
         Cn = mVSCF.Cs[0][:, mVSCF.BasisList[n][0]]
         for i in range(1, mVSCF.NModes):
             Cn = np.kron(mVSCF.Cs[i][:, mVSCF.BasisList[n][i]], Cn)
         mVSCF.C[:, n] = Cn
         '''
-    
-    E = []
-    for B in mVSCF.BasisList:
-        E.append(mVSCF.CalcESCF(ModeOcc = B))
-        if len(E) == NStates:
-            break
-    E = np.asarray(E)
-    SortedInd = np.argsort(E)
-    mVSCF.E = E[SortedInd]
-    mVSCF.C = mVSCF.C[:, SortedInd]
-        
-
 def MakeBasisList(mVSCF):
     mVSCF.Basis, mVSCF.BasisList = InitGridBasis(mVSCF.Frequencies, mVSCF.MaxQuanta)
 

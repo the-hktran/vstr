@@ -236,10 +236,22 @@ def PrintResults(mVHCI):
         Outline += '\t%s' % (LCString)
         print(Outline, flush = True)
 
-def InitBasisAndC(mVHCI):
-    mVHCI.Basis = utils.init_funcs.InitTruncatedBasis(mVHCI.NModes, mVHCI.Frequencies, mVHCI.MaxQuanta, MaxTotalQuanta = mVHCI.MaxTotalQuanta)
+def InitBasisAndC(mVHCI, Basis = None):
+    if Basis is None:
+        mVHCI.Basis = utils.init_funcs.InitTruncatedBasis(mVHCI.NModes, mVHCI.Frequencies, mVHCI.MaxQuanta, MaxTotalQuanta = mVHCI.MaxTotalQuanta)
+    else:
+        mVHCI.Basis = Basis
     mVHCI.C = np.eye(len(mVHCI.Basis))
-    mVHCI.E = mVHCI.mVSCF.E[:len(mVHCI.Basis)]
+    try:
+        mVHCI.E = mVHCI.mVSCF.E[:len(mVHCI.Basis)]
+    except:
+        mVHCI.E = []
+        for B in mVHCI.Basis:
+            BL = []
+            for m in range(mVHCI.NModes):
+                BL.append(B.Modes[m].Quanta)
+            mVHCI.E.append(mVHCI.mVSCF.CalcESCF(ModeOcc = BL))
+        mVHCI.E = np.asarray(mVHCI.E)
     mVHCI.Ys = ContractedAnharmonicPotential(mVHCI.ModalCs, mVHCI.GenericV)
     mVHCI.Xs = ContractedHOTerms(mVHCI.ModalCs, mVHCI.Frequencies)
 

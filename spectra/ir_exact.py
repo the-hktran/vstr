@@ -148,21 +148,21 @@ if __name__ == "__main__":
 
     from vstr.mf.vscf import VSCF
     from vstr.ci.vci import VCI
-    vmf = VSCF(w, V, MaxQuanta = 2, NStates = 4)
+    vmf = VSCF(w, V, MaxQuanta = 10, NStates = 100)
     vmf.kernel()
-    vmf.MakeCoeffMatrix(NStates = 4)
-    print(vmf.BasisList)
-    vmf.PrintResults(NStates = 4)
-    print(vmf.E)
-    print(vmf.C)
+    #vmf.InitCs()
+    #vmf.MakeCoeffMatrix(NStates = 6)
+    #vmf.PrintResults(NStates = 100)
 
+    '''
     mIR = IRSpectra(mf, vmf, NormalModes = NormalModes, Order = 2)
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum.png", XMin = 0, XMax = 5000)
     print(mIR.C.T @ mIR.D @ mIR.C)
+    '''
 
-    mVCI = VCI(vmf, 1, NStates = 4)
-    mVCI.InitBasisAndC()
+    mVCI = VCI(vmf, 10, NStates = 100)
+    mVCI.InitBasisAndC()#(Basis = vmf.Basis)
     mIR = VSCFIRSpectra(mf, mVCI, NormalModes = NormalModes, Order = 2)
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum.png", XMin = 0, XMax = 5000)
