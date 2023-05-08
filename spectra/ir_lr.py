@@ -3,6 +3,7 @@ from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HO
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
+import gc
 
 def GetTransitionDipoleMatrix(mIR, IncludeZeroth = False):
     mIR.D = GenerateSparseHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
@@ -77,6 +78,7 @@ def SpectralHCIStep(mIR, w, eps = 0.01, eps_denom = 1e-3, InitState = 0):
         mIR.mVCI.Basis += mIR.mVCI.NewBasis
         mIR.mVCI.SparseDiagonalize()
         mIR.mVCI.NewBasis = None
+        del mIR.mVCI.NewBasis
         
         # HB using H and b/D
         mIR.GetTransitionDipoleMatrix()
@@ -94,6 +96,7 @@ def SpectralHCIStep(mIR, w, eps = 0.01, eps_denom = 1e-3, InitState = 0):
         mIR.mVCI.Basis += mIR.mVCI.NewBasis
         mIR.mVCI.SparseDiagonalize()
         mIR.mVCI.NewBasis = None
+        del mIR.mVCI.NewBasis
         
         # HB using H and x
         mIR.GetTransitionDipoleMatrix()
@@ -117,15 +120,21 @@ def SpectralHCI(mIR, w):
         if it > mIR.mVCI.MaxIter:
             raise RuntimeError("VHCI did not converge")
     print("VHCI converaged for w =", w, "with a total of", len(mIR.mVCI.Basis), "configurations.", flush = True)
-    #from vstr.utils.init_funcs import PrintBasis
-    #PrintBasis(mIR.mVCI.Basis)
     mIR.mVCI.NewBasis = None
+    del mIR.mVCI.NewBasis
 
 def ResetVCI(mIR):
+    del mIR.mVCI.Basis
+    del mIR.mVCI.H
+    del mIR.mVCI.C
+    del mIR.mVCI.E
+
     mIR.mVCI.Basis = mIR.Basis0.copy()
     mIR.mVCI.H = mIR.H0.copy()
     mIR.mVCI.C = mIR.C0.copy()
     mIR.mVCI.E = mIR.E0.copy()
+    
+    gc.collect()
 
 def Intensity(mIR, w):
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object
@@ -134,10 +143,6 @@ def Intensity(mIR, w):
     # Solve for intensity using updated VCI object
     A, b = mIR.GetAb(w)
     x = SolveAxb(A, b)
-    #AInv = mIR.ApproximateAInv(w)
-    #AInvX = np.linalg.inv(A)
-    #print(w, ((AInv - AInvX).conj() * (AInv - AInvX)).sum().real)
-    #x = AInv @ b
     x = np.asarray(x).ravel()
     b = np.asarray(b).ravel()
     # Reset VCI object
@@ -253,7 +258,6 @@ class LinearResponseIR:
 class VSCFLinearResponseIR(LinearResponseIR):
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrixFromVSCF
     GetAb = GetAbFromVSCF
-    #SpectralHCIStep = SpectralHCIStepFromVSCF
 
     def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, **kwargs):
         LinearResponseIR.__init__(self, mf, mVCI, FreqRange = FreqRange, NPoints = NPoints, eta = eta, NormalModes = NormalModes, DipoleSurface = DipoleSurface)
