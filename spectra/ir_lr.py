@@ -71,7 +71,7 @@ def SpectralScreenBasis(mIR, Ws = None, C = None, eps = 0.01, InitState = None):
 
     return mIR.mVCI.ScreenBasis(Ws = Ws, C = C, eps = eps)
 
-def SpectralHCIStep(mIR, w, eps = 0.01, eps_denom = 1e-3, InitState = 0):
+def SpectralHCIStep(mIR, w, eps = 0.01, InitState = 0):
     if mIR.SpectralHBMethod == 1: # means perturbing the ground state
         # HB using dipole operator first
         mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(Ws = mIR.DipoleSurfaceList, C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
@@ -113,7 +113,7 @@ def SpectralHCI(mIR, w):
     NAdded = len(mIR.mVCI.Basis)
     it = 1
     while (float(NAdded) / float(len(mIR.mVCI.Basis))) > mIR.mVCI.tol:
-        mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, eps = mIR.eps1, eps_denom = mIR.epsD)
+        mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, eps = mIR.eps1)
         #print("VHCI Iteration", it, "for w =", w, "complete with", NAdded, "new configurations and a total of", len(mIR.mVCI.Basis), flush = True)
         mIR.mVCI.SparseDiagonalize()
         it += 1
@@ -213,7 +213,6 @@ class LinearResponseIR:
         self.E0 = mVCI.E.copy()
         self.Frequencies = mVCI.Frequencies
         self.eps1 = mVCI.eps1 / 100
-        self.epsD = 1e-3
         self.NormalModes = NormalModes
         self.InitState = 0
         self.FreqRange = FreqRange
@@ -294,7 +293,7 @@ if __name__ == "__main__":
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
 
-    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.001, epsD = 1e-1, eta = 100, NormalModes = NormalModes, Order = 2)
+    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.001, eta = 100, NormalModes = NormalModes, Order = 2)
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum_lr.png")
     #mIR.TestPowerSeries()
@@ -306,6 +305,6 @@ if __name__ == "__main__":
     mVCI = VCI(vmf, MaxTotalQuanta = 1, eps1 = 1000, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVCI.kernel()
 
-    mVSCFIR = VSCFLinearResponseIR(mf, mVCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.001, epsD = 1e-1, eta = 100, NormalModes = NormalModes, Order = 2)
+    mVSCFIR = VSCFLinearResponseIR(mf, mVCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.001, eta = 100, NormalModes = NormalModes, Order = 2)
     mVSCFIR.kernel()
     mVSCFIR.PlotSpectrum("water_spectrum_vscf_lr.png")
