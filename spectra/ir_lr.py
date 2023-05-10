@@ -29,8 +29,13 @@ def GetAb(mIR, w, Basis = None):
         H = GenerateSparseHamV(Basis, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3])
         E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
 
-    A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
-    b = mIR.D @ C[:, 0]
+    #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
+    HDiag = H.diagonal()
+    HDiag = (w - mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
+    A = -1 * H
+    A.setdiag(HDiag)
+    A.tocsr()
+    b = np.asarray(mIR.D @ C[:, 0]).T
     return A, b
 
 def GetAbFromVSCF(mIR, w, Basis = None):
@@ -42,12 +47,17 @@ def GetAbFromVSCF(mIR, w, Basis = None):
         H = VCISparseHamFromVSCF(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.Ys, mIR.Xs, True)
         E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
 
-    A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
+    #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
+    HDiag = H.diagonal()
+    HDiag = (w - mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
+    A = -1 * H
+    A.setdiag(HDiag)
+    A.tocsr()
     b = np.asarray(mIR.D @ C[:, 0]).T
     return A, b
 
 def SolveAxb(A, b):
-    return np.linalg.solve(A, b)
+    return sparse.linalg.spsolve(A, b)
 
 def ApproximateAInv(mIR, w, Order = 1):
     HOD = mIR.mVCI.H.todense()
@@ -228,7 +238,7 @@ class LinearResponseIR:
     def kernel(self):
         # Make dipole surface
         if self.DipoleSurface is None:
-            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)
+            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)[2]
             self.DipoleSurface = []
             self.DipoleSurface.append(mu_raw[0][0])
             for n in range(1, self.Order + 1):

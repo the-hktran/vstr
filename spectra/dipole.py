@@ -73,7 +73,7 @@ def GetDipoleSurface(mf, Coords, Freq = None, Order = 1, dx = 1e-1, Method = 'rh
     NCoord = Coords.shape[1]
     X0 = AtomToCoord(mf) # in Bohr
     atom0 = mf.mol._atom.copy()
-    mu0 = GetDipole(mol, mf, Method = Method)
+    mu0 = GetDipole(mf.mol, mf, Method = Method)
     new_mol = mf.mol.copy()
     new_mol.unit = 'B'
 
