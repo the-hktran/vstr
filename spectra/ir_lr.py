@@ -5,22 +5,53 @@ from scipy import sparse
 import matplotlib.pyplot as plt
 import gc
 
-def GetTransitionDipoleMatrix(mIR, IncludeZeroth = False):
-    mIR.D = GenerateSparseHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
-    if IncludeZeroth:
-        mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
+def GetTransitionDipoleMatrix(mIR, xi = None, IncludeZeroth = False):
+    if xi is None:
+        mIR.D = []
+        for x in range(3):
+            Dx = GenerateSparseHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList[x], mIR.DipoleSurface[x][3], mIR.DipoleSurface[x][4], mIR.DipoleSurface[x][5], mIR.DipoleSurface[x][6])
+            if IncludeZeroth:
+                D0 = Dx.diagonal()
+                D0 += mIR.DipoleSurface[x][0][0]
+                Dx.setdiag(D0)
+            #else:
+            #    Dx.setdiag(0)
+            mIR.D.append(Dx)
     else:
-        mIR.D.setdiag(0)
+        Dx = GenerateSparseHamAnharmV(mIR.mVCI.Basis, list(mIR.mVCI.Frequencies), mIR.DipoleSurfaceList[xi], mIR.DipoleSurface[xi][3], mIR.DipoleSurface[xi][4], mIR.DipoleSurface[xi][5], mIR.DipoleSurface[xi][6])
+        if IncludeZeroth:
+            D0 = Dx.diagonal()
+            D0 += mIR.DipoleSurface[x][0][0]
+            Dx.setdiag(D0)
+        else:
+            Dx.setdiag(0)
+        mIR.D[xi] = Dx
 
-def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = False):
+
+def GetTransitionDipoleMatrixFromVSCF(mIR, xi = None, IncludeZeroth = False):
     X0 = []
     for X in mIR.Xs:
         X0.append(np.zeros(X.shape))
-    mIR.D = VCISparseHamFromVSCF(mIR.mVCI.Basis, mIR.mVCI.Basis, mIR.Frequencies, mIR.DipoleSurfaceList, mIR.Ys, X0, True).todense()
-    if IncludeZeroth:
-        mIR.D += np.eye(mIR.D.shape[0]) * mIR.DipoleSurface[0][0]
 
-def GetAb(mIR, w, Basis = None):
+    if xi is None:
+        mIR.D = []
+        for x in range(3):
+            Dx = VCISparseHamFromVSCF(mIR.mVCI.Basis, mIR.mVCI.Basis, mIR.Frequencies, mIR.DipoleSurfaceList[x], mIR.Ys, X0, True)
+            if IncludeZeroth:
+                D0 = Dx.diagonal()
+                D0 += mIR.DipoleSurface[x][0][0]
+                Dx.setdiag(D0)
+            mIR.D.append(Dx)
+    else:
+        Dx = VCISparseHamFromVSCF(mIR.mVCI.Basis, mIR.mVCI.Basis, mIR.Frequencies, mIR.DipoleSurfaceList[xi], mIR.Ys, X0, True)
+        if IncludeZeroth:
+            D0 = Dx.diagonal()
+            D0 += mIR.DipoleSurface[xi][0][0]
+            Dx.setdiag(D0)
+        mIR.D[xi] = Dx
+
+
+def GetAb(mIR, w, Basis = None, xi = None):
     if Basis is None:
         H = mIR.mVCI.H
         C = mIR.mVCI.C
@@ -31,14 +62,19 @@ def GetAb(mIR, w, Basis = None):
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
-    HDiag = (w - mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
+    HDiag = (w + mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
     A = -1 * H
     A.setdiag(HDiag)
-    A.tocsr()
-    b = np.asarray(mIR.D @ C[:, 0]).T
+    A = A.tocsr()
+    b = [None] * 3
+    if xi is None:
+        for x in range(3):
+            b[x] = np.asarray(mIR.D[x] @ C[:, 0]).T
+    else:
+        b[xi] = np.asarray(mIR.D[xi] @ C[:, 0]).T
     return A, b
 
-def GetAbFromVSCF(mIR, w, Basis = None):
+def GetAbFromVSCF(mIR, w, Basis = None, xi = None):
     if Basis is None:
         H = mIR.mVCI.H
         C = mIR.mVCI.C
@@ -49,11 +85,17 @@ def GetAbFromVSCF(mIR, w, Basis = None):
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
-    HDiag = (w - mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
+    HDiag = (w + mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
     A = -1 * H
     A.setdiag(HDiag)
-    A.tocsr()
-    b = np.asarray(mIR.D @ C[:, 0]).T
+    A = A.tocsr()
+    b = [None] * 3
+    if xi is None:
+        for x in range(3):
+            b[x] = np.asarray(mIR.D[x] @ C[:, 0]).T
+    else:
+        b[xi] = np.asarray(mIR.D[xi] @ C[:, 0]).T
+
     return A, b
 
 def SolveAxb(A, b):
@@ -81,55 +123,56 @@ def SpectralScreenBasis(mIR, Ws = None, C = None, eps = 0.01, InitState = None):
 
     return mIR.mVCI.ScreenBasis(Ws = Ws, C = C, eps = eps)
 
-def SpectralHCIStep(mIR, w, eps = 0.01, InitState = 0):
+def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
     if mIR.SpectralHBMethod == 1: # means perturbing the ground state
         # HB using dipole operator first
-        mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(Ws = mIR.DipoleSurfaceList, C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
+        mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(Ws = mIR.DipoleSurfaceList[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
         mIR.mVCI.Basis += mIR.mVCI.NewBasis
         mIR.mVCI.SparseDiagonalize()
         mIR.mVCI.NewBasis = None
         del mIR.mVCI.NewBasis
         
         # HB using H and b/D
-        mIR.GetTransitionDipoleMatrix()
-        A, b = mIR.GetAb(w)
-        b = b.ravel()
-        x = SolveAxb(A, b)
+        mIR.GetTransitionDipoleMatrix(xi = xi)
+        A, b = mIR.GetAb(w, xi = xi)
+        b[xi] = b[xi].ravel()
+        x = SolveAxb(A, b[xi])
         D = np.sqrt((w - mIR.mVCI.H.diagonal() + mIR.mVCI.E[0])**2.0 + mIR.eta**2.0)
-        bD = abs(b / D)
+        bD = abs(b[xi] / D)
         NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = bD, eps = eps, InitState = InitState)
         mIR.mVCI.Basis += NewBasis
 
     elif mIR.SpectralHBMethod == 2: # means perturbing x
         # HB using dipole operator first
-        mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(Ws = mIR.DipoleSurfaceList, C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
+        mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(Ws = mIR.DipoleSurfaceList[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
         mIR.mVCI.Basis += mIR.mVCI.NewBasis
         mIR.mVCI.SparseDiagonalize()
         mIR.mVCI.NewBasis = None
         del mIR.mVCI.NewBasis
         
         # HB using H and x
-        mIR.GetTransitionDipoleMatrix()
-        A, b = mIR.GetAb(w)
-        b = b.ravel()
-        x = SolveAxb(A, b)
+        mIR.GetTransitionDipoleMatrix(xi = xi)
+        A, b = mIR.GetAb(w, xi = xi)
+        b[xi] = b[xi].ravel()
+        x = SolveAxb(A, b[xi])
         NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x), eps = eps, InitState = InitState)
         mIR.mVCI.Basis += NewBasis
 
     return NewBasis, NAdded1 + NAdded2
 
-def SpectralHCI(mIR, w):
+def SpectralHCI(mIR, w, xi):
+    CartCoord = ['x', 'y', 'z']
     # First, get new basis based on the dipole operator
     NAdded = len(mIR.mVCI.Basis)
     it = 1
     while (float(NAdded) / float(len(mIR.mVCI.Basis))) > mIR.mVCI.tol:
-        mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, eps = mIR.eps1)
+        mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, xi = xi, eps = mIR.eps1)
         #print("VHCI Iteration", it, "for w =", w, "complete with", NAdded, "new configurations and a total of", len(mIR.mVCI.Basis), flush = True)
         mIR.mVCI.SparseDiagonalize()
         it += 1
         if it > mIR.mVCI.MaxIter:
             raise RuntimeError("VHCI did not converge")
-    print("VHCI converaged for w =", w, "with a total of", len(mIR.mVCI.Basis), "configurations.", flush = True)
+    print("VHCI for coordinate", CartCoord[xi], "converged for w =", w, "with a total of", len(mIR.mVCI.Basis), "configurations.", flush = True)
     mIR.mVCI.NewBasis = None
     del mIR.mVCI.NewBasis
 
@@ -147,17 +190,21 @@ def ResetVCI(mIR):
     gc.collect()
 
 def Intensity(mIR, w):
-    # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object
-    mIR.SpectralHCI(w)
-    mIR.GetTransitionDipoleMatrix(IncludeZeroth = False)
-    # Solve for intensity using updated VCI object
-    A, b = mIR.GetAb(w)
-    x = SolveAxb(A, b)
-    x = np.asarray(x).ravel()
-    b = np.asarray(b).ravel()
-    # Reset VCI object
-    mIR.ResetVCI()
-    return (1.j * np.dot(b, x)).real / np.pi
+    I = np.zeros((3,3))
+    # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object 
+    for xi in range(3):
+        mIR.SpectralHCI(w, xi = xi)
+        mIR.GetTransitionDipoleMatrix(IncludeZeroth = False)
+        # Solve for intensity using updated VCI object
+        A, b = mIR.GetAb(w)
+        x = SolveAxb(A, b[xi])
+        x = np.asarray(x).ravel()
+        for xj in range(3):
+            b[xj] = np.asarray(b[xj]).ravel()
+            I[xj, xi] = (1.j * np.dot(b[xj], x)).real / np.pi
+        # Reset VCI object
+        mIR.ResetVCI()
+    return I
 
 def PlotSpectrum(mIR, PlotName, XLabel = "Frequency", YLabel = "Intensity", Title = "IR Spectrum"):
     plt.plot(mIR.ws, mIR.Is, linestyle = '-', marker = None)
@@ -210,7 +257,7 @@ class LinearResponseIR:
 
     TestPowerSeries = TestPowerSeries
 
-    def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, SpectralHBMethod = 1, **kwargs):
+    def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, SpectralHBMethod = 2, **kwargs):
         self.mf = mf
         self.mVCI = mVCI
         #self.mVCI.HBMethod = 'coupling'
@@ -230,39 +277,53 @@ class LinearResponseIR:
         self.eta = eta
         self.Order = 1
         if DipoleSurface is not None:
-            self.Order = len(DipoleSurface) - 1
+            self.Order = len(DipoleSurface[0]) - 1
         self.DipoleSurface = DipoleSurface
+        self.Normalize = False
 
         self.__dict__.update(kwargs)
 
     def kernel(self):
         # Make dipole surface
         if self.DipoleSurface is None:
-            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)[2]
+            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)
             self.DipoleSurface = []
-            self.DipoleSurface.append(mu_raw[0][0])
-            for n in range(1, self.Order + 1):
-                Dn = MakeDipoleList(mu_raw[n])
-                self.DipoleSurface.append(Dn)
-        for n in range(self.Order + 1, 7):
-            self.DipoleSurface.append([])
+            for x in range(3):
+                DS = []
+                DS.append(mu_raw[x][0][0])
+                for n in range(1, self.Order + 1):
+                    Dn = MakeDipoleList(mu_raw[x][n])
+                    DS.append(Dn)
+                for n in range(self.Order + 1, 7):
+                    DS.append([])
+                self.DipoleSurface.append(DS)
         self.DipoleSurfaceList = []
-        for Dn in self.DipoleSurface[1:]:
-            self.DipoleSurfaceList += Dn
+        for x in range(3):
+            DSListX = []
+            for Dn in self.DipoleSurface[x][1:]:
+                DSListX += Dn
+            self.DipoleSurfaceList.append(DSListX)
 
         # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest even order, so we will make sure that happens here
-        self.DipoleSurface[3] += self.DipoleSurface[1]
-        self.DipoleSurface[4] += self.DipoleSurface[2]
-        self.DipoleSurfaceList.append(FConst(0.0, [0] * 6, False))
-        self.DipoleSurfaceList = HeatBath_Sort_FC(self.DipoleSurfaceList)
+        for x in range(3):
+            self.DipoleSurface[x][3] += self.DipoleSurface[x][1]
+            self.DipoleSurface[x][4] += self.DipoleSurface[x][2]
+            self.DipoleSurfaceList[x].append(FConst(0.0, [0] * 6, False))
+            self.DipoleSurfaceList[x] = HeatBath_Sort_FC(self.DipoleSurfaceList[x])
 
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
 
         self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
-        I = []
+        self.ITensors = []
         for w in self.ws:
-            I.append(self.Intensity(w))
-        self.Is = np.asarray(I) / max(I)
+            self.ITensors.append(self.Intensity(w))
+        self.Is = []
+        for I in self.ITensors:
+            self.Is.append(I[0, 0] + I[1, 1] + I[2, 2])
+
+        self.Is = np.asarray(self.Is)
+        if self.Normalize:
+            self.Is = np.asarray(self.Is) / max(self.Is)
 
 class VSCFLinearResponseIR(LinearResponseIR):
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrixFromVSCF
@@ -288,7 +349,7 @@ if __name__ == "__main__":
     H 1 0.95
     H 1 0.95 2 104
     '''
-    mol.basis = 'sto-3g'
+    mol.basis = 'cc-pvdz'
     mol.build()
     mf = scf.RHF(mol)
     mf.kernel()
@@ -296,14 +357,13 @@ if __name__ == "__main__":
     w, NormalModes = GetNormalModes(mf)
 
     V = GetFF(mf, NormalModes, w, Order = 4)
-    print(V)
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 1000, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 10, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
 
-    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.001, eta = 100, NormalModes = NormalModes, Order = 2)
+    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 0.01, eta = 100, NormalModes = NormalModes, Order = 2)
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum_lr.png")
     #mIR.TestPowerSeries()
@@ -312,9 +372,9 @@ if __name__ == "__main__":
     from vstr.mf.vscf import VSCF
     vmf = VSCF(w, V, MaxQuanta = 10, NStates = 1)
     vmf.kernel()
-    mVCI = VCI(vmf, MaxTotalQuanta = 1, eps1 = 1000, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
+    mVCI = VCI(vmf, MaxTotalQuanta = 1, eps1 = 10, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVCI.kernel()
 
-    mVSCFIR = VSCFLinearResponseIR(mf, mVCI, FreqRange = [0, 16000], NPoints = 1000, eps1 = 0.001, eta = 100, NormalModes = NormalModes, Order = 2)
+    mVSCFIR = VSCFLinearResponseIR(mf, mVCI, FreqRange = [0, 5000], NPoints = 1000, eps1 = 0.01, eta = 100, NormalModes = NormalModes, Order = 2)
     mVSCFIR.kernel()
-    mVSCFIR.PlotSpectrum("water_spectrum_vscf_lr.png")
+    mVSCFIR.PlotSpectrum("water_spectrum_lr.png")

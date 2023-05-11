@@ -5,25 +5,31 @@ from scipy import sparse
 import matplotlib.pyplot as plt
 
 def GetTransitionDipoleMatrix(mIR, IncludeZeroth = False):
-    mIR.D = GenerateSparseHamAnharmV(mIR.Basis, list(mIR.Frequencies), mIR.DipoleSurfaceList, mIR.DipoleSurface[3], mIR.DipoleSurface[4], mIR.DipoleSurface[5], mIR.DipoleSurface[6])
-    if IncludeZeroth:
-        for i in range(mIR.D.shape[0]):
-            mIR.D[i, i] += mIR.DipoleSurface[0][0]
+    mIR.D = []
+    for xi in range(3):
+        mIR.D.append(GenerateSparseHamAnharmV(mIR.Basis, list(mIR.Frequencies), mIR.DipoleSurfaceList[xi], mIR.DipoleSurface[xi][3], mIR.DipoleSurface[xi][4], mIR.DipoleSurface[xi][5], mIR.DipoleSurface[xi][6]))
+        if IncludeZeroth:
+            for i in range(mIR.D[xi].shape[0]):
+                mIR.D[xi][i, i] += mIR.DipoleSurface[xi][0][0]
 
 def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = False):
     X0 = []
     for X in mIR.Xs:
         X0.append(np.zeros(X.shape))
-    mIR.D = VCISparseHamFromVSCF(mIR.Basis, mIR.Basis, mIR.Frequencies, mIR.DipoleSurfaceList, mIR.Ys, X0, True).todense()
-    if IncludeZeroth:
-        for i in range(mIR.D.shape[0]):
-            mIR.D[i, i] += mIR.DipoleSurface[0][0]
+    mIR.D = []
+    for xi in range(3):
+        mIR.D.append(VCISparseHamFromVSCF(mIR.Basis, mIR.Basis, mIR.Frequencies, mIR.DipoleSurfaceList[xi], mIR.Ys, X0, True))
+        if IncludeZeroth:
+            for i in range(mIR.D[xi].shape[0]):
+                mIR.D[xi][i, i] += mIR.DipoleSurface[xi][0][0]
 
 def GetSpectralIntensities(mIR):
-    CDC = mIR.C[:, 0].T @ mIR.D @ mIR.C[:, 1:]
-    if CDC.ndim == 2:
-        CDC = np.asarray(CDC).ravel()
-    mIR.Intensities = CDC**2
+    mIR.Intensities = [None] * 3
+    for xi in range(3):
+        CDC = mIR.C[:, 0].T @ mIR.D[xi] @ mIR.C[:, 1:]
+        if CDC.ndim == 2:
+            CDC = np.asarray(CDC).ravel()
+        mIR.Intensities[xi] = CDC**2
     mIR.Excitations = []
     for w in mIR.E[1:]:
         mIR.Excitations.append(w - mIR.E[0])
@@ -41,11 +47,12 @@ def PlotSpectrum(mIR, PlotName, NPoints = 1000, L = 100, XLabel = "Frequency", Y
     for x in X:
         y = 0
         for n in range(len(mIR.Excitations)):
-            y += mIR.Intensities[n] * Lorentzian(x, mIR.Excitations[n], L = L)
+            y += (mIR.Intensities[0][n] + mIR.Intensities[1][n] + mIR.Intensities[2][n]) * Lorentzian(x, mIR.Excitations[n], L = L)
         Y.append(y)
     mIR.ws = X
     mIR.Is = np.asarray(Y)
-    mIR.Is = mIR.Is / max(mIR.Is) 
+    if mIR.Normalize:
+        mIR.Is = mIR.Is / max(mIR.Is) 
     plt.plot(mIR.ws, mIR.Is, linestyle = '-', marker = None)
     plt.xlabel(XLabel)
     plt.ylabel(YLabel)
@@ -73,31 +80,35 @@ class IRSpectra:
         self.NormalModes = NormalModes
         self.Order = 1
         self.DipoleSurface = DipoleSurface
+        self.Normalize = False
         
         self.__dict__.update(kwargs)
 
     def kernel(self):
         if self.DipoleSurface is None:
-            # Make dipole surface
-            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order)
+            mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)
             self.DipoleSurface = []
-            self.DipoleSurface.append(mu_raw[0][0])
-            for n in range(1, self.Order + 1):
-                Dn = MakeDipoleList(mu_raw[n])
-                self.DipoleSurface.append(Dn)
-        else:
-            self.Order = len(self.DipoleSurface) - 1
-
-        for n in range(self.Order + 1, 7):
-            self.DipoleSurface.append([])
+            for x in range(3):
+                DS = []
+                DS.append(mu_raw[x][0][0])
+                for n in range(1, self.Order + 1):
+                    Dn = MakeDipoleList(mu_raw[x][n])
+                    DS.append(Dn)
+                for n in range(self.Order + 1, 7):
+                    DS.append([])
+                self.DipoleSurface.append(DS)
         self.DipoleSurfaceList = []
-        for Dn in self.DipoleSurface[1:]:
-            self.DipoleSurfaceList += Dn
+        for x in range(3):
+            DSListX = []
+            for Dn in self.DipoleSurface[x][1:]:
+                DSListX += Dn
+            self.DipoleSurfaceList.append(DSListX)
 
-        # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest linear order, so we will make sure that happens here
-        self.DipoleSurface[3] = self.DipoleSurface[1] + self.DipoleSurface[3]
-        self.DipoleSurface[4] = self.DipoleSurface[2] + self.DipoleSurface[4]
-        self.DipoleSurfaceList.append(FConst(0.0, [0] * 6, False))
+        # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest even order, so we will make sure that happens here
+        for x in range(3):
+            self.DipoleSurface[x][3] += self.DipoleSurface[x][1]
+            self.DipoleSurface[x][4] += self.DipoleSurface[x][2]
+            self.DipoleSurfaceList[x].append(FConst(0.0, [0] * 6, False))
 
         self.GetTransitionDipoleMatrix()
         self.GetSpectralIntensities()
@@ -166,7 +177,6 @@ if __name__ == "__main__":
     mIR = VSCFIRSpectra(mf, mVCI, NormalModes = NormalModes, Order = 2)
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum.png", XMin = 0, XMax = 5000)
-    print(mIR.D)
 
     '''
     mVCI = VCI(vmf, 3, eps1 = 10, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
