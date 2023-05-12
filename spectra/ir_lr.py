@@ -357,6 +357,16 @@ if __name__ == "__main__":
     w, NormalModes = GetNormalModes(mf)
 
     V = GetFF(mf, NormalModes, w, Order = 4)
+
+    from vstr.spectra.ir_exact import IRSpectra
+
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 3, eps1 = 0.1, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
+    mVHCI.kernel()
+
+    mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes, Order = 2)
+    mIR.kernel()
+    mIR.PlotSpectrum("water_spectrum_lr.png", L = 100, XMin = 0, XMax = 5000)
+
     
     mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 10, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()

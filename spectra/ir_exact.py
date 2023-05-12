@@ -35,7 +35,8 @@ def GetSpectralIntensities(mIR):
         mIR.Excitations.append(w - mIR.E[0])
 
 def Lorentzian(x, x0, L):
-    return 0.5 * L / (np.pi * ((x - x0)**2 + 0.25 * L**2))
+    #return 0.5 * L / (np.pi * ((x - x0)**2 + 0.25 * L**2))
+    return L / (np.pi * ((x - x0)**2 + L**2))
 
 def PlotSpectrum(mIR, PlotName, NPoints = 1000, L = 100, XLabel = "Frequency", YLabel = "Intensity", Title = "IR Spectrum", XMin = None, XMax = None):
     if XMin is None:
