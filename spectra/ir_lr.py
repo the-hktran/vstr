@@ -293,21 +293,23 @@ class LinearResponseIR:
                 DS.append(mu_raw[x][0][0])
                 for n in range(1, self.Order + 1):
                     Dn = MakeDipoleList(mu_raw[x][n])
-                    DS.append(Dn)
+                    DS.append(Dn.copy())
                 for n in range(self.Order + 1, 7):
                     DS.append([])
-                self.DipoleSurface.append(DS)
+                self.DipoleSurface.append(DS.copy())
         self.DipoleSurfaceList = []
         for x in range(3):
             DSListX = []
             for Dn in self.DipoleSurface[x][1:]:
-                DSListX += Dn
-            self.DipoleSurfaceList.append(DSListX)
+                DSListX += Dn.copy()
+            self.DipoleSurfaceList.append(DSListX.copy())
 
         # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest even order, so we will make sure that happens here
         for x in range(3):
-            self.DipoleSurface[x][3] += self.DipoleSurface[x][1]
-            self.DipoleSurface[x][4] += self.DipoleSurface[x][2]
+            self.DipoleSurface[x][3] += self.DipoleSurface[x][1].copy()
+            self.DipoleSurface[x][4] += self.DipoleSurface[x][2].copy()
+            self.DipoleSurface[x][1] = []
+            self.DipoleSurface[x][2] = []
             self.DipoleSurfaceList[x].append(FConst(0.0, [0] * 6, False))
             self.DipoleSurfaceList[x] = HeatBath_Sort_FC(self.DipoleSurfaceList[x])
 
@@ -345,6 +347,14 @@ if __name__ == "__main__":
 
     mol = gto.M()
     mol.atom ='''
+    H      0.5288      0.1610      0.9359
+  C      0.0000      0.0000      0.0000
+  H      0.2051      0.8240     -0.6786
+  H      0.3345     -0.9314     -0.4496
+  H     -1.0685     -0.0537      0.1921
+  '''
+    
+    '''
     O
     H 1 0.95
     H 1 0.95 2 104
@@ -360,7 +370,7 @@ if __name__ == "__main__":
 
     from vstr.spectra.ir_exact import IRSpectra
 
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 3, eps1 = 0.1, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 3, eps1 = 10, eps2 = 0.01, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 10)
     mVHCI.kernel()
 
     mIR = IRSpectra(mf, mVHCI, NormalModes = NormalModes, Order = 2)
@@ -368,16 +378,21 @@ if __name__ == "__main__":
     mIR.PlotSpectrum("water_spectrum_lr.png", L = 100, XMin = 0, XMax = 5000)
 
     
-    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 10, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
+    mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 100, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
 
-    mIR = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 0.01, eta = 100, NormalModes = NormalModes, Order = 2)
-    mIR.kernel()
-    mIR.PlotSpectrum("water_spectrum_lr.png")
+    mIR2 = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 1, eta = 100, DipoleSurface = mIR.DipoleSurface, Order = 2, SpectralHBMethod = 1)
+    mIR2.kernel()
+    mIR2.PlotSpectrum("water_spectrum_lr.png")
+    
+    mIR2 = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 1, eta = 100, DipoleSurface = mIR.DipoleSurface, Order = 2)
+    mIR2.kernel()
+    mIR2.PlotSpectrum("water_spectrum_lr.png")
     #mIR.TestPowerSeries()
 
+    '''
     from vstr.ci.vci import VCI
     from vstr.mf.vscf import VSCF
     vmf = VSCF(w, V, MaxQuanta = 10, NStates = 1)
@@ -388,3 +403,4 @@ if __name__ == "__main__":
     mVSCFIR = VSCFLinearResponseIR(mf, mVCI, FreqRange = [0, 5000], NPoints = 1000, eps1 = 0.01, eta = 100, NormalModes = NormalModes, Order = 2)
     mVSCFIR.kernel()
     mVSCFIR.PlotSpectrum("water_spectrum_lr.png")
+    '''

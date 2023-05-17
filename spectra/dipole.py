@@ -38,21 +38,21 @@ def ScaleDipole(mu, Freq, Modes):
     # Units are now scaled by unitless factor. Dipole derivative has the same units as dipole.
     return ScaledMu
 
-def GetDipole(mol, new_mf, Method = 'rhf'):
+def GetDipole(mol, mf, Method = 'rhf'):
     if Method == 'rhf':
-        return new_mf.dip_moment()
+        return mf.dip_moment()
     elif Method == 'ccsd':
         mcc = cc.CCSD(mf)
         mcc.kernel()
         P = mcc.make_rdm1(ao_repr=True)
-        return new_mf.dip_moment(mol, P)
+        return mf.dip_moment(mol, P)
     elif Method == 'ccsd_t':
         mcc = cc.CCSD(mf)
         mcc.kernel()
         eris = mcc.ao2mo()
         conv, l1, l2 = ccsd_t_lambda.kernel(mcc, eris, mcc.t1, mcc.t2)
         P = ccsd_t_rdm.make_rdm1(mcc, mcc.t1, mcc.t2, l1, l2, eris, ao_repr = True)
-        return new_new.dip_moment(mol, P)
+        return mf.dip_moment(mol, P)
     else:
         raise RuntimeError("Unrecognized method for dipole calculation")
 

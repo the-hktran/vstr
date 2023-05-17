@@ -26,7 +26,10 @@ def GetTransitionDipoleMatrixFromVSCF(mIR, IncludeZeroth = False):
 def GetSpectralIntensities(mIR):
     mIR.Intensities = [None] * 3
     for xi in range(3):
-        CDC = mIR.C[:, 0].T @ mIR.D[xi] @ mIR.C[:, 1:]
+        if mIR.C is None:
+            CDC = mIR.D[xi][0, 1:].todense()
+        else:
+            CDC = mIR.C[:, 0].T @ mIR.D[xi] @ mIR.C[:, 1:]
         if CDC.ndim == 2:
             CDC = np.asarray(CDC).ravel()
         mIR.Intensities[xi] = CDC**2
@@ -94,21 +97,24 @@ class IRSpectra:
                 DS.append(mu_raw[x][0][0])
                 for n in range(1, self.Order + 1):
                     Dn = MakeDipoleList(mu_raw[x][n])
-                    DS.append(Dn)
+                    DS.append(Dn.copy())
                 for n in range(self.Order + 1, 7):
                     DS.append([])
-                self.DipoleSurface.append(DS)
+                self.DipoleSurface.append(DS.copy())
+        
         self.DipoleSurfaceList = []
         for x in range(3):
             DSListX = []
             for Dn in self.DipoleSurface[x][1:]:
                 DSListX += Dn
-            self.DipoleSurfaceList.append(DSListX)
+            self.DipoleSurfaceList.append(DSListX.copy())
 
         # Cubic/linear and quadratic/quartic terms must stack, and there must be something at the highest even order, so we will make sure that happens here
         for x in range(3):
-            self.DipoleSurface[x][3] += self.DipoleSurface[x][1]
-            self.DipoleSurface[x][4] += self.DipoleSurface[x][2]
+            self.DipoleSurface[x][3] += self.DipoleSurface[x][1].copy()
+            self.DipoleSurface[x][4] += self.DipoleSurface[x][2].copy()
+            self.DipoleSurface[x][1] = []
+            self.DipoleSurface[x][2] = []
             self.DipoleSurfaceList[x].append(FConst(0.0, [0] * 6, False))
 
         self.GetTransitionDipoleMatrix()

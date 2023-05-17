@@ -241,7 +241,7 @@ def InitBasisAndC(mVHCI, Basis = None):
         mVHCI.Basis = utils.init_funcs.InitTruncatedBasis(mVHCI.NModes, mVHCI.Frequencies, mVHCI.MaxQuanta, MaxTotalQuanta = mVHCI.MaxTotalQuanta)
     else:
         mVHCI.Basis = Basis
-    mVHCI.C = np.eye(len(mVHCI.Basis))
+    mVHCI.C = None #np.eye(len(mVHCI.Basis))
     try:
         mVHCI.E = mVHCI.mVSCF.E[:len(mVHCI.Basis)]
     except:
