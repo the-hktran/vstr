@@ -199,6 +199,7 @@ def Intensity(mIR, w):
         A, b = mIR.GetAb(w)
         x = SolveAxb(A, b[xi])
         x = np.asarray(x).ravel()
+        mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = 1e-4, C = np.reshape(abs(x) ,(x.shape[0], 1))))
         for xj in range(3):
             b[xj] = np.asarray(b[xj]).ravel()
             I[xj, xi] = (1.j * np.dot(b[xj], x)).real / np.pi
@@ -218,6 +219,11 @@ def SaveSpectrum(mIR, SaveName):
     A[:, 0] = mIR.ws
     A[:, 1] = mIR.Is
     np.savetxt(SaveName + ".csv", A, delimiter=",")
+
+    StateFile = open(SaveName + "_states.txt", "w")
+    for i in range(mIR.ws.shape[0]):
+        StateFile.write('%.6f\t%.12f\tx: %s\ty: %s\tz: %s\n' % (mIR.ws[i], mIR.Is[i], mIR.XString[0][i], mIR.XString[1][i], mIR.XString[2][i]))
+        
 
 def TestPowerSeries(mIR):
     H = mIR.mVCI.H.todense()
@@ -317,6 +323,7 @@ class LinearResponseIR:
 
         self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
         self.ITensors = []
+        self.XString = [[], [], []]
         for w in self.ws:
             self.ITensors.append(self.Intensity(w))
         self.Is = []
@@ -377,19 +384,21 @@ if __name__ == "__main__":
     mIR.kernel()
     mIR.PlotSpectrum("water_spectrum_lr.png", L = 100, XMin = 0, XMax = 5000)
 
-    
     mVHCI = VHCI(w, V, MaxQuanta = 10, MaxTotalQuanta = 1, eps1 = 100, eps2 = 0.001, eps3 = -1, NWalkers = 50, NSamples = 50, NStates = 1)
     mVHCI.kernel()
     #mVHCI.E, mVHCI.C = np.linalg.eigh(mVHCI.H.todense())
     #mVHCI.E_HCI = mVHCI.E
 
+    '''
     mIR2 = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 1, eta = 100, DipoleSurface = mIR.DipoleSurface, Order = 2, SpectralHBMethod = 1)
     mIR2.kernel()
     mIR2.PlotSpectrum("water_spectrum_lr.png")
-    
+    '''
+
     mIR2 = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 1, eta = 100, DipoleSurface = mIR.DipoleSurface, Order = 2)
     mIR2.kernel()
     mIR2.PlotSpectrum("water_spectrum_lr.png")
+    mIR2.SaveSpectrum("water_spectrum")
     #mIR.TestPowerSeries()
 
     '''
