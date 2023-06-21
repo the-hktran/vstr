@@ -155,7 +155,7 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         A, b = mIR.GetAb(w, xi = xi)
         b[xi] = b[xi].ravel()
         x = SolveAxb(A, b[xi])
-        NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x), eps = eps, InitState = InitState)
+        NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.real()), eps = eps, InitState = InitState)
         mIR.mVCI.Basis += NewBasis
 
     return NewBasis, NAdded1 + NAdded2
@@ -199,7 +199,7 @@ def Intensity(mIR, w):
         A, b = mIR.GetAb(w)
         x = SolveAxb(A, b[xi])
         x = np.asarray(x).ravel()
-        mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = 1e-4, C = np.reshape(abs(x) ,(x.shape[0], 1))))
+        mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = 1e-3, C = np.reshape(abs(x) ,(x.shape[0], 1))))
         for xj in range(3):
             b[xj] = np.asarray(b[xj]).ravel()
             I[xj, xi] = (1.j * np.dot(b[xj], x)).real / np.pi
@@ -276,6 +276,7 @@ class LinearResponseIR:
         self.E0 = mVCI.E.copy()
         self.Frequencies = mVCI.Frequencies
         self.eps1 = mVCI.eps1 / 100
+        self.eps2 = self.eps1 / 100
         self.NormalModes = NormalModes
         self.InitState = 0
         self.FreqRange = FreqRange
@@ -288,6 +289,8 @@ class LinearResponseIR:
         self.Normalize = False
 
         self.__dict__.update(kwargs)
+
+        assert(self.eps2 < self.eps1)
 
     def kernel(self):
         # Make dipole surface

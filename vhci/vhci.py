@@ -211,6 +211,16 @@ def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
         BasisWF.append(WF)
     return BasisWF
 
+def InitC(mVHCI):
+    from vscf.harmonic.harm_analysis import HarmonicEnergy
+    mVHCI.C = np.ones(len(mVHCI.Basis))
+    mVHCI.E = []
+    ZPE = 0.0
+    for w in mVHCI.Frequencies:
+        ZPE += 0.5 * w
+    for B in mVHCI.Basis:
+        mVHCI.E.append(HarmonicEnergy(mVHCI.Frequencies, B, ZPE = ZPE))
+
 def TranslateBasisToString(B):
     BString = ""
     for j, HO in enumerate(B.Modes):
@@ -287,6 +297,7 @@ class VHCI:
     ScreenBasis = ScreenBasis
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
+    InitC = InitC
     PrintResults = PrintResults
     LCLine = LCLine
     PrintParameters = PrintParameters

@@ -65,4 +65,5 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("AddStatesHBStoreCoupling", AddStatesHBStoreCoupling, "Add states based on HB but keeps coupling elements too");
     m.def("SpectralFrequencyPrune", SpectralFrequencyPrune, "Prunes basis based on how close w is to Hnn-E0");
     m.def("SpectralFrequencyPruneFromVSCF", SpectralFrequencyPruneFromVSCF, "Prunes basis based on how close w is to Hnn-E0 using VSCF modals");
+    m.def("DoSpectralPT2", DoSpectralPT2, "Runs spectral PT2 corrections");
 }

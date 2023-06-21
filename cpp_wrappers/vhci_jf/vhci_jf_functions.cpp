@@ -2620,6 +2620,85 @@ std::vector<WaveFunction> AddStatesHBFromVSCF(std::vector<WaveFunction> &BasisSe
     return NewBasis;
 }
 
+HashedStates AddStatesHBFromVSCF2Hashed(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<double> &WVec, std::vector<long unsigned int> &WSortedInd, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys, std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> &YSortedColInd, std::vector<std::vector<double>> &MaxY){ // Expand basis via Heat Bath algorithm
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
+    for( WaveFunction& wfn : BasisSet){
+        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    }
+
+    // Begin by sorting the columns of Y
+    unsigned int NModes = Ys.size();
+    unsigned int NPower = Ys[0].size();
+    unsigned int NModal = Ys[0][3].rows();
+
+    std::vector<double> CVec;
+    for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
+    std::vector<long unsigned int> CSortedInd = SortIndices(CVec);
+
+
+    for(int ii = WSortedInd.size() - 1; ii >= 0; ii--){ // Loop over sorted force constants
+        unsigned int i = WSortedInd[ii];
+        if (abs(WVec[i] * C[CSortedInd[CSortedInd.size() - 1]]) < eps) break; // means that the largest Cn doesn't meet the criteria so we are done
+        for (int nn = CSortedInd.size() - 1; nn >= 0; nn--)
+        {
+            unsigned int n = CSortedInd[nn];
+            double Cn = C[n];
+            if(abs(Cn * WVec[i]) >= eps) // States connected by fc will be added if |fc*Cn| >= eps
+            {
+                double Factor = 1.0;
+                std::vector<int> LQuanta = GetQuantaList(BasisSet[n]);
+                std::vector<int> KQuantaInd(AnharmHB[i].QUnique.size(), NModal - 1);
+                bool LoopK = true;
+                while (LoopK)
+                {
+                    std::vector<int> KQuanta = LQuanta;
+                    for (unsigned int q = 0; q < KQuantaInd.size(); q++)
+                    {
+                        KQuanta[AnharmHB[i].QUnique[q]] = YSortedColInd[AnharmHB[i].QUnique[q]][AnharmHB[i].QPowers[q]][LQuanta[AnharmHB[i].QUnique[q]]][KQuantaInd[q]];
+                    }
+                    double Factor = HBFactor(Ys, KQuanta, LQuanta, AnharmHB[i].QUnique, AnharmHB[i].QPowers);
+                    if (abs(Cn * AnharmHB[i].fc * Factor) >= eps)
+                    {
+                        WaveFunction tmp = BasisSet[n];
+                        for (unsigned int m = 0; m < KQuanta.size(); m++) tmp.Modes[m].Quanta = KQuanta[m];
+                        if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
+                        KQuantaInd[0] = KQuantaInd[0] - 1;
+                    }
+                    else // Need to increment something
+                    {
+                        for (unsigned int m = 1; m < KQuantaInd.size(); m++)
+                        {
+                            if ((KQuantaInd[m - 1] != (NModal - 1)))
+                            {
+                                KQuantaInd[m] = KQuantaInd[m] - 1;
+                                KQuantaInd[m - 1] = NModal - 1;
+                                continue;
+                            }
+                            if (m == KQuantaInd.size() - 1) LoopK = false;
+                        }
+                        if (KQuantaInd.size() == 1) LoopK = false;
+                    }
+
+                    for (unsigned int m = 0; m < KQuantaInd.size() - 1; m++)
+                    {
+                        if (KQuantaInd[m] == -1)
+                        {
+                            KQuantaInd[m] = NModal - 1;
+                            KQuantaInd[m + 1] = KQuantaInd[m + 1] - 1;
+                        }
+                    }
+                    if (KQuantaInd[KQuantaInd.size() - 1] == -1) LoopK = false;
+                }
+                        
+            }
+            else{break;}// break loop if you've reached element < eps, since all future elements will be smaller (HB sorting)
+        }
+    }
+    return HashedNewStates;
+}
+
+
 // Does all sorting beforehand
 std::vector<WaveFunction> AddStatesHBFromVSCF2(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<double> &WVec, std::vector<long unsigned int> &WSortedInd, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys, std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> &YSortedColInd, std::vector<std::vector<double>> &MaxY){ // Expand basis via Heat Bath algorithm
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
@@ -2701,6 +2780,101 @@ std::vector<WaveFunction> AddStatesHBFromVSCF2(std::vector<WaveFunction> &BasisS
     //return std::make_tuple(NewBasis, HighestQuanta);
     return NewBasis;
 }
+
+// For complex vectors. Real or imaginary 0 = norm, 1 = real, 2 = imag
+HashedStates AddStatesHBFromVSCF2HashedComplex(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<double> &WVec, std::vector<long unsigned int> &WSortedInd, Eigen::Ref<Eigen::VectorXcd> C, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys, std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> &YSortedColInd, std::vector<std::vector<double>> &MaxY, int RealOrImag = 0){ // Expand basis via Heat Bath algorithm
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
+    for( WaveFunction& wfn : BasisSet){
+        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    }
+
+    // Begin by sorting the columns of Y
+    unsigned int NModes = Ys.size();
+    unsigned int NPower = Ys[0].size();
+    unsigned int NModal = Ys[0][3].rows();
+
+    std::vector<double> CVec;
+    Eigen::VectorXd CTrans(C.rows());
+    switch (RealOrImag)
+    {
+        case 0:
+            CTrans = C.cwiseAbs();
+            break;
+        case 1:
+            CTrans = C.real();
+            break;
+        case 2:
+            CTrans = C.imag();
+            break;
+        default:
+            std::cout << "Invalid RealOrImag argument. Must be 0, 1, or 2." << std::endl;
+            exit(1);
+    }
+    for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
+    std::vector<long unsigned int> CSortedInd = SortIndices(CVec);
+
+    for(int ii = WSortedInd.size() - 1; ii >= 0; ii--){ // Loop over sorted force constants
+        unsigned int i = WSortedInd[ii];
+        if (abs(WVec[i] * C[CSortedInd[CSortedInd.size() - 1]]) < eps) break; // means that the largest Cn doesn't meet the criteria so we are done
+        for (int nn = CSortedInd.size() - 1; nn >= 0; nn--)
+        {
+            unsigned int n = CSortedInd[nn];
+            double Cn = CTrans[n];
+            if(abs(Cn * WVec[i]) >= eps) // States connected by fc will be added if |fc*Cn| >= eps
+            {
+                double Factor = 1.0;
+                std::vector<int> LQuanta = GetQuantaList(BasisSet[n]);
+                std::vector<int> KQuantaInd(AnharmHB[i].QUnique.size(), NModal - 1);
+                bool LoopK = true;
+                while (LoopK)
+                {
+                    std::vector<int> KQuanta = LQuanta;
+                    for (unsigned int q = 0; q < KQuantaInd.size(); q++)
+                    {
+                        KQuanta[AnharmHB[i].QUnique[q]] = YSortedColInd[AnharmHB[i].QUnique[q]][AnharmHB[i].QPowers[q]][LQuanta[AnharmHB[i].QUnique[q]]][KQuantaInd[q]];
+                    }
+                    double Factor = HBFactor(Ys, KQuanta, LQuanta, AnharmHB[i].QUnique, AnharmHB[i].QPowers);
+                    if (abs(Cn * AnharmHB[i].fc * Factor) >= eps)
+                    {
+                        WaveFunction tmp = BasisSet[n];
+                        for (unsigned int m = 0; m < KQuanta.size(); m++) tmp.Modes[m].Quanta = KQuanta[m];
+                        if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
+                        KQuantaInd[0] = KQuantaInd[0] - 1;
+                    }
+                    else // Need to increment something
+                    {
+                        for (unsigned int m = 1; m < KQuantaInd.size(); m++)
+                        {
+                            if ((KQuantaInd[m - 1] != (NModal - 1)))
+                            {
+                                KQuantaInd[m] = KQuantaInd[m] - 1;
+                                KQuantaInd[m - 1] = NModal - 1;
+                                continue;
+                            }
+                            if (m == KQuantaInd.size() - 1) LoopK = false;
+                        }
+                        if (KQuantaInd.size() == 1) LoopK = false;
+                    }
+
+                    for (unsigned int m = 0; m < KQuantaInd.size() - 1; m++)
+                    {
+                        if (KQuantaInd[m] == -1)
+                        {
+                            KQuantaInd[m] = NModal - 1;
+                            KQuantaInd[m + 1] = KQuantaInd[m + 1] - 1;
+                        }
+                    }
+                    if (KQuantaInd[KQuantaInd.size() - 1] == -1) LoopK = false;
+                }
+                        
+            }
+            else{break;}// break loop if you've reached element < eps, since all future elements will be smaller (HB sorting)
+        }
+    }
+    return HashedNewStates;
+}
+
 
 
 std::vector<WaveFunction> InternalAddStatesHBFromVSCF(std::vector<WaveFunction> &BasisSet, HashedStates &HashedNewStates, std::vector<FConst> &AnharmHB, std::vector<double> &WVec, std::vector<long unsigned int> &WSortedInd, int n, double Cn, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys, std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> &YSortedColInd, std::vector<std::vector<double>> &MaxY)
@@ -4190,4 +4364,184 @@ std::vector<WaveFunction> SpectralFrequencyPruneFromVSCF(double w, double E0, do
     }
 
     return NewBasis;
+}
+
+/* Runs spectral PT2 correction 
+ * Evecs is X(omega) and C is the wavefunction */
+std::complex<double> DoSpectralPT2(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& C, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<FConst> &Mu, std::vector<std::vector<Eigen::MatrixXd>> &Ys, double PT2_Eps, int NEig, double w, double eta)
+{
+    int N_opt;
+    if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
+        N_opt = BasisSet.size();
+    }else{ // If number of states exceeds the number selected to optimize
+        N_opt = NEig;
+    }
+
+    std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> YSortedColInd; // mode, power, column
+    std::vector<std::vector<double>> MaxY; // mode, power
+    for (unsigned int m = 0; m < Ys.size(); m++)
+    {
+        std::vector<std::vector<std::vector<long unsigned int>>> YSorted_m;
+        std::vector<double> YMax_m;
+        for (unsigned int p = 0; p < Ys[m].size(); p++)
+        {
+            YMax_m.push_back((Ys[m][p]).cwiseAbs().maxCoeff());
+            std::vector<std::vector<long unsigned int>> YSorted_mp;
+            for (unsigned int n = 0; n < Ys[m][p].cols(); n++)
+            {
+                std::vector<long unsigned int> YSorted_mpn = SortIndices((Ys[m][p].col(n)).cwiseAbs());
+                YSorted_mp.push_back(YSorted_mpn);
+            }
+            YSorted_m.push_back(YSorted_mp);
+        }
+        YSortedColInd.push_back(YSorted_m);
+        MaxY.push_back(YMax_m);
+    }
+
+    std::vector<double> WVec;
+    for (FConst &FC : AnharmHB)
+    {
+        double fc = FC.fc;
+        for (unsigned int q = 0; q < FC.QUnique.size(); q++)
+        {
+            fc *= MaxY[FC.QUnique[q]][FC.QPowers[q]];
+        }
+        WVec.push_back(abs(fc));
+    }
+
+    std::vector<double> MuVec;
+    for (FConst &FC : Mu)
+    {
+        double fc = FC.fc;
+        for (unsigned int q = 0; q < FC.QUnique.size(); q++)
+        {
+            fc *= MaxY[FC.QUnique[q]][FC.QPowers[q]];
+        }
+        MuVec.push_back(abs(fc));
+    }
+
+    /*
+    for (FConst &FC : AnharmHB)
+    {
+        double W = FC.fc;
+        for (int q : FC.QIndices) W *= sqrt(HighestQuanta[q] + 1);
+        WVec.push_back(abs(W));
+    }
+    //HeatBath_Sort_FC(AnharmHB);
+    */
+    std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
+    std::vector<long unsigned int> MuSortedInd = SortIndices(MuVec);
+
+    vector<std::complex<double>> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
+    int fcmax=0;
+    for (unsigned int k=0;k<AnharmFC.size();k++){ //Order of maximum anharmonic term
+        if(AnharmFC[k].fcpow.size()>fcmax){
+            fcmax = AnharmFC[k].fcpow.size();
+        }
+    }
+
+    for (unsigned int n = 0; n < N_opt; n++)
+    {
+        // Start with the zeroth order condition
+        HashedStates PTBasisSet1 = AddStatesHBFromVSCF2Hashed(BasisSet, Mu, MuVec, MuSortedInd, C.col(n), PT2_Eps, Ys, YSortedColInd, MaxY);
+        // Account for first order condition too
+        HashedStates PTBasisSet2 = AddStatesHBFromVSCF2HashedComplex(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, Ys, YSortedColInd, MaxY, 1);
+        // Put into hashed list to remove duplicates
+        for (auto &WF : PTBasisSet2) PTBasisSet1.insert(WF);
+        std::vector<WaveFunction> PTBasisSet;
+        for (auto &WF : PTBasisSet1) PTBasisSet.push_back(WF);
+
+        std::cout << " Perturbative space for state " << n << " contains " << PTBasisSet.size() << " basis states." << std::endl;
+
+        #pragma omp parallel for
+        for (unsigned int a = 0; a < PTBasisSet.size(); a++)
+        {
+            std::complex<double> HaiCi(0.0, 0.0);
+            vector<int> qdiffvec(BasisSet[0].M,0);
+            for (unsigned int i = 0; i < BasisSet.size(); i++)
+            {
+                double Hai = 0;
+                int mchange = 0; // number of modes with nonzero change in quanta
+                int qdiff = 0; // total number of quanta difference 
+                QDiffVec(PTBasisSet[a], BasisSet[i], qdiff, mchange, qdiffvec);
+                if(qdiff <= fcmax && mchange <= fcmax && qdiff%2==0)
+                { 
+                    // States cannot differ by more than fcmax quanta
+                    for (unsigned int k=0;k<QuarticFC.size();k++)
+                    {
+                        if ( ScreenState(qdiff,mchange,qdiffvec,QuarticFC[k]) ){
+                            //Screen force constants for connection                      
+                            //Add anharmonic matrix elements
+                            Hai += AnharmPot(PTBasisSet[a], BasisSet[i], QuarticFC[k]);
+                        }
+                    }
+                    for (unsigned int k=0;k<SexticFC.size();k++)
+                    {
+                        if ( ScreenState(qdiff,mchange,qdiffvec,SexticFC[k]) ){
+                            //Screen force constants for connection                      
+                            //Add anharmonic matrix elements
+                            Hai += AnharmPot(PTBasisSet[a], BasisSet[i], SexticFC[k]);
+                        }
+                    }
+                    HaiCi += Hai * Evecs(i, n); // C_i Hai for each eigenvalue of interest
+                }
+                if(qdiff <= fcmax-1 && mchange <= fcmax-1 && qdiff%2==1)
+                { 
+                    // fcmax-1 assumes 4th or 6th max order 
+                    // States cannot differ by more than fcmax quanta
+                    for (unsigned int k=0;k<CubicFC.size();k++)
+                    {
+                        if ( ScreenState(qdiff,mchange,qdiffvec,CubicFC[k]) ){
+                            //Screen force constants for connection                      
+                            //Add anharmonic matrix elements
+                            Hai += AnharmPot(PTBasisSet[a], BasisSet[i], CubicFC[k]);
+                        }
+                    }
+                    for (unsigned int k=0;k<QuinticFC.size();k++)
+                    {
+                        if ( ScreenState(qdiff,mchange,qdiffvec,QuinticFC[k]) ){
+                            //Screen force constants for connection                      
+                            //Add anharmonic matrix elements
+                            Hai += AnharmPot(PTBasisSet[a], BasisSet[i], QuinticFC[k]);
+                        }
+                    }
+                    HaiCi += Hai * Evecs(i, n); // C_i Hai for each eigenvalue of interest
+                }
+            }
+            double Ea = 0.; //Hii matrix element
+            for (unsigned int j = 0; j < PTBasisSet[a].M; j++)
+            {
+              //Calculate partial energies
+              double Ej = 0.5;
+              Ej += PTBasisSet[a].Modes[j].Quanta;
+              Ej *= PTBasisSet[a].Modes[j].Freq;
+              //Update matrix element
+              Ea += Ej;
+            }
+            vector<int> zerodiffvec(BasisSet[0].M,0);
+            int qdiff=0;
+            int mchange=0;
+            for (unsigned int k = 0; k < QuarticFC.size(); k++) // Only even-ordered fc can affect this
+            {
+                if (ScreenState(qdiff, mchange, zerodiffvec, QuarticFC[k]))
+                {
+                    // Screen force constants that cannot connect basis states a and a
+                    //Add anharmonic matrix elements
+                    Ea += AnharmPot(PTBasisSet[a], PTBasisSet[a], QuarticFC[k]);
+                }
+            }
+            for (unsigned int k = 0; k < SexticFC.size(); k++) // Only even-ordered fc can affect this
+            {    
+                if (ScreenState(qdiff, mchange, zerodiffvec, SexticFC[k]))
+                {
+                    // Screen force constants that cannot connect basis states a and a
+                    //Add anharmonic matrix elements
+                    Ea += AnharmPot(PTBasisSet[a], PTBasisSet[a], SexticFC[k]);
+                }
+            }
+            #pragma omp critical // Will cause floating point error if blindly done in parallel
+            DeltaE[n] += pow(std::norm(HaiCi), 2) / (w - (Evals(n) - Ea) + std::complex<double>(0, eta));
+        }
+    }
+    return DeltaE[0];    
 }
