@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, DoSpectralPT2
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
@@ -155,7 +155,7 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         A, b = mIR.GetAb(w, xi = xi)
         b[xi] = b[xi].ravel()
         x = SolveAxb(A, b[xi])
-        NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.real()), eps = eps, InitState = InitState)
+        NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.real), eps = eps, InitState = InitState)
         mIR.mVCI.Basis += NewBasis
 
     return NewBasis, NAdded1 + NAdded2
@@ -199,10 +199,16 @@ def Intensity(mIR, w):
         A, b = mIR.GetAb(w)
         x = SolveAxb(A, b[xi])
         x = np.asarray(x).ravel()
-        mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = 1e-3, C = np.reshape(abs(x) ,(x.shape[0], 1))))
+        mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = 1e-3, C = np.reshape(abs(x), (x.shape[0], 1))))
         for xj in range(3):
             b[xj] = np.asarray(b[xj]).ravel()
             I[xj, xi] = (1.j * np.dot(b[xj], x)).real / np.pi
+
+            # Include PT2 corrections
+            if mIR.DoPT2:
+                # Only do it for diagonal elements
+                if xj == xi:
+                    I[xj, xi] += DoSpectralPT2(x.reshape(x.shape[0], 1), mIR.mVCI.E, mIR.mVCI.C, mIR.mVCI.Basis, mIR.mVCI.PotentialListFull, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.DipoleSurfaceList[xi], mIR.mVCI.Ys, mIR.eps2, 1, w, mIR.eta).real / np.pi
         # Reset VCI object
         mIR.ResetVCI()
     return I
@@ -287,10 +293,9 @@ class LinearResponseIR:
             self.Order = len(DipoleSurface[0]) - 1
         self.DipoleSurface = DipoleSurface
         self.Normalize = False
+        self.DoPT2 = False
 
         self.__dict__.update(kwargs)
-
-        assert(self.eps2 < self.eps1)
 
     def kernel(self):
         # Make dipole surface
@@ -398,11 +403,16 @@ if __name__ == "__main__":
     mIR2.PlotSpectrum("water_spectrum_lr.png")
     '''
 
-    mIR2 = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 1, eta = 100, DipoleSurface = mIR.DipoleSurface, Order = 2)
+    #mIR2 = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 1, eta = 100, DipoleSurface = mIR.DipoleSurface, Order = 2)
+    #mIR2.kernel()
+    #mIR2.PlotSpectrum("water_spectrum_lr.png")
+    #mIR2.SaveSpectrum("water_spectrum")
+
+
+    mIR2 = LinearResponseIR(mf, mVHCI, FreqRange = [0, 5000], NPoints = 100, eps1 = 1, eps2 = 0.001, DoPT2 = True, eta = 100, DipoleSurface = mIR.DipoleSurface, Order = 2)
     mIR2.kernel()
     mIR2.PlotSpectrum("water_spectrum_lr.png")
     mIR2.SaveSpectrum("water_spectrum")
-    #mIR.TestPowerSeries()
 
     '''
     from vstr.ci.vci import VCI

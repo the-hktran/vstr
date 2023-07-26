@@ -1458,6 +1458,8 @@ std::tuple<std::vector<double>, std::vector<double>> DoSPT2(MatrixXd& Evecs, Vec
         std::vector<WaveFunction> DetPTBasisSet;
         if (SemiStochastic)
         {
+            std::vector<WaveFunction> tmpPTBasis = AddStatesHBFromVSCF2(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps2, Ys, YSortedColInd, MaxY);
+            std::cout << "Perturbative space for state " << n << " contains " << tmpPTBasis.size() << " total basis states." << std::endl;
             DetPTBasisSet = AddStatesHBFromVSCF2(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, Ys, YSortedColInd, MaxY);
             std::cout << "Perturbative space for state " << n << " contains " << DetPTBasisSet.size() << " deterministic basis states." << std::endl;
         }
@@ -4368,7 +4370,7 @@ std::vector<WaveFunction> SpectralFrequencyPruneFromVSCF(double w, double E0, do
 
 /* Runs spectral PT2 correction 
  * Evecs is X(omega) and C is the wavefunction */
-std::complex<double> DoSpectralPT2(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& C, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<FConst> &Mu, std::vector<std::vector<Eigen::MatrixXd>> &Ys, double PT2_Eps, int NEig, double w, double eta)
+complex<double> DoSpectralPT2(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& C, std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, std::vector<FConst> &AnharmFC, std::vector<FConst> &CubicFC, std::vector<FConst> &QuarticFC, std::vector<FConst> &QuinticFC, std::vector<FConst> &SexticFC, std::vector<FConst> &Mu, std::vector<std::vector<Eigen::MatrixXd>> &Ys, double PT2_Eps, int NEig, double w, double eta)
 {
     int N_opt;
     if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
@@ -4444,8 +4446,11 @@ std::complex<double> DoSpectralPT2(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& 
     {
         // Start with the zeroth order condition
         HashedStates PTBasisSet1 = AddStatesHBFromVSCF2Hashed(BasisSet, Mu, MuVec, MuSortedInd, C.col(n), PT2_Eps, Ys, YSortedColInd, MaxY);
+        std::vector<WaveFunction> PlusPTBasisSet;
+        for (auto &WF : BasisSet) PlusPTBasisSet.push_back(WF);
+        for (auto &WF : PTBasisSet1) PlusPTBasisSet.push_back(WF);
         // Account for first order condition too
-        HashedStates PTBasisSet2 = AddStatesHBFromVSCF2HashedComplex(BasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, Ys, YSortedColInd, MaxY, 1);
+        HashedStates PTBasisSet2 = AddStatesHBFromVSCF2HashedComplex(PlusPTBasisSet, AnharmHB, WVec, WSortedInd, Evecs.col(n), PT2_Eps, Ys, YSortedColInd, MaxY, 1);
         // Put into hashed list to remove duplicates
         for (auto &WF : PTBasisSet2) PTBasisSet1.insert(WF);
         std::vector<WaveFunction> PTBasisSet;
