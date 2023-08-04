@@ -284,6 +284,30 @@ def MakeInputFile(Vs, Freqs, InpFile):
                 Qs += str(j) + " "
             f.write(str(len(v[1])) + Qs + str(v[0]) + "\n")
 
+def PruneVs(Vs, type = ['positive']):
+    PrunedV = Vs.copy()
+    for t in type:
+        if t.upper() == 'SEMIDIAGONAL':
+            SQFF = []
+            for v in Vs[1]:
+                if v[1][0] == v[1][1] and v[1][2] == v[1][3]:
+                    SQFF.append(v)
+            PrunedV[1] = SQFF
+        if t.upper() == 'POSITIVE':
+            V4 = []
+            for v in Vs[1]:
+                if v[1][0] == v[1][1]:
+                    #iiii, iijj, iijk
+                    if (v[1][1] == v[1][2] and v[1][1] == v[1][3]) or v[1][2] == v[1][3] or (v[1][1] != v[1][2] and v[1][2] != v[1][3]):
+                        if v[0] > -20:
+                            V4.append(v)
+                    else:
+                        V4.append(v)
+                else:
+                    V4.append(v)
+            PrunedV[1] = V4
+    return PrunedV
+
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
 
