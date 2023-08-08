@@ -245,6 +245,71 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0, Qu
     
     return V
 
+def GetCHARMMFF(HessDir, H0, Freqs, dx, BaseName = 'mode', Order = 4, Semidiagonal = True, tol = 1.0):
+    '''
+    args
+        HessDir (string): Directory where the hessians are stored
+        BaseName (string): Name of hessian files following format BaseName+n.hess
+        Order (int): Order of expansion
+        Semidiagonal (bool): Keep only semidiagonal terms in even order expansions
+    '''
+    from vstr.utils.charmm_tools import ReadHessian
+    V = [] 
+    V3 = []
+    V4 = []
+    V5 = []
+    V6 = []
+
+    # read first line of file
+    with open(HessDir + '/' + BaseName + '.hess', 'r') as f:
+        NAtom = int(f.readline())
+    NCoord = 3 * NAtom - 6
+
+    if Order >= 3:
+        for i in range(NCoord):
+            Hpi = ReadHessian(HessDir + '/' + BaseName + '+' + str(i) + '.hess', NAtom)
+            Hmi = ReadHessian(HessDir + '/' + BaseName + '-' + str(i) + '.hess', NAtom)
+
+            dHdxi = (Hpi - Hmi) / (2 * dx)
+
+            for j in range(i, NCoord):
+                for k in range(j, NCoord):
+                    Hijk = ScaleFC(dHdxi[j, k], Freqs, [i, j, k])
+                    if abs(Hijk) > tol:
+                        V3.append((Hijk, [i, j, k]))
+
+            if Order >= 4:
+                # Can do iijk here as well
+                d2Hdxidxi = (Hpi + Hmi - 2 * H0) / (dx * dx)
+                for j in range(i, NCoord):
+                    for k in range(j, NCoord):
+                        Hiijk = ScaleFC(d2Hdxidxi[j, k], Freqs, [i, i, j, k])
+                        if abs(Hiijk) > tol:
+                            V4.append((Hiijk, [i, i, j, k]))
+        V.append(V3)
+        if Semidiagonal:
+            V.append(V4)
+
+    if Order >= 4 and not Semidiagonal:
+        for i in range(NCoord):
+            # iijk terms are handled in the cubic part
+            for j in range(i + 1, NCoord):
+                Hpipj = ReadHessian(HessDir + '/' + BaseName + '+' + str(i) + '+' + str(j) + '.hess', NAtom)
+                Hmimj = ReadHessian(HessDir + '/' + BaseName + '-' + str(i) + '-' + str(j) + '.hess', NAtom)
+                Hpimj = ReadHessian(HessDir + '/' + BaseName + '+' + str(i) + '-' + str(j) + '.hess', NAtom)
+                Hmipj = ReadHessian(HessDir + '/' + BaseName + '-' + str(i) + '+' + str(j) + '.hess', NAtom)
+                
+                Hij = (Hpipj + Hmimj - Hpimj - Hmipj) / (4 * dx * dx)
+                
+                for k in range(j, NCoord):
+                    for l in range(k, NCoord):
+                        Hijkl = ScaleFC(Hij[k, l], Freqs, [i, j, k, l])
+                        if abs(Hijkl) > tol:
+                            V4.append((Hijkl, [i, j, k, l]))
+        V.append(V4)
+
+    return V
+
 def MakeMatrix(VList, N):
     V3 = np.zeros((N, N, N))
     for v in VList[0]:
@@ -284,8 +349,17 @@ def MakeInputFile(Vs, Freqs, InpFile):
                 Qs += str(j) + " "
             f.write(str(len(v[1])) + Qs + str(v[0]) + "\n")
 
-def PruneVs(Vs, type = ['positive']):
+def PruneVs(Vs, Max = None, type = []):
     PrunedV = Vs.copy()
+    if Max is not None:
+        PrunedV = []
+        for V in Vs:
+            Vi = []
+            for v in V:
+                if abs(v[0]) < Max:
+                    Vi.append(v)
+            PrunedV.append(Vi)
+
     for t in type:
         if t.upper() == 'SEMIDIAGONAL':
             SQFF = []

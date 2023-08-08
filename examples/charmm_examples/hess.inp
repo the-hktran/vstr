@@ -1,0 +1,37 @@
+* normal modes
+* (C) Arjan van der Vaart
+*
+
+SET TOPPAR toppar
+SET CRDFILE crdfile
+SET PSFFILE psffile
+
+! extended atom model
+open read card unit 1 name @TOPPAR/toph19.inp
+read rtf card unit 1
+close unit 1
+
+open read card unit 1 name @TOPPAR/param19.inp
+read param card unit 1
+close unit 1
+
+  open unit 1 read card name @PSFFILE.psf
+  read psf card unit 1
+  close unit 1
+
+  open unit 1 read card name @CRDFILE.crd
+  read coor card unit 1
+  close unit 1
+
+ 
+  NBONDS  ATOM  SHIFT RDIE  VDW VSHIFT  -
+          CUTNB 13.0  CTOFNB 12.0 CTONNB 8.0  WMIN 1.5  EPS 1.0 INBFRQ -1
+
+  calc natom3 ?NATOM * 3
+
+  vibran nmode @natom3
+  diag
+
+  open unit 100 write card name @CRDFILE.hess
+  write second card unit 100
+  stop

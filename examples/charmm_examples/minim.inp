@@ -1,0 +1,122 @@
+! Adapted from http://www.rc.usf.edu/~avandervaart/charmm_workshop/charmmworkshop-1.0.pdf
+
+SET TOPPAR $$TOPPAR_PATH
+SET PDBFILE $$PDB_FILE
+
+! extended atom model
+open read card unit 1 name @TOPPAR/toph19.inp
+read rtf card unit 1
+close unit 1
+
+open read card unit 1 name @TOPPAR/param19.inp
+read param card unit 1
+close unit 1
+
+open unit 1 read card name @PDBFILE.pdb
+read sequ pdb unit 1      ! get the sequence from the pdb file
+close unit 1
+
+generate bpti setup
+
+open unit 1 read card name @PDBFILE.pdb
+read coor pdb unit 1
+close unit 1
+
+print coor select  ( prop x .ge. 9999 ) -
+             .and. ( prop y .ge. 9999 ) -
+             .and. ( prop z .ge. 9999 ) end
+
+ic param
+ic build
+
+hbuild select type h* end
+hbuild select type h* end
+
+print coor select  ( prop x .ge. 9999 ) -
+             .and. ( prop y .ge. 9999 ) -
+             .and. ( prop z .ge. 9999 ) end
+
+  NBONDS  ATOM  SHIFT RDIE  VDW VSHIFT  -
+          CUTNB 13.0  CTOFNB 12.0 CTONNB 8.0  WMIN 1.5  EPS 1.0 INBFRQ -1
+  
+  
+  set sms1 1000
+  set sgt1 0.01
+  set ams1 10000
+  set agt1 0.000001
+  
+  ! Use exponentially decreasing force constants
+  ! Initial exponent
+  set q1 6
+  ! The final exponent of the force
+  set q2 -6
+  ! The step in the exponent change
+  set w -0.5
+  
+  ! A minimization touch without restraints to a lower tolerance
+  mini sd   nstep @sms1 tolgrd @sgt1 step 0.0001 nprint 20
+  mini abnr nstep @ams1 tolgrd @agt1 step 0.0001 nprint 20
+  ! And finally, a minimization with respect to the gradient
+  mini abnr gradient nstep @ams1 tolgrd @agt1 step 0.0001 nprint 20
+  
+  ! Check the energy
+  energy
+  set en ?ENER
+  ! Check the rmsd with the comparison set
+  coor orient rms comp
+  set r ?RMS
+  coor orient rms comp select type ca .or. type n .or. type c end
+  set rbb ?RMS 
+  
+  ! Save the final structure
+  open writ unit 1 card name @PDBFILE.crd
+  writ coor card unit 1
+  * Energy @en , RMSD @r , RMSD-BB @rbb
+  * PARAMETERS: SD TOLGRD @sgt1 ABNR TOLGRD @agt1
+  * 
+  close unit 1
+  
+  ! Save the pdf
+  open unit 1 write card name @PDBFILE.psf
+  write psf card unit 1
+  close unit 1
+
+  stop
+
+  ! read in psf and minimized coordinates
+  open unit 1 read card name @PDBFILE.psf
+  read psf card unit 1
+  close unit 1
+
+  open unit 1 read card name @PDBFILE.crd
+  read coor card unit 1
+  close unit 1
+
+  NBONDS  ATOM  SHIFT RDIE  VDW VSHIFT  -
+          CUTNB 13.0  CTOFNB 12.0 CTONNB 8.0  WMIN 1.5  EPS 1.0 INBFRQ -1
+
+  ! do the vibrational analysis (normal mode analysis)
+  
+  ! we have a total of NATOM * 3 modes; for large system
+  ! we can restrict the number of modes we want to calculate
+  ! (this is generally cheaper)
+  calc natom3 ?NATOM * 3
+
+  ! the vibran module calculates the normal modes
+  vibran nmode @natom3
+  
+  ! diagonalize the hessian
+  diag
+  
+  ! print the normal modes
+  ! print norm
+
+  print norm finit vector dotproducts dipoles
+
+  !write second raise mass unit 1
+  !open unit 1 write card name hessian.out
+  !write psf card unit 1
+  !close unit 1
+
+open unit 100 write card name hess.out
+write second card unit 100
