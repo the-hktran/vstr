@@ -245,7 +245,7 @@ def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0, Qu
     
     return V
 
-def GetCHARMMFF(HessDir, H0, Freqs, dx, BaseName = 'mode', Order = 4, Semidiagonal = True, tol = 1.0):
+def GetCHARMMFF(HessDir, H0, Freqs, dx, BaseName = 'mode', Order = 4, Semidiagonal = True, tol = 1.0, Modes = None):
     '''
     args
         HessDir (string): Directory where the hessians are stored
@@ -263,18 +263,22 @@ def GetCHARMMFF(HessDir, H0, Freqs, dx, BaseName = 'mode', Order = 4, Semidiagon
     # read first line of file
     with open(HessDir + '/' + BaseName + '.hess', 'r') as f:
         NAtom = int(f.readline())
-    NCoord = 3 * NAtom - 6
+    if Modes is None:
+        NCoord = 3 * NAtom - 6
+        Modes = np.linspace(0, NCoord - 1, NCoord, dtype = int)
+    else:
+        NCoord = Modes.shape[0]
 
     if Order >= 3:
         for i in range(NCoord):
-            Hpi = ReadHessian(HessDir + '/' + BaseName + '+' + str(i) + '.hess', NAtom)
-            Hmi = ReadHessian(HessDir + '/' + BaseName + '-' + str(i) + '.hess', NAtom)
+            Hpi = ReadHessian(HessDir + '/' + BaseName + '+' + str(Modes[i]) + '.hess', NAtom)
+            Hmi = ReadHessian(HessDir + '/' + BaseName + '-' + str(Modes[i]) + '.hess', NAtom)
 
             dHdxi = (Hpi - Hmi) / (2 * dx)
 
             for j in range(i, NCoord):
                 for k in range(j, NCoord):
-                    Hijk = ScaleFC(dHdxi[j, k], Freqs, [i, j, k])
+                    Hijk = ScaleFC(dHdxi[Modes[j], Modes[k]], Freqs, [i, j, k])
                     if abs(Hijk) > tol:
                         V3.append((Hijk, [i, j, k]))
 
@@ -283,7 +287,7 @@ def GetCHARMMFF(HessDir, H0, Freqs, dx, BaseName = 'mode', Order = 4, Semidiagon
                 d2Hdxidxi = (Hpi + Hmi - 2 * H0) / (dx * dx)
                 for j in range(i, NCoord):
                     for k in range(j, NCoord):
-                        Hiijk = ScaleFC(d2Hdxidxi[j, k], Freqs, [i, i, j, k])
+                        Hiijk = ScaleFC(d2Hdxidxi[Modes[j], Modes[k]], Freqs, [i, i, j, k])
                         if abs(Hiijk) > tol:
                             V4.append((Hiijk, [i, i, j, k]))
         V.append(V3)
@@ -363,13 +367,13 @@ def PruneVs(Vs, Max = None, type = []):
     for t in type:
         if t.upper() == 'SEMIDIAGONAL':
             SQFF = []
-            for v in Vs[1]:
+            for v in PrunedV[1]:
                 if v[1][0] == v[1][1] and v[1][2] == v[1][3]:
                     SQFF.append(v)
             PrunedV[1] = SQFF
         if t.upper() == 'POSITIVE':
             V4 = []
-            for v in Vs[1]:
+            for v in PrunedV[1]:
                 if v[1][0] == v[1][1]:
                     #iiii, iijj, iijk
                     if (v[1][1] == v[1][2] and v[1][1] == v[1][3]) or v[1][2] == v[1][3] or (v[1][1] != v[1][2] and v[1][2] != v[1][3]):

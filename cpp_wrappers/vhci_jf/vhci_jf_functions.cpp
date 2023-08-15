@@ -4550,3 +4550,97 @@ complex<double> DoSpectralPT2(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& C, st
     }
     return DeltaE[0];    
 }
+
+/*************************************************************************************
+************************************ NMode Functions *********************************
+*************************************************************************************/
+SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, bool DiagonalBlock)
+{
+    SpMat H(BasisSet1.size(), BasisSet2.size());
+    std::vector<Trip> HTrip;
+
+    std::vector<int> MaxQuanta;
+
+    int MaxNMode = 3;
+    if (ThreeModePotential.size() == 0) MaxNMode = 2;
+    if (TwoModePotential.size() == 0) MaxNMode = 1;
+
+    #pragma omp parallel for
+    for (unsigned int i = 0; i < BasisSet1.size(); i++)
+    {
+        std::vector<int> ModeOccI;
+        for (unsigned int m = 0; m < BasisSet1[i].Modes.size(); m++) ModeOccI.push_back(BasisSet1[i].Modes[m].Quanta);
+        unsigned int jstart;
+        if (DiagonalBlock) jstart = i;
+        else jstart = 0;
+        for (unsigned int j = jstart; j < BasisSet2.size(); j++) // starts with j=i to exploit Hermiticity (Hij = Hji)
+        {
+            double Vij = 0;
+            std::vector<int> ModeOccJ;
+            for (unsigned int m = 0; m < BasisSet2[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet2[j].Modes[m].Quanta);
+            std::vector<int> DiffModes = CalcDiffModes(BasisSet1[i], BasisSet2[j]);
+
+            // Kinetic Energy Part
+            if (DiffMode.size() == 0)
+            {
+                for (unsigned int m = 0; m < Frequencies.size(); m++) Vij += Frequencies[m] / 2 * (ModeOccI[m] + 0.5);
+            }
+            else if (DiffModes.size() == 1)
+            {
+                if (ModeOccI[DiffModes[0]] - ModeOccJ[DiffModes[0]] == 2) Vij += -1 * Frequencies[DiffModes[0]] / 4 * sqrt(ModeOccI[DiffModes[0]] * (ModeOccI[DiffModes[0]] - 1));
+                else if (ModeOccI[DiffModes[0]] - ModeOccJ[DiffModes[0]] == -2) Vij += -1 * Frequencies[DiffModes[0]] / 4 * sqrt(ModeOccJ[DiffModes[0]] * (ModeOccJ[DiffModes[0]] - 1));
+            }
+
+            // Potential Energy Part
+            if (DiffModes.size() > MaxNMode) 
+            {
+                /*#pragma omp critical
+                if (abs(Vij) > 1e-12) 
+                {
+                    if (DiagonalBlock)
+                    {
+                        if (i == j) HTrip.push_back(Trip(i, j, Vij / 2));
+                        else HTrip.push_back(Trip(i, j, Vij));
+                    }
+                }*/
+                continue;
+            }
+            std::vector<unsigned int> SortedDiffModes = SortIndices(DiffModes);
+
+            else if (DiffMode.size() == 1) Vij += OneModePotential[DiffModes[SortedDiffModes[0]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]];
+            else if (DiffMode.size() == 2) Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
+            else if (DiffMode.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
+           
+            #pragma omp critical
+            if (abs(Vij) > 1e-12)
+            {
+                if (DiagonalBlock)
+                {
+                    if (i == j) HTrip.push_back(Trip(i, j, Vij / 2.0));
+                    else HTrip.push_back(Trip(i, j, Vij));
+                }
+                else
+                {
+                    HTrip.push_back(Trip(i, j, Vij));
+                }
+            }
+        }
+    }
+    
+    H.setFromTriplets(HTrip.begin(), HTrip.end());
+    H.makeCompressed();
+    HTrip = std::vector<Trip>(); // Free memory
+    if (DiagonalBlock)
+    {
+        SpMat HT = H.transpose();
+        HT.makeCompressed();
+        H += HT; // Complete symmetric matrix
+        HT = SpMat(1,1); // Free memory
+        H.makeCompressed();
+    }
+    cout << "The Hamiltonian is " << fixed << setprecision(2) << 
+        100*(1.-(double)H.nonZeros()/(double)H.size()) << "% sparse." << endl;
+    return H;
+};
+
+

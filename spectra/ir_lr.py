@@ -144,12 +144,15 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
 
     elif mIR.SpectralHBMethod == 2: # means perturbing x
         # HB using dipole operator first
+        '''
         mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(Ws = mIR.DipoleSurfaceList[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
         mIR.mVCI.Basis += mIR.mVCI.NewBasis
         mIR.mVCI.SparseDiagonalize()
         mIR.mVCI.NewBasis = None
         del mIR.mVCI.NewBasis
-        
+        '''
+        NAdded1 = 0
+
         # HB using H and x
         mIR.GetTransitionDipoleMatrix(xi = xi)
         A, b = mIR.GetAb(w, xi = xi)

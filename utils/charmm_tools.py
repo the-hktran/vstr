@@ -161,7 +161,42 @@ def GenerateCharmmCRDs(OptimizedCRD, HessianOutput, CRDDirectory, dx = 1e-1, Ord
                 NewCRDFile = 'Mode-{}+{}.crd'.format(i, j)
                 WriteNewCRD(OptimizedCRD, CRDDirectory + '/' + NewCRDFile, NAtom, NewCoord)
     '''
+def GenerateDipoleFile(OutputName, DipoleFile, Freq):
+    '''
+    DipoleFile generated using
+        grep "DIPOLE DERIVATIVE" <charmm_output> > <DipoleFile>
+    '''
+    from vstr.spectra.dipole import ScaleDipole
+    from vstr.ff.force_field import MakeInputFile
+    DipoleX = []
+    DipoleY = []
+    DipoleZ = []
+    DipoleX.append([(1.0, [])])
+    DipoleY.append([(1.0, [])])
+    DipoleZ.append([(1.0, [])])
 
+    mux = []
+    muy = []
+    muz = []
+    n = 0
+    with open(DipoleFile, 'r') as f:
+        for i in range(6):
+            f.readline()
+        for line in f:
+            mx = ScaleDipole(float(line.split()[2]), Freq, [n])
+            my = ScaleDipole(float(line.split()[3]), Freq, [n])
+            mz = ScaleDipole(float(line.split()[4]), Freq, [n])
+            mux.append((mx, [n]))
+            muy.append((my, [n]))
+            muz.append((mz, [n]))
+    DipoleX.append(mux)
+    DipoleY.append(muy)
+    DipoleZ.append(muz)
+    
+    MakeInputFile(DipoleX, Freq, OutputName + '.xdip')
+    MakeInputFile(DipoleY, Freq, OutputName + '.ydip')
+    MakeInputFile(DipoleZ, Freq, OutputName + '.zdip')
+    
 
 if __name__ == '__main__':
     '''
