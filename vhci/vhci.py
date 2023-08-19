@@ -431,7 +431,14 @@ class VHCI:
             return self._HighestQuanta
         return self._HighestQuanta
             
+class NModeVHCI(VHCI):
+    
+    def __init__(self, mol, [[]], MaxQuanta = 2, MaxTotalQuanta = 2, NStates = 10, **kwargs):
+        VHCI.__init__(self, mol.Frequencies, None, MaxQuanta = MaxQuanta, MaxTotalQuanta = MaxTotalQuanta, NStates = NStates, kwargs)
+        self.mol = mol
 
+        self.__dict__.update(kwargs)
+        
 if __name__ == "__main__":
     '''
     V2 = np.asarray([[0, 1], [1, 0]])

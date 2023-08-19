@@ -2,6 +2,7 @@
 #include <pybind11/eigen.h>
 //#include <pybind11/spectra.h>
 #include <pybind11/stl.h>
+#include <pybind11/operators.h>
 #include "VCI_headers.h"
 #include <vector>
 
@@ -22,7 +23,9 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     pybind11::class_<WaveFunction>(m, "WaveFunction")
         .def(pybind11::init<std::vector<int>, std::vector<double>>())
         .def_readwrite("M", &WaveFunction::M)
-        .def_readwrite("Modes", &WaveFunction::Modes);
+        .def_readwrite("Modes", &WaveFunction::Modes)
+        .def(pybind11::self == pybind11::self)
+        .def(pybind11::self != pybind11::self);
     pybind11::class_<ptr_wrapper<double>>(m, "ptr_double");
 
     //m.def("DenseDiagonalizeCPP", DenseDiagonalizeCPP, "Forms and diagonalizes dense vibrational Hamiltonian");

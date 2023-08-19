@@ -4581,7 +4581,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             std::vector<int> DiffModes = CalcDiffModes(BasisSet1[i], BasisSet2[j]);
 
             // Kinetic Energy Part
-            if (DiffMode.size() == 0)
+            if (DiffModes.size() == 0)
             {
                 for (unsigned int m = 0; m < Frequencies.size(); m++) Vij += Frequencies[m] / 2 * (ModeOccI[m] + 0.5);
             }
@@ -4605,11 +4605,11 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                 }*/
                 continue;
             }
-            std::vector<unsigned int> SortedDiffModes = SortIndices(DiffModes);
+            std::vector<long unsigned int> SortedDiffModes = SortIndices(DiffModes);
 
-            else if (DiffMode.size() == 1) Vij += OneModePotential[DiffModes[SortedDiffModes[0]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]];
-            else if (DiffMode.size() == 2) Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
-            else if (DiffMode.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
+            if (DiffModes.size() == 1) Vij += OneModePotential[DiffModes[SortedDiffModes[0]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]];
+            else if (DiffModes.size() == 2) Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
+            else if (DiffModes.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
            
             #pragma omp critical
             if (abs(Vij) > 1e-12)
