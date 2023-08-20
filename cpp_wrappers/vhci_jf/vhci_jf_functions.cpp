@@ -4562,8 +4562,8 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
     std::vector<int> MaxQuanta;
 
     int MaxNMode = 3;
-    if (ThreeModePotential.size() == 0) MaxNMode = 2;
-    if (TwoModePotential.size() == 0) MaxNMode = 1;
+    if (ThreeModePotential.size() == 1 and ThreeModePotential[0].size() == 1) MaxNMode = 2;
+    if (TwoModePotential.size() == 1 and TwoModePotential[0].size() == 1) MaxNMode = 1;
 
     #pragma omp parallel for
     for (unsigned int i = 0; i < BasisSet1.size(); i++)
@@ -4579,6 +4579,8 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             std::vector<int> ModeOccJ;
             for (unsigned int m = 0; m < BasisSet2[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet2[j].Modes[m].Quanta);
             std::vector<int> DiffModes = CalcDiffModes(BasisSet1[i], BasisSet2[j]);
+            for (unsigned int m = 0; m < DiffModes.size(); m++) std::cout << DiffModes[m] << " ";
+            std::cout << std::endl;
 
             // Kinetic Energy Part
             if (DiffModes.size() == 0)

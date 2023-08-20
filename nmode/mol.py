@@ -1,7 +1,7 @@
 import numpy as np
 import scipy
 import numdifftools as nd
-from vstr.utils import init_funcs
+from vstr.utils import init_funcs, constants
 
 A2B = 1.88973
 AU2CM = 219474.63
@@ -17,16 +17,22 @@ class Molecule():
 
         self.potential_cart = potential_cart
         self.natoms = natoms
+        self.Nm = 3 * natoms - 6
         self.mass = mass
 
         self.Order = 2
 
-        self.MaxQuanta = 10
-        self.TotalQuanta = 10
+        self.FullMaxQuanta = 10
+        self.FullTotalQuanta = 5
         self.InitMaxQuanta = 10
         self.InitTotalQuanta = 2
 
         self.__dict__.update(kwargs)
+
+        if (isinstance(self.FullMaxQuanta, (int, np.int))):
+            self.FullMaxQuanta = [self.FullMaxQuanta] * self.Nm
+        if (isinstance(self.InitMaxQuanta, (int, np.int))):
+            self.InitMaxQuanta = [self.InitMaxQuanta] * self.Nm
 
     def _potential(self, x):
         """
@@ -37,20 +43,34 @@ class Molecule():
     def CalcNM(self):
         self.nm = NormalModes(self)
         self.nm.kernel()
+        self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
 
     def CalcNModePotential(self, Order = None):
         if Order is None:
             Order = self.Order
         self.nmode = NModePotential(self.nm)
-        self.ints = []
+        self.ints = [np.asarray([]), np.asarray([]), np.asarray([[[[[[[[[]]]]]]]]])]
         for i in range(Order):
-            self.ints.append(self.nmode.get_ints(i+1))
+            self.ints[i] = self.nmode.get_ints(i+1)
 
-    def DefineBasis(self, MaxQuanta = None, TotalQuanta = None):
-        # FullBasis
+    def InitializeBasis(self):
+        self.FullBasis = init_funcs.InitTruncatedBasis(self.Nm, self.Frequencies, self.FullMaxQuanta, self.FullTotalQuanta)
+        self.Basis = init_funcs.InitTruncatedBasis(self.Nm, self.Frequencies, self.InitMaxQuanta, self.InitTotalQuanta)
 
-    def kernel():
+    def ReorganizeBasis(self):
+        IndexBasis = []
+        for B in self.Basis:
+            IndexBasis.append(self.FullBasis.index(B))
+        IndexOther = [i for i in range(len(self.FullBasis)) if i not in IndexBasis]
+        FullBasis = [self.FullBasis[i] for i in IndexBasis] + [self.FullBasis[i] for i in IndexOther]
+        self.FullBasis = FullBasis
+        return FullBasis, IndexBasis, IndexOther
+
+    def kernel(self):
         self.CalcNM()
+        self.InitializeBasis()
+        self.ReorganizeBasis()
+        # The NMode potential is done in HO basis, doesn't see product basis
         self.CalcNModePotential()
 
 
@@ -249,16 +269,20 @@ class NModePotential():
         if nmode == 1:
             ints = np.empty(nmodes, dtype=object)
             for i in range(nmodes):
-                vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                vgrid_diag = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                vgrid = np.zeros((ngridpts[i],ngridpts[i]))
+                np.fill_diagonal(vgrid, vgrid_diag)
                 vi = np.dot(coeff[i], np.dot(vgrid, coeff[i].T))
-                ints[i] = vi
+                ints[i] = vi# * constants.AU_TO_INVCM
         elif nmode == 2:
             ints = np.empty((nmodes,nmodes), dtype=object)
             for i in range(nmodes):
                 for j in range(nmodes):
-                    vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qi in gridpts[i]] for qj in gridpts[j]]) # this should be vectorized
+                    vgrid_diag = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qi in gridpts[i]] for qj in gridpts[j]]) # this should be vectorized
+                    vgrid = np.zeros((ngridpts[i],ngridpts[j]))
+                    np.fill_diagonal(vgrid, vgrid_diag)
                     vij = np.einsum('gp,hq,gh,gr,hs->pqrs', coeff[i], coeff[j], vgrid, coeff[i], coeff[j])
-                    ints[i,j] = vij
+                    ints[i,j] = vij# * constants.AU_TO_INVCM
 
         return ints
 
