@@ -4591,40 +4591,32 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                 for (unsigned int m = 0; m < Frequencies.size(); m++) Vij += Frequencies[m] / 2 * (ModeOccI[m] + 0.5);
                 std::cout << Vij << std::endl;
             }
-            else
+            else if (DiffModes.size() == 1)
             {
-                bool NonZeroT = true;
-                for (unsigned int k = 0; k < DiffModes.size(); k++)
+                if (abs(ModeOccI[DiffModes[0]] - ModeOccJ[DiffModes[0]]) == 2)
                 {
-                    if (abs(ModeOccI[DiffModes[k]] - ModeOccJ[DiffModes[k]]) != 2)
-                    {
-                        NonZeroT = false;
-                        break;
-                    }
-                }
-                if (NonZeroT)
-                {
-                    for (unsigned int k = 0; k < DiffModes.size(); k++)
-                    {
-                        if (ModeOccI[DiffModes[k]] - ModeOccJ[DiffModes[k]] == 2) Vij += -1 * Frequencies[DiffModes[k]] / 4 * sqrt(ModeOccI[DiffModes[k]] * (ModeOccI[DiffModes[k]] - 1));
-                        else if (ModeOccI[DiffModes[k]] - ModeOccJ[DiffModes[k]] == -2) Vij += -1 * Frequencies[DiffModes[k]] / 4 * sqrt(ModeOccJ[DiffModes[k]] * (ModeOccJ[DiffModes[k]] - 1));
-                        if (i == 7 && j == 9) std::cout << "Vij = " << Vij << std::endl;
-                    }
+                    int N = std::max(ModeOccI[DiffModes[0]], ModeOccJ[DiffModes[0]]);
+                    Vij += -1 * Frequencies[DiffModes[0]] / 4 * sqrt(N * (N - 1));
                 }
             }
 
             // Potential Energy Part
             if (DiffModes.size() > MaxNMode) 
             {
-                /*#pragma omp critical
-                if (abs(Vij) > 1e-12) 
+                #pragma omp critical
+                if (abs(Vij) > 1e-12)
                 {
                     if (DiagonalBlock)
                     {
+                        //if (i == j) HTrip.push_back(Trip(i, j, Vij));
                         if (i == j) HTrip.push_back(Trip(i, j, Vij / 2));
                         else HTrip.push_back(Trip(i, j, Vij));
                     }
-                }*/
+                    else
+                    {
+                        HTrip.push_back(Trip(i, j, Vij));
+                    }
+                }
                 continue;
             }
             std::vector<long unsigned int> SortedDiffModes = SortIndices(DiffModes);
