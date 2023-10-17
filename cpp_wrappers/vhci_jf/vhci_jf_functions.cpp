@@ -4565,7 +4565,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
     if (ThreeModePotential.size() == 1 and ThreeModePotential[0].size() == 1) MaxNMode = 2;
     if (TwoModePotential.size() == 1 and TwoModePotential[0].size() == 1) MaxNMode = 1;
 
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for (unsigned int i = 0; i < BasisSet1.size(); i++)
     {
         std::vector<int> ModeOccI;
@@ -4579,18 +4579,38 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             std::vector<int> ModeOccJ;
             for (unsigned int m = 0; m < BasisSet2[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet2[j].Modes[m].Quanta);
             std::vector<int> DiffModes = CalcDiffModes(BasisSet1[i], BasisSet2[j]);
-            for (unsigned int m = 0; m < DiffModes.size(); m++) std::cout << DiffModes[m] << " ";
+            std::cout << "Calculating matrix element for" << std::endl;
+            for (unsigned int m = 0; m < ModeOccI.size(); m++) std::cout << ModeOccI[m] << " ";
+            std::cout << std::endl;
+            for (unsigned int m = 0; m < ModeOccJ.size(); m++) std::cout << ModeOccJ[m] << " ";
             std::cout << std::endl;
 
             // Kinetic Energy Part
             if (DiffModes.size() == 0)
             {
                 for (unsigned int m = 0; m < Frequencies.size(); m++) Vij += Frequencies[m] / 2 * (ModeOccI[m] + 0.5);
+                std::cout << Vij << std::endl;
             }
-            else if (DiffModes.size() == 1)
+            else
             {
-                if (ModeOccI[DiffModes[0]] - ModeOccJ[DiffModes[0]] == 2) Vij += -1 * Frequencies[DiffModes[0]] / 4 * sqrt(ModeOccI[DiffModes[0]] * (ModeOccI[DiffModes[0]] - 1));
-                else if (ModeOccI[DiffModes[0]] - ModeOccJ[DiffModes[0]] == -2) Vij += -1 * Frequencies[DiffModes[0]] / 4 * sqrt(ModeOccJ[DiffModes[0]] * (ModeOccJ[DiffModes[0]] - 1));
+                bool NonZeroT = true;
+                for (unsigned int k = 0; k < DiffModes.size(); k++)
+                {
+                    if (abs(ModeOccI[DiffModes[k]] - ModeOccJ[DiffModes[k]]) != 2)
+                    {
+                        NonZeroT = false;
+                        break;
+                    }
+                }
+                if (NonZeroT)
+                {
+                    for (unsigned int k = 0; k < DiffModes.size(); k++)
+                    {
+                        if (ModeOccI[DiffModes[k]] - ModeOccJ[DiffModes[k]] == 2) Vij += -1 * Frequencies[DiffModes[k]] / 4 * sqrt(ModeOccI[DiffModes[k]] * (ModeOccI[DiffModes[k]] - 1));
+                        else if (ModeOccI[DiffModes[k]] - ModeOccJ[DiffModes[k]] == -2) Vij += -1 * Frequencies[DiffModes[k]] / 4 * sqrt(ModeOccJ[DiffModes[k]] * (ModeOccJ[DiffModes[k]] - 1));
+                        if (i == 7 && j == 9) std::cout << "Vij = " << Vij << std::endl;
+                    }
+                }
             }
 
             // Potential Energy Part
@@ -4609,16 +4629,83 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             }
             std::vector<long unsigned int> SortedDiffModes = SortIndices(DiffModes);
 
-            if (DiffModes.size() == 1) Vij += OneModePotential[DiffModes[SortedDiffModes[0]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]];
-            else if (DiffModes.size() == 2) Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
-            else if (DiffModes.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
+            if (DiffModes.size() == 0)
+            {
+                if (MaxNMode >= 1)
+                {
+                    for (unsigned int m = 0; m < Frequencies.size(); m++)
+                    {
+                        Vij += OneModePotential[m][ModeOccI[m]][ModeOccJ[m]];
+                        std::cout << "one mode " << OneModePotential[m][ModeOccI[m]][ModeOccJ[m]] << std::endl;
+                    }
+                }
+                if (MaxNMode >= 2)
+                {
+                    for (unsigned int m = 0; m < Frequencies.size(); m++)
+                    {
+                        for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+                        {
+                            Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
+                            std::cout << "two mode " <<  m << " " << n << " " << TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
+                            std::cout << "two mode " <<  m << " " << n << " " << TwoModePotential[n][m][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
+                        }
+                    }
+                }
+                if (MaxNMode >= 3)
+                {
+                    for (unsigned int m = 0; m < Frequencies.size(); m++)
+                    {
+                        for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+                        {
+                            for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+                            {
+                                Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                            }
+                        }
+                    }
+                }
+            }   
+            else if (DiffModes.size() == 1) 
+            {
+                Vij += OneModePotential[DiffModes[SortedDiffModes[0]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]];
+                unsigned int m = DiffModes[SortedDiffModes[0]];
+                for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+                {
+                    if (MaxNMode >= 2)
+                    {
+                        Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
+                    }
+                    if (MaxNMode >= 3)
+                    {
+                        for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+                        {
+                            Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                        }
+                    }
+                }
+            }
+            else if (DiffModes.size() == 2) 
+            {
+                Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
+                if (MaxNMode >= 3)
+                {
+                    unsigned int m = DiffModes[SortedDiffModes[0]];
+                    unsigned int n = DiffModes[SortedDiffModes[1]];
+                    for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+                    {
+                        Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                    }
+                }
+            }
+            else if (DiffModes.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
            
             #pragma omp critical
             if (abs(Vij) > 1e-12)
             {
                 if (DiagonalBlock)
                 {
-                    if (i == j) HTrip.push_back(Trip(i, j, Vij / 2.0));
+                    //if (i == j) HTrip.push_back(Trip(i, j, Vij));
+                    if (i == j) HTrip.push_back(Trip(i, j, Vij / 2));
                     else HTrip.push_back(Trip(i, j, Vij));
                 }
                 else

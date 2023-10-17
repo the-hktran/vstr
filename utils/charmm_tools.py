@@ -28,7 +28,7 @@ def WriteNewCRD(OrigCRDFile, NewCRDFile, NAtom, Coord):
                     g.write(line)
                     for i in range(NAtom):
                         line = f.readline()
-                        g.write('{:>5}{:>5} {:<5}{:<6}{:>8.5f}{:>10.5f}{:>10.5f} {:<5}{:<2}{:>12}\n'.format(line.split()[0], line.split()[1], line.split()[2], line.split()[3], Coord[3 * i], Coord[3 * i + 1], Coord[3 * i + 2], line.split()[7], line.split()[8], line.split()[9]))
+                        g.write('{:>5}{:>5} {:<5}{:<5}{:>9.5f}{:>10.5f}{:>10.5f} {:<5}{:<2}{:>12}\n'.format(line.split()[0], line.split()[1], line.split()[2], line.split()[3], Coord[3 * i], Coord[3 * i + 1], Coord[3 * i + 2], line.split()[7], line.split()[8], line.split()[9]))
                     break
                 else:
                     g.write(line)

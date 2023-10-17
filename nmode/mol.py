@@ -4,7 +4,7 @@ import numdifftools as nd
 from vstr.utils import init_funcs, constants
 
 A2B = 1.88973
-AU2CM = 219474.63
+AU2CM = 219474.63 
 AMU2AU = 1822.888486209
 
 
@@ -40,16 +40,16 @@ class Molecule():
         """
         return self.potential_cart(x.reshape((self.natoms,3)))
 
-    def CalcNM(self):
+    def CalcNM(self, x0 = None):
         self.nm = NormalModes(self)
-        self.nm.kernel()
+        self.nm.kernel(x0 = x0)
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
 
     def CalcNModePotential(self, Order = None):
         if Order is None:
             Order = self.Order
         self.nmode = NModePotential(self.nm)
-        self.ints = [np.asarray([]), np.asarray([]), np.asarray([[[[[[[[[]]]]]]]]])]
+        self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
         for i in range(Order):
             self.ints[i] = self.nmode.get_ints(i+1)
 
@@ -66,8 +66,8 @@ class Molecule():
         self.FullBasis = FullBasis
         return FullBasis, IndexBasis, IndexOther
 
-    def kernel(self):
-        self.CalcNM()
+    def kernel(self, x0 = None):
+        self.CalcNM(x0 = x0)
         self.InitializeBasis()
         self.ReorganizeBasis()
         # The NMode potential is done in HO basis, doesn't see product basis
@@ -270,19 +270,27 @@ class NModePotential():
             ints = np.empty(nmodes, dtype=object)
             for i in range(nmodes):
                 vgrid_diag = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                vgrid_diag = np.flip(vgrid_diag)
                 vgrid = np.zeros((ngridpts[i],ngridpts[i]))
                 np.fill_diagonal(vgrid, vgrid_diag)
                 vi = np.dot(coeff[i], np.dot(vgrid, coeff[i].T))
-                ints[i] = vi# * constants.AU_TO_INVCM
+                ints[i] = vi * constants.AU_TO_INVCM
+            print(ints[0][0, 0])
+            print(ints[1][0, 0])
+            print(ints[2][0, 0])
         elif nmode == 2:
             ints = np.empty((nmodes,nmodes), dtype=object)
             for i in range(nmodes):
                 for j in range(nmodes):
-                    vgrid_diag = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qi in gridpts[i]] for qj in gridpts[j]]) # this should be vectorized
-                    vgrid = np.zeros((ngridpts[i],ngridpts[j]))
-                    np.fill_diagonal(vgrid, vgrid_diag)
+                    vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qi in gridpts[i]] for qj in gridpts[j]]) # this should be vectorized
+                    #vgrid = np.zeros((ngridpts[i],ngridpts[j]))
+                    #np.fill_diagonal(vgrid, vgrid_diag)
                     vij = np.einsum('gp,hq,gh,gr,hs->pqrs', coeff[i], coeff[j], vgrid, coeff[i], coeff[j])
-                    ints[i,j] = vij# * constants.AU_TO_INVCM
+                    ints[i,j] = vij * 0# * constants.AU_TO_INVCM
+            print(ints[0, 1][0, 1, 0, 1])
+            print(ints[0, 1][1, 0, 1, 0])
+            print(ints[0, 1][0, 0, 1, 1])
+            print(ints[0, 1][1, 1, 0, 0])
 
         return ints
 

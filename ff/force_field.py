@@ -273,6 +273,10 @@ def GetCHARMMFF(HessDir, H0, Freqs, dx, BaseName = 'mode', Order = 4, Semidiagon
         for i in range(NCoord):
             Hpi = ReadHessian(HessDir + '/' + BaseName + '+' + str(Modes[i]) + '.hess', NAtom)
             Hmi = ReadHessian(HessDir + '/' + BaseName + '-' + str(Modes[i]) + '.hess', NAtom)
+            if i == 0:
+                print(Modes[i])
+                print(Hpi)
+                print(H0)
 
             dHdxi = (Hpi - Hmi) / (2 * dx)
 
@@ -384,6 +388,7 @@ def PruneVs(Vs, Max = None, type = []):
                 else:
                     V4.append(v)
             PrunedV[1] = V4
+
     return PrunedV
 
 if __name__ == "__main__":

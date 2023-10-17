@@ -460,7 +460,9 @@ class NModeVHCI(VHCI):
         if isinstance(MaxQuanta, int):
             self.MaxQuanta = [MaxQuanta] * self.NModes
         
-        self.MaxTotalQuanta = mol.InitTotalQuanta
+        #self.MaxTotalQuanta = mol.InitTotalQuanta
+        self.MaxTotalQuanta = MaxTotalQuanta
+        assert(self.MaxTotalQuanta <= mol.InitTotalQuanta)
         self._HighestQuanta = [mol.InitTotalQuanta] * self.NModes
         self.H = None
         self.eps1 = 0.1 # HB epsilon
