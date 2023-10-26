@@ -4628,7 +4628,6 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                     for (unsigned int m = 0; m < Frequencies.size(); m++)
                     {
                         Vij += OneModePotential[m][ModeOccI[m]][ModeOccJ[m]];
-                        std::cout << "one mode " << OneModePotential[m][ModeOccI[m]][ModeOccJ[m]] << std::endl;
                     }
                 }
                 if (MaxNMode >= 2)
@@ -4638,8 +4637,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                         for (unsigned int n = m + 1; n < Frequencies.size(); n++)
                         {
                             Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
-                            std::cout << "two mode " <<  m << " " << n << " " << TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
-                            std::cout << "two mode " <<  m << " " << n << " " << TwoModePotential[n][m][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
+                            std::cout << "two mode " << TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
                         }
                     }
                 }
