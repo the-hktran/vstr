@@ -20,6 +20,8 @@ class Molecule():
         self.Nm = 3 * natoms - 6
         self.mass = mass
 
+        self.ngridpts = None
+
         self.Order = 2
 
         self.FullMaxQuanta = 10
@@ -51,7 +53,7 @@ class Molecule():
         self.nmode = NModePotential(self.nm)
         self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
         for i in range(Order):
-            self.ints[i] = self.nmode.get_ints(i+1)
+            self.ints[i] = self.nmode.get_ints(i+1, ngridpts = self.ngridpts)
         #if Order >= 2:
         #    N = len(self.ints[0])
         #    for i in range(N):
@@ -157,6 +159,14 @@ class NormalModes():
         x = self._normal2cart(q)
         return (self.mol.potential_cart(x)
                 - self.potential_1mode(i,qi) - self.potential_1mode(j,qj))
+
+    def potential_3mode(self, i, j, k, qi, qj, qk):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        q[k] = qk
+        x = self._normal2cart(q)
+        return (self.mol.potential_cart(x) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(j, k, qj, qk) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk))
 
 def get_qmat_ho(omega, nmax):
     qmat = np.zeros((nmax,nmax))
@@ -276,16 +286,21 @@ class NModePotential():
                 vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                 vi = np.dot(coeff[i], np.dot(np.diag(vgrid), coeff[i].T))
                 ints[i] = vi * constants.AU_TO_INVCM
-            print(ints[0][0,0])
         elif nmode == 2:
             ints = np.empty((nmodes,nmodes), dtype=object)
             for i in range(nmodes):
                 for j in range(nmodes):
-                    vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qi in gridpts[i]] for qj in gridpts[j]]).T # this should be vectorized
-                    vij = np.einsum('pg,qh,gh,rg,sh->pqrs', coeff[i], coeff[j], vgrid, coeff[i], coeff[j])
-                    ints[i,j] = vij * constants.AU_TO_INVCM
-            print(ints[0,1][0,0,0,0])   
-            print(ints[0,0][0,0,0,0])   
+                    vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
+                    vij = np.einsum('gp,hq,gh,gr,hs->pqrs', coeff[i].T, coeff[j].T, vgrid, coeff[i].T, coeff[j].T, optimize=True)
+                    ints[i, j] = vij * constants.AU_TO_INVCM
+        elif nmode == 3:
+            ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
+            for i in range(nmodes):
+                for j in range(nmodes):
+                    for k in range(nmodes):
+                        vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                        vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', coeff[i].T, coeff[j].T, coeff[k].T, vgrid, coeff[i].T, coeff[j].T, coeff[k].T, optimize=True)
+                        ints[i, j, k] = vijk * constants.AU_TO_INVCM
 
         return ints
 
@@ -314,7 +329,7 @@ class NModePotential():
 
                 tmat = get_tmat_ho(omega, nho)
                 vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in q0]) # this should be vectorized
-                vmat = np.dot(u0, np.dot(vgrid, u0.T))
+                vmat = np.dot(u0, np.dot(np.diag(vgrid), u0.T))
                 e, c = scipy.linalg.eigh(tmat+vmat)
                 c = c[:,:ngridpts[i]]
                 qmat = np.dot(c.T, np.dot(qmat, c))

@@ -190,7 +190,6 @@ def SparseDiagonalizeNMode(mVHCI):
     mVHCI.Timer.start(1)
     if mVHCI.H is None:
         mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
-        print(mVHCI.H)
     else:
         if len(mVHCI.NewBasis) != 0:
             HIJ = GenerateSparseHamVOD(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
@@ -199,6 +198,7 @@ def SparseDiagonalizeNMode(mVHCI):
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
+    print(mVHCI.H)
     mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')
     mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()

@@ -4579,17 +4579,11 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             std::vector<int> ModeOccJ;
             for (unsigned int m = 0; m < BasisSet2[j].Modes.size(); m++) ModeOccJ.push_back(BasisSet2[j].Modes[m].Quanta);
             std::vector<int> DiffModes = CalcDiffModes(BasisSet1[i], BasisSet2[j]);
-            std::cout << "Calculating matrix element for" << std::endl;
-            for (unsigned int m = 0; m < ModeOccI.size(); m++) std::cout << ModeOccI[m] << " ";
-            std::cout << std::endl;
-            for (unsigned int m = 0; m < ModeOccJ.size(); m++) std::cout << ModeOccJ[m] << " ";
-            std::cout << std::endl;
 
             // Kinetic Energy Part
             if (DiffModes.size() == 0)
             {
                 for (unsigned int m = 0; m < Frequencies.size(); m++) Vij += Frequencies[m] / 2 * (ModeOccI[m] + 0.5);
-                std::cout << Vij << std::endl;
             }
             else if (DiffModes.size() == 1)
             {
@@ -4637,7 +4631,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                         for (unsigned int n = m + 1; n < Frequencies.size(); n++)
                         {
                             Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
-                            std::cout << "two mode " << TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
+                            std::cout << "two " << TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
                         }
                     }
                 }
@@ -4650,6 +4644,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                             for (unsigned int o = n + 1; o < Frequencies.size(); o++)
                             {
                                 Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                                std::cout << "three " << ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]] << std::endl;
                             }
                         }
                     }
@@ -4659,7 +4654,28 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             {
                 Vij += OneModePotential[DiffModes[SortedDiffModes[0]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]];
                 unsigned int m = DiffModes[SortedDiffModes[0]];
-                for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+                if (MaxNMode >= 2)
+                {
+                    for (unsigned int n = 0; n < Frequencies.size(); n++)
+                    {
+                        if (n != m)
+                        {
+                            Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
+                            if (MaxNMode >= 3)
+                            {
+                                for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+                                {
+                                    if (o != m && o != n)
+                                    {
+                                        Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+                /*for (unsigned int n = m + 1; n < Frequencies.size(); n++)
                 {
                     if (MaxNMode >= 2)
                     {
@@ -4673,7 +4689,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                         }
                     }
                 }
-            }
+            }*/
             else if (DiffModes.size() == 2) 
             {
                 Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
@@ -4681,9 +4697,12 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                 {
                     unsigned int m = DiffModes[SortedDiffModes[0]];
                     unsigned int n = DiffModes[SortedDiffModes[1]];
-                    for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+                    for (unsigned int o = 0; o < Frequencies.size(); o++)
                     {
-                        Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                        if (o != m && o != n)
+                        {
+                            Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                        }
                     }
                 }
             }
