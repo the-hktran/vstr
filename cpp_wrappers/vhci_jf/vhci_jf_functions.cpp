@@ -4631,7 +4631,6 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                         for (unsigned int n = m + 1; n < Frequencies.size(); n++)
                         {
                             Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
-                            std::cout << "two " << TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]] << std::endl;
                         }
                     }
                 }
@@ -4644,7 +4643,6 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                             for (unsigned int o = n + 1; o < Frequencies.size(); o++)
                             {
                                 Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
-                                std::cout << "three " << ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]] << std::endl;
                             }
                         }
                     }

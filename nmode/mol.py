@@ -7,6 +7,11 @@ A2B = 1.88973
 AU2CM = 219474.63 
 AMU2AU = 1822.888486209
 
+def ho_3d(x):
+    w = [0.00748436, 0.01743128, 0.01790309]
+    #w = [1642.62705755, 3825.7245683,  3929.27450625]
+    #print(x)
+    return 0.5 * (w[0]**2 * x[0, 0]**2 + w[1]**2 * x[0, 1]**2 + w[2]**2 * x[0, 2]**2 + 0.001 * x[0, 1] * x[0, 2] * x[0, 2] + 0.001 * x[0, 0] * x[0, 1] * x[0, 2] + 0.01 * x[0, 0]**2 * x[0, 1]**2 * x[0, 2]**2) * 1836.15267389
 
 class Molecule():
     '''
@@ -45,6 +50,14 @@ class Molecule():
     def CalcNM(self, x0 = None):
         self.nm = NormalModes(self)
         self.nm.kernel(x0 = x0)
+        # debug!!
+        c = np.zeros((self.natoms * 3, self.nm.nmodes))
+        c[:3,:3] = np.eye(3)
+        self.nm.nm_coeff = c.reshape((self.natoms, 3, self.nm.nmodes))
+        print(self.nm.freqs)
+        self.potential_cart = ho_3d
+        self.nm.x0 = np.zeros_like(self.nm.x0)
+        # debug!!
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
 
     def CalcNModePotential(self, Order = None):
@@ -293,6 +306,9 @@ class NModePotential():
                     vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
                     vij = np.einsum('gp,hq,gh,gr,hs->pqrs', coeff[i].T, coeff[j].T, vgrid, coeff[i].T, coeff[j].T, optimize=True)
                     ints[i, j] = vij * constants.AU_TO_INVCM
+            print(ints[1, 2][0, 0, 1, 2])
+            print(ints[1, 2][0, 0, 1, 0] * np.sqrt(2**3) * 2)
+            # scaling: / (2^n * prod_i p_i!)
         elif nmode == 3:
             ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
             for i in range(nmodes):
@@ -301,6 +317,8 @@ class NModePotential():
                         vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
                         vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', coeff[i].T, coeff[j].T, coeff[k].T, vgrid, coeff[i].T, coeff[j].T, coeff[k].T, optimize=True)
                         ints[i, j, k] = vijk * constants.AU_TO_INVCM
+            print(ints[0, 1, 2][0, 0, 0, 1, 1, 1] * np.sqrt(2**3))
+            print(ints[0, 1, 2][0, 0, 0, 0, 0, 0] * np.sqrt(2**6) * 2 * 2 * 2)
 
         return ints
 
