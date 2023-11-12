@@ -4598,7 +4598,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             if (DiffModes.size() > MaxNMode) 
             {
                 #pragma omp critical
-                if (abs(Vij) > 1e-12)
+                if (abs(Vij) > 1e-8)
                 {
                     if (DiagonalBlock)
                     {
@@ -4707,7 +4707,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
             else if (DiffModes.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
            
             #pragma omp critical
-            if (abs(Vij) > 1e-12)
+            if (abs(Vij) > 1e-8)
             {
                 if (DiagonalBlock)
                 {

@@ -7,6 +7,7 @@ from functools import reduce
 import itertools
 import math
 from scipy import sparse
+import numdifftools as nd
 
 def ReadBasisFromFile(mVHCI, FileName):
     mVHCI.Basis = []
@@ -62,10 +63,10 @@ def MakeAnharmTensor(mVHCI, PotentialList = None):
     AnharmTensor[0] = AnharmTensor[1]
     return AnharmTensor
 
-def FormW(mVHCI, V):
+def FormW(mVHCI, V, Scaled = True):
     Ws = []
     for v in V:
-        W = FConst(v[0], v[1], True);
+        W = FConst(v[0], v[1], Scaled);
         Ws.append(W)
     return Ws
 
@@ -112,7 +113,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         UniqueBasis = AddStatesHB(mVHCI.Basis, Ws, C, eps)
     elif mVHCI.HBMethod == 'max':
         UniqueBasis = AddStatesHBWithMax(mVHCI.Basis, Ws, C, eps, mVHCI.MaxQuanta, mVHCI.HighestQuanta)
-    elif mVHCI.HBMethod == 'exact':
+    elif mVHCI.HBMethod == 'exact' or mVHCI.HBMethod.upper() == 'QFF':
         UniqueBasis = AddStatesHBFromVSCF(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
     elif mVHCI.HBMethod == 'coupling':
         UniqueBasis = AddStatesHBStoreCoupling(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
@@ -476,7 +477,7 @@ class NModeVHCI(VHCI):
         self.NSamples = 50
         self.dE_PT2 = None
         self.sE_PT2 = None
-        self.HBMethod = 'exact' #['orig', 'max', 'exact']
+        self.HBMethod = 'qff' #['orig', 'max', 'exact']
 
         self.CHKFile = None
         self.ReadFromFile = False
@@ -489,6 +490,24 @@ class NModeVHCI(VHCI):
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
 
     def kernel(self, doVCI = True, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
+        if self.HBMethod.upper() == 'QFF':
+            V3, V4 = self.mol.nm.get_ff()
+            self.Potential = [[]] * 4 # Cubic, quartic, quintic, sextic
+            for V in [V3, V4]:
+                Wp = self.FormW(V)
+                self.Potential[Wp[0].Order - 3] = Wp
+            self.FormWSD()
+
+            self.PotentialListFull = []
+            for Wp in self.PotentialSD:
+                self.PotentialListFull += Wp
+            self.PotentialList = []
+            for Wp in self.Potential:
+                self.PotentialList += Wp
+                self.PotentialListFull += Wp
+            self.PotentialListFull = HeatBath_Sort_FC(self.PotentialListFull) # Only need to sort these once
+            self.Ys = [self.MakeAnharmTensor()] * self.NModes
+
         if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)
 

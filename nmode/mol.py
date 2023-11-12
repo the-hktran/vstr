@@ -2,16 +2,16 @@ import numpy as np
 import scipy
 import numdifftools as nd
 from vstr.utils import init_funcs, constants
-
+from vstr.ff.force_field import ScaleFC_me
 A2B = 1.88973
 AU2CM = 219474.63 
 AMU2AU = 1822.888486209
 
 def ho_3d(x):
-    w = [0.00748436, 0.01743128, 0.01790309]
+    w = [0.00751348, 0.01746552, 0.01797136]
     #w = [1642.62705755, 3825.7245683,  3929.27450625]
-    #print(x)
-    return 0.5 * (w[0]**2 * x[0, 0]**2 + w[1]**2 * x[0, 1]**2 + w[2]**2 * x[0, 2]**2 + 0.001 * x[0, 1] * x[0, 2] * x[0, 2] + 0.001 * x[0, 0] * x[0, 1] * x[0, 2] + 0.01 * x[0, 0]**2 * x[0, 1]**2 * x[0, 2]**2) * 1836.15267389
+    return (0.5 * (w[0]**2 * x[0, 0]**2 + w[1]**2 * x[0, 1]**2 + w[2]**2 * x[0, 2]**2) * 1836.15267389
+            + 0.25 * 100 * x[0, 1] * x[0, 1] * x[0, 2] * x[0, 2]) # + 0.001 * x[0, 0] * x[0, 1] * x[0, 2] + 0.01 * x[0, 0]**2 * x[0, 1]**2 * x[0, 2]**2)
 
 class Molecule():
     '''
@@ -50,13 +50,13 @@ class Molecule():
     def CalcNM(self, x0 = None):
         self.nm = NormalModes(self)
         self.nm.kernel(x0 = x0)
-        # debug!!
-        c = np.zeros((self.natoms * 3, self.nm.nmodes))
-        c[:3,:3] = np.eye(3)
-        self.nm.nm_coeff = c.reshape((self.natoms, 3, self.nm.nmodes))
-        print(self.nm.freqs)
-        self.potential_cart = ho_3d
-        self.nm.x0 = np.zeros_like(self.nm.x0)
+        #debug!!
+        #c = np.zeros((self.natoms * 3, self.nm.nmodes))
+        #c[:3,:3] = np.eye(3)
+        #self.nm.nm_coeff = c.reshape((self.natoms, 3, self.nm.nmodes))
+        #print(self.nm.freqs)
+        #self.potential_cart = ho_3d
+        #self.nm.x0 = np.zeros_like(self.nm.x0)
         # debug!!
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
 
@@ -145,6 +145,76 @@ class NormalModes():
             for j in range(natoms):
                 hess[i,:,j,:] /= np.sqrt(mass[i]*mass[j])
         return hess
+
+    def get_ff(self, dx = 1e-4, Order = 4):
+        """
+        Calculate the cubic and quartic derivatives of the potential with respect to normal modes
+        """
+        natoms = self.mol.natoms
+        mass = self.mol.mass
+        pes = self.mol._potential
+        freq_cm = self.freqs * constants.AU_TO_INVCM
+        def hess(x):
+            C = np.einsum('nij,n->nij', self.nm_coeff, 1/np.sqrt(mass))
+            C = C.reshape(3 * natoms, self.nmodes)
+            return np.einsum('ki,kl,lj->ij', C, nd.Hessian(pes)(x.reshape(-1)), C)
+        H0 = hess(self.x0)
+        V3 = []
+        V4 = []
+        for i in range(self.nmodes):
+            q = np.zeros(self.nmodes)
+            q[i] = dx
+            x = self._normal2cart(q)
+            Hpi = hess(x)
+
+            q = np.zeros(self.nmodes)
+            q[i] = -dx
+            x = self._normal2cart(q)
+            Hmi = hess(x)
+
+            d3V = (Hpi - Hmi) / (2 * dx)
+            d4Vd = (Hpi + Hmi - 2 * H0) / (dx**2)
+            for j in range(i, self.nmodes):
+                for k in range(j, self.nmodes):
+                    Vijk = ScaleFC_me(d3V[j, k], freq_cm, [i, j, k])
+                    Viijk = ScaleFC_me(d4Vd[j, k], freq_cm, [i, i, j, k])
+                    if abs(Vijk) > 1.0:
+                        V3.append((Vijk, [i, j, k]))
+                    if abs(Viijk) > 1.0:
+                        V4.append((Viijk, [i, i, j, k]))
+                
+            for j in range(i + 1, self.nmodes):
+                q = np.zeros(self.nmodes)
+                q[i] = dx
+                q[j] = dx
+                x = self._normal2cart(q)
+                Hpipj = hess(x)
+
+                q = np.zeros(self.nmodes)
+                q[i] = dx
+                q[j] = -dx
+                x = self._normal2cart(q)
+                Hpimj = hess(x)
+
+                q = np.zeros(self.nmodes)
+                q[i] = -dx
+                q[j] = dx
+                x = self._normal2cart(q)
+                Hmipj = hess(x)
+
+                q = np.zeros(self.nmodes)
+                q[i] = -dx
+                q[j] = -dx
+                x = self._normal2cart(q)
+                Hmimj = hess(x)
+
+                d4V = (Hpipj + Hmimj - Hmipj - Hpimj) / (4 * dx**2)
+                for k in range(j, self.nmodes):
+                    for l in range(k, self.nmodes):
+                        Vijkl = ScaleFC_me(d4V[k, l], freq_cm, [i, j, k, l])
+                        if abs(Vijkl) > 1.0:
+                            V4.append((Vijkl, [i, j, k, l]))
+        return V3, V4
 
     def _normal2cart(self, q):
         return self.x0 + np.einsum('n,ndi,i->nd',1/np.sqrt(self.mol.mass),self.nm_coeff,q)
@@ -306,9 +376,6 @@ class NModePotential():
                     vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
                     vij = np.einsum('gp,hq,gh,gr,hs->pqrs', coeff[i].T, coeff[j].T, vgrid, coeff[i].T, coeff[j].T, optimize=True)
                     ints[i, j] = vij * constants.AU_TO_INVCM
-            print(ints[1, 2][0, 0, 1, 2])
-            print(ints[1, 2][0, 0, 1, 0] * np.sqrt(2**3) * 2)
-            # scaling: / (2^n * prod_i p_i!)
         elif nmode == 3:
             ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
             for i in range(nmodes):
@@ -317,8 +384,6 @@ class NModePotential():
                         vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
                         vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', coeff[i].T, coeff[j].T, coeff[k].T, vgrid, coeff[i].T, coeff[j].T, coeff[k].T, optimize=True)
                         ints[i, j, k] = vijk * constants.AU_TO_INVCM
-            print(ints[0, 1, 2][0, 0, 0, 1, 1, 1] * np.sqrt(2**3))
-            print(ints[0, 1, 2][0, 0, 0, 0, 0, 0] * np.sqrt(2**6) * 2 * 2 * 2)
 
         return ints
 

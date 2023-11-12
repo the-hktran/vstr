@@ -52,6 +52,34 @@ def ScaleFC(FC, Freqs, Modes):
         ScaledFC = ScaledFC / np.sqrt(Freqs[i])
     return ScaledFC
 
+def ScaleFC_me(FC, Freqs, Modes):
+    n = len(Modes)
+    ScaledFC = FC / ((2 * np.pi)**(n / 2) * constants.C_AU**(n / 2) * constants.BOHR_TO_CM**(n / 2)) * constants.HARTREE_TO_INVCM #/ constants.C_AU**((n-1)/4)
+    for i in Modes:
+        ScaledFC = ScaledFC / np.sqrt(Freqs[i])
+    return ScaledFC
+
+
+
+def D2F(f, x0, thr = 1e-4):
+    f0 = f(x0)
+    n = x0.shape[0]
+    d2f = []
+    for i in range(n):
+        d2fi = []
+        dxi = np.zeros_like(x0)
+        dxi[i] = thr
+        for j in range(n):
+            dxj = np.zeros_like(x0)
+            dxj[j] = thr
+            fpipj = f(x0 + dxi + dxj)
+            fpimj = f(x0 + dxi - dxj)
+            fmipj = f(x0 - dxi + dxj)
+            fmimj = f(x0 - dxi - dxj)
+            d2fi.append((fpipj - fpimj - fmipj + fmimj) / (4 * thr**2))
+        d2f.append(np.asarray(d2fi))
+    return np.asarray(d2f)
+
 def GetFF(mf, Coords, Freqs, Order = 4, Method = 'rhf', dx = 1e-4, tol = 1.0, QuarticMin = None):
     V = []
     NCoord = Coords.shape[1]
