@@ -199,7 +199,6 @@ def SparseDiagonalizeNMode(mVHCI):
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
-    print(mVHCI.H)
     mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SM')
     mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
