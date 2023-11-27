@@ -369,6 +369,7 @@ class NModePotential():
                 vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                 vi = np.dot(coeff[i], np.dot(np.diag(vgrid), coeff[i].T))
                 ints[i] = vi * constants.AU_TO_INVCM
+                print(ints[i])
         elif nmode == 2:
             ints = np.empty((nmodes,nmodes), dtype=object)
             for i in range(nmodes):

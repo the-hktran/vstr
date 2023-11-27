@@ -4943,116 +4943,30 @@ std::vector<WaveFunction> ConnectedStatesCIPSI(std::vector<WaveFunction> &BasisS
     return NewBasis;
 }
 
-std::vector<WaveFunction> AddStatesCIPSIFromVSCF(std::vector<WaveFunction> &BasisSet, std::vector<FConst> &AnharmHB, Eigen::Ref<Eigen::VectorXd> C, double eps, std::vector<std::vector<Eigen::MatrixXd>> &Ys){ // Expand basis via Heat Bath algorithm
+std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &ConnectedBasis, Eigen::VectorXd &C, Eigen::VectorXd &EVal, std::vector<double> &Frequencies, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, double eps)
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
     HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
     for( WaveFunction& wfn : BasisSet){
         HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
     }
 
-    // Begin by sorting the columns of Y
-    unsigned int NModes = Ys.size();
-    unsigned int NPower = Ys[0].size();
-    unsigned int NModal = Ys[0][3].rows();
-    std::vector<std::vector<std::vector<std::vector<long unsigned int>>>> YSortedColInd; // mode, power, column
-    std::vector<std::vector<double>> MaxY; // mode, power
-    for (unsigned int m = 0; m < Ys.size(); m++)
+    for (unsigned int a = 0; a < ConnectedBasis.size(); a++)
     {
-        std::vector<std::vector<std::vector<long unsigned int>>> YSorted_m;
-        std::vector<double> YMax_m;
-        for (unsigned int p = 0; p < Ys[m].size(); p++)
+        double HaiCi = 0.0;
+        for (unsigned int i = 0; i < BasisSet.size(); i++)
         {
-            YMax_m.push_back((Ys[m][p]).cwiseAbs().maxCoeff());
-            std::vector<std::vector<long unsigned int>> YSorted_mp;
-            for (unsigned int n = 0; n < Ys[m][p].cols(); n++)
-            {
-                std::vector<long unsigned int> YSorted_mpn = SortIndices((Ys[m][p].col(n)).cwiseAbs());
-                YSorted_mp.push_back(YSorted_mpn);
-            }
-            YSorted_m.push_back(YSorted_mp);
+            double Hai = VCISparseHamNModeElement(BasisSet[i], ConnectedBasis[a], Frequencies, OneModePotential, TwoModePotential, ThreeModePotential);
+            HaiCi += Hai * C[i]
         }
-        YSortedColInd.push_back(YSorted_m);
-        MaxY.push_back(YMax_m);
+        double Ea = VCISparseHamNModeElement(ConnectedBasis[a], ConnectedBasis[a], Frequencies, OneModePotential, TwoModePotential, ThreeModePotential);
+        Eigen::VectorXd Denom = (EVal - Ea * Eigen::VectorXd::Ones(EVal.size())).cwiseAbs();
+        double DenomMin = Denom.minCoeff();
+        double tol = pow(HaiCi, 2) / DenomMin;
+        if (tol > eps) HashedNewStates.insert(ConnectedBasis[a]);
     }
 
-    std::vector<double> WVec;
-    for (FConst &FC : AnharmHB)
-    {
-        double fc = FC.fc;
-        for (unsigned int q = 0; q < FC.QUnique.size(); q++)
-        {
-            fc *= MaxY[FC.QUnique[q]][FC.QPowers[q]];
-        }
-        WVec.push_back(abs(fc));
-    }
-    std::vector<long unsigned int> WSortedInd = SortIndices(WVec);
-
-    std::vector<double> CVec;
-    for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
-    std::vector<long unsigned int> CSortedInd = SortIndices(CVec);
-
-
-    for(int ii = WSortedInd.size() - 1; ii >= 0; ii--){ // Loop over sorted force constants
-        unsigned int i = WSortedInd[ii];
-        if (abs(WVec[i] * C[CSortedInd[CSortedInd.size() - 1]]) < eps) break; // means that the largest Cn doesn't meet the criteria so we are done
-        for (int nn = CSortedInd.size() - 1; nn >= 0; nn--)
-        {
-            unsigned int n = CSortedInd[nn];
-            double Cn = C[n];
-            if(abs(Cn * WVec[i]) >= eps) // States connected by fc will be added if |fc*Cn| >= eps
-            {
-                double Factor = 1.0;
-                std::vector<int> LQuanta = GetQuantaList(BasisSet[n]);
-                std::vector<int> KQuantaInd(AnharmHB[i].QUnique.size(), NModal - 1);
-                bool LoopK = true;
-                while (LoopK)
-                {
-                    std::vector<int> KQuanta = LQuanta;
-                    for (unsigned int q = 0; q < KQuantaInd.size(); q++)
-                    {
-                        KQuanta[AnharmHB[i].QUnique[q]] = YSortedColInd[AnharmHB[i].QUnique[q]][AnharmHB[i].QPowers[q]][LQuanta[AnharmHB[i].QUnique[q]]][KQuantaInd[q]];
-                    }
-                    double Factor = HBFactor(Ys, KQuanta, LQuanta, AnharmHB[i].QUnique, AnharmHB[i].QPowers);
-                    if (abs(Cn * AnharmHB[i].fc * Factor) >= eps)
-                    {
-                        WaveFunction tmp = BasisSet[n];
-                        for (unsigned int m = 0; m < KQuanta.size(); m++) tmp.Modes[m].Quanta = KQuanta[m];
-                        if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
-                        KQuantaInd[0] = KQuantaInd[0] - 1;
-                    }
-                    else // Need to increment something
-                    {
-                        for (unsigned int m = 1; m < KQuantaInd.size(); m++)
-                        {
-                            if ((KQuantaInd[m - 1] != (NModal - 1)))
-                            {
-                                KQuantaInd[m] = KQuantaInd[m] - 1;
-                                KQuantaInd[m - 1] = NModal - 1;
-                                continue;
-                            }
-                            if (m == KQuantaInd.size() - 1) LoopK = false;
-                        }
-                        if (KQuantaInd.size() == 1) LoopK = false;
-                    }
-
-                    for (unsigned int m = 0; m < KQuantaInd.size() - 1; m++)
-                    {
-                        if (KQuantaInd[m] == -1)
-                        {
-                            KQuantaInd[m] = NModal - 1;
-                            KQuantaInd[m + 1] = KQuantaInd[m + 1] - 1;
-                        }
-                    }
-                    if (KQuantaInd[KQuantaInd.size() - 1] == -1) LoopK = false;
-                }
-                        
-            }
-            else{break;}// break loop if you've reached element < eps, since all future elements will be smaller (HB sorting)
-        }
-    }
     std::vector<WaveFunction> NewBasis;
     for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
-    //return std::make_tuple(NewBasis, HighestQuanta);
     return NewBasis;
 }
 
