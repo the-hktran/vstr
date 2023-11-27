@@ -25,16 +25,17 @@ class Molecule():
         self.Nm = 3 * natoms - 6
         self.mass = mass
 
-        self.ngridpts = None
+        self.ngridpts = 12
 
         self.Order = 2
 
-        self.FullMaxQuanta = 10
         self.FullTotalQuanta = 5
-        self.InitMaxQuanta = 10
         self.InitTotalQuanta = 2
 
         self.__dict__.update(kwargs)
+
+        self.FullMaxQuanta = self.ngridpts
+        self.InitMaxQuanta = self.ngridpts
 
         if (isinstance(self.FullMaxQuanta, (int, np.int))):
             self.FullMaxQuanta = [self.FullMaxQuanta] * self.Nm
@@ -369,7 +370,6 @@ class NModePotential():
                 vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                 vi = np.dot(coeff[i], np.dot(np.diag(vgrid), coeff[i].T))
                 ints[i] = vi * constants.AU_TO_INVCM
-                print(ints[i])
         elif nmode == 2:
             ints = np.empty((nmodes,nmodes), dtype=object)
             for i in range(nmodes):

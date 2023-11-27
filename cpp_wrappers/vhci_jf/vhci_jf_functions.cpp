@@ -4877,7 +4877,7 @@ std::vector<WaveFunction> ConnectedStatesCIPSI(std::vector<WaveFunction> &BasisS
             {
                 for (unsigned int a = 0; a < MaxQuanta[i]; a++)
                 {
-                    tmp.Modes[i] = a;
+                    tmp.Modes[i].Quanta = a;
                     if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
                 }
             }
@@ -4893,12 +4893,12 @@ std::vector<WaveFunction> ConnectedStatesCIPSI(std::vector<WaveFunction> &BasisS
             {
                 for (unsigned int a = 0; a < MaxQuanta[i]; a++)
                 {
-                    tmp.Modes[i] = a;
+                    tmp.Modes[i].Quanta = a;
                     for (unsigned int j = i + 1; j < N; j++)
                     {
                         for (unsigned int b = 0; b < MaxQuanta[j]; b++)
                         {
-                            tmp.Modes[j] = b;
+                            tmp.Modes[j].Quanta = b;
                             if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
                         }
                     }
@@ -4916,17 +4916,17 @@ std::vector<WaveFunction> ConnectedStatesCIPSI(std::vector<WaveFunction> &BasisS
             {
                 for (unsigned int a = 0; a < MaxQuanta[i]; a++)
                 {
-                    tmp.Modes[i] = a;
+                    tmp.Modes[i].Quanta = a;
                     for (unsigned int j = i + 1; j < N; j++)
                     {
                         for (unsigned int b = 0; b < MaxQuanta[j]; b++)
                         {
-                            tmp.Modes[j] = b;
+                            tmp.Modes[j].Quanta = b;
                             for (unsigned int k = j + 1; k < N; k++)
                             {
                                 for (unsigned int c = 0; c < MaxQuanta[k]; c++)
                                 {
-                                    tmp.Modes[k] = c;
+                                    tmp.Modes[k].Quanta = c;
                                     if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
                                 }
                             }
@@ -4944,6 +4944,7 @@ std::vector<WaveFunction> ConnectedStatesCIPSI(std::vector<WaveFunction> &BasisS
 }
 
 std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &ConnectedBasis, Eigen::VectorXd &C, Eigen::VectorXd &EVal, std::vector<double> &Frequencies, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, double eps)
+{
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
     HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
     for( WaveFunction& wfn : BasisSet){
@@ -4956,7 +4957,7 @@ std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, st
         for (unsigned int i = 0; i < BasisSet.size(); i++)
         {
             double Hai = VCISparseHamNModeElement(BasisSet[i], ConnectedBasis[a], Frequencies, OneModePotential, TwoModePotential, ThreeModePotential);
-            HaiCi += Hai * C[i]
+            HaiCi += Hai * C[i];
         }
         double Ea = VCISparseHamNModeElement(ConnectedBasis[a], ConnectedBasis[a], Frequencies, OneModePotential, TwoModePotential, ThreeModePotential);
         Eigen::VectorXd Denom = (EVal - Ea * Eigen::VectorXd::Ones(EVal.size())).cwiseAbs();
@@ -4969,5 +4970,3 @@ std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, st
     for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
     return NewBasis;
 }
-
-

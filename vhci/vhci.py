@@ -2,7 +2,7 @@ import numpy as np
 from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode, ConnectedStatesCIPSI, AddStatesCIPSI
 from functools import reduce
 import itertools
 import math
@@ -118,6 +118,10 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
     elif mVHCI.HBMethod == 'coupling':
         UniqueBasis = AddStatesHBStoreCoupling(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
         return UniqueBasis, len(UniqueBasis[0])
+    elif mVHCI.HBMethod.upper() == 'CIPSI':
+        ConnectedBasis = ConnectedStatesCIPSI(mVHCI.Basis, mVHCI.MaxQuanta, mVHCI.mol.Order)
+        UniqueBasis = AddStatesCIPSI(mVHCI.Basis, ConnectedBasis, C, mVHCI.E, mVHCI.Frequencies, mVHCI.mol.ints[0], mVHCI.mol.ints[1], mVHCI.mol.ints[2], eps)
+
     return UniqueBasis, len(UniqueBasis)
 
 def HCIStep(mVHCI, eps = 0.01):
@@ -193,8 +197,8 @@ def SparseDiagonalizeNMode(mVHCI):
         mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
     else:
         if len(mVHCI.NewBasis) != 0:
-            HIJ = GenerateSparseHamVOD(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
-            HJJ = GenerateSparseHamV(mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.PotentialList, mVHCI.Potential[0], mVHCI.Potential[1], mVHCI.Potential[2], mVHCI.Potential[3])
+            HIJ = VCISparseHamNMode(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
+            HJJ = VCISparseHamNMode(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
@@ -452,17 +456,19 @@ class VHCI:
 class NModeVHCI(VHCI):
     SparseDiagonalize = SparseDiagonalizeNMode
     
-    def __init__(self, mol, MaxQuanta = 2, MaxTotalQuanta = 2, NStates = 10, **kwargs):
+    def __init__(self, mol, NStates = 10, **kwargs):
         self.mol = mol
         self.Frequencies = mol.Frequencies # 1D array of all harmonic frequencies.
         self.NModes = self.Frequencies.shape[0]
         self.MaxQuanta = mol.InitMaxQuanta
-        if isinstance(MaxQuanta, int):
-            self.MaxQuanta = [MaxQuanta] * self.NModes
+        #if isinstance(MaxQuanta, int):
+        #    self.MaxQuanta = [MaxQuanta] * self.NModes
         
-        #self.MaxTotalQuanta = mol.InitTotalQuanta
-        self.MaxTotalQuanta = MaxTotalQuanta
+        self.MaxTotalQuanta = mol.InitTotalQuanta
+        #self.MaxTotalQuanta = MaxTotalQuanta
         assert(self.MaxTotalQuanta <= mol.InitTotalQuanta)
+        for m in self.MaxQuanta:
+            assert(m <= mol.ngridpts)
         self._HighestQuanta = [mol.InitTotalQuanta] * self.NModes
         self.H = None
         self.eps1 = 0.1 # HB epsilon
@@ -506,6 +512,8 @@ class NModeVHCI(VHCI):
                 self.PotentialListFull += Wp
             self.PotentialListFull = HeatBath_Sort_FC(self.PotentialListFull) # Only need to sort these once
             self.Ys = [self.MakeAnharmTensor()] * self.NModes
+        else:
+            self.PotentialListFull = []
 
         if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)

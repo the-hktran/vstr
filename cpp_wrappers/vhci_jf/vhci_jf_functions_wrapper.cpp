@@ -70,4 +70,6 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("SpectralFrequencyPruneFromVSCF", SpectralFrequencyPruneFromVSCF, "Prunes basis based on how close w is to Hnn-E0 using VSCF modals");
     m.def("DoSpectralPT2", DoSpectralPT2, "Runs spectral PT2 corrections");
     m.def("VCISparseHamNMode", VCISparseHamNMode, "Generates H using n-Mode potential.");
+    m.def("ConnectedStatesCIPSI", ConnectedStatesCIPSI, "Finds all connected configurations given an n-mode potential to a space of configurations.");
+    m.def("AddStatesCIPSI", AddStatesCIPSI, "Selects configurations based on the CIPSI criterion.");
 }
