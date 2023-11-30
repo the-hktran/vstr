@@ -48,6 +48,24 @@ class Molecule():
         """
         return self.potential_cart(x.reshape((self.natoms,3)))
 
+    def _nmode_potential(self, x):
+        V = 0.0
+        V += self.nm.V0
+        q = self.nm._cart2normal(x)
+        if self.Order >= 1:
+            for i in range(self.nm.nmodes):
+                V += self.nm.potential_1mode(i, q[i])
+        if self.Order >= 2:
+            for i in range(self.nm.nmodes):
+                for j in range(i + 1, self.nm.nmodes):
+                    V += self.nm.potential_2mode(i, j, q[i], q[j])
+        if self.Order >= 3:
+            for i in range(self.nm.nmodes):
+                for j in range(i + 1, self.nm.nmodes):
+                    for k in range(j + 1, self.nm.nmodes):
+                        V += self.nm.potential_3mode(i, j, k, q[i], q[j], q[k])
+        return V
+
     def CalcNM(self, x0 = None):
         self.nm = NormalModes(self)
         self.nm.kernel(x0 = x0)
@@ -60,6 +78,8 @@ class Molecule():
         #self.nm.x0 = np.zeros_like(self.nm.x0)
         # debug!!
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
+        self.x0 = self.nm.x0 / constants.ANGSTROM_TO_AU
+        self.V0 = self.nm.V0 * constants.AU_TO_INVCM
 
     def CalcNModePotential(self, Order = None):
         if Order is None:
@@ -118,6 +138,7 @@ class NormalModes():
         pes = self.mol._potential
         result = scipy.optimize.minimize(pes, x0)
         self.x0 = result.x.reshape((natoms,3))
+        self.V0 = pes(self.x0.reshape(-1))
         
         hess0 = self.hessian(self.x0).reshape((natoms*3, natoms*3))
 
@@ -234,7 +255,7 @@ class NormalModes():
         q = np.zeros(self.nmodes)
         q[i] = qi
         x = self._normal2cart(q)
-        return self.mol.potential_cart(x)
+        return self.mol.potential_cart(x) - self.V0
 
     def potential_2mode(self, i, j, qi, qj):
         q = np.zeros(self.nmodes)
@@ -242,7 +263,7 @@ class NormalModes():
         q[j] = qj
         x = self._normal2cart(q)
         return (self.mol.potential_cart(x)
-                - self.potential_1mode(i,qi) - self.potential_1mode(j,qj))
+                - self.potential_1mode(i,qi) - self.potential_1mode(j,qj) - self.V0)
 
     def potential_3mode(self, i, j, k, qi, qj, qk):
         q = np.zeros(self.nmodes)
@@ -250,7 +271,7 @@ class NormalModes():
         q[j] = qj
         q[k] = qk
         x = self._normal2cart(q)
-        return (self.mol.potential_cart(x) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(j, k, qj, qk) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk))
+        return (self.mol.potential_cart(x) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(j, k, qj, qk) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk) - self.V0)
 
 def get_qmat_ho(omega, nmax):
     qmat = np.zeros((nmax,nmax))

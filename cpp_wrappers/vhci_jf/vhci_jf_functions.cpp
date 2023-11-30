@@ -4554,7 +4554,7 @@ complex<double> DoSpectralPT2(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& C, st
 /*************************************************************************************
 ************************************ NMode Functions *********************************
 *************************************************************************************/
-SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, bool DiagonalBlock)
+SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, double V0, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, bool DiagonalBlock)
 {
     SpMat H(BasisSet1.size(), BasisSet2.size());
     std::vector<Trip> HTrip;
@@ -4618,6 +4618,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
 
             if (DiffModes.size() == 0)
             {
+                Vij += V0;
                 if (MaxNMode >= 1)
                 {
                     for (unsigned int m = 0; m < Frequencies.size(); m++)
@@ -4740,7 +4741,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
     return H;
 }
 
-double VCISparseHamNModeElement(WaveFunction &BasisSet1, WaveFunction &BasisSet2, std::vector<double> &Frequencies, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential)
+double VCISparseHamNModeElement(WaveFunction &BasisSet1, WaveFunction &BasisSet2, std::vector<double> &Frequencies, double V0, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential)
 {
     int MaxNMode = 3;
     if (ThreeModePotential.size() == 1 and ThreeModePotential[0].size() == 1) MaxNMode = 2;
@@ -4778,6 +4779,7 @@ double VCISparseHamNModeElement(WaveFunction &BasisSet1, WaveFunction &BasisSet2
 
     if (DiffModes.size() == 0)
     {
+        Vij += V0;
         if (MaxNMode >= 1)
         {
             for (unsigned int m = 0; m < Frequencies.size(); m++)
@@ -4943,7 +4945,7 @@ std::vector<WaveFunction> ConnectedStatesCIPSI(std::vector<WaveFunction> &BasisS
     return NewBasis;
 }
 
-std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &ConnectedBasis, Eigen::VectorXd &C, Eigen::VectorXd &EVal, std::vector<double> &Frequencies, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, double eps)
+std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &ConnectedBasis, Eigen::VectorXd &C, Eigen::VectorXd &EVal, std::vector<double> &Frequencies, double V0, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, double eps)
 {
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
     HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
@@ -4956,10 +4958,10 @@ std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, st
         double HaiCi = 0.0;
         for (unsigned int i = 0; i < BasisSet.size(); i++)
         {
-            double Hai = VCISparseHamNModeElement(BasisSet[i], ConnectedBasis[a], Frequencies, OneModePotential, TwoModePotential, ThreeModePotential);
+            double Hai = VCISparseHamNModeElement(BasisSet[i], ConnectedBasis[a], Frequencies, V0, OneModePotential, TwoModePotential, ThreeModePotential);
             HaiCi += Hai * C[i];
         }
-        double Ea = VCISparseHamNModeElement(ConnectedBasis[a], ConnectedBasis[a], Frequencies, OneModePotential, TwoModePotential, ThreeModePotential);
+        double Ea = VCISparseHamNModeElement(ConnectedBasis[a], ConnectedBasis[a], Frequencies, V0, OneModePotential, TwoModePotential, ThreeModePotential);
         Eigen::VectorXd Denom = (EVal - Ea * Eigen::VectorXd::Ones(EVal.size())).cwiseAbs();
         double DenomMin = Denom.minCoeff();
         double tol = pow(HaiCi, 2) / DenomMin;
