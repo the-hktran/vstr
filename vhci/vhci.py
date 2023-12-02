@@ -2,7 +2,7 @@ import numpy as np
 from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode, ConnectedStatesCIPSI, AddStatesCIPSI
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNModeFromOM, ConnectedStatesCIPSI, AddStatesCIPSI
 from functools import reduce
 import itertools
 import math
@@ -194,11 +194,11 @@ def SparseDiagonalize(mVHCI):
 def SparseDiagonalizeNMode(mVHCI):
     mVHCI.Timer.start(1)
     if mVHCI.H is None:
-        mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+        mVHCI.H = VCISparseHamNModeFromOM(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
     else:
         if len(mVHCI.NewBasis) != 0:
-            HIJ = VCISparseHamNMode(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
-            HJJ = VCISparseHamNMode(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+            HIJ = VCISparseHamNModeFromOM(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
+            HJJ = VCISparseHamNModeFromOM(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)

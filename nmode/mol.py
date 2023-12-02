@@ -3,6 +3,8 @@ import scipy
 import numdifftools as nd
 from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
+
 A2B = 1.88973
 AU2CM = 219474.63 
 AMU2AU = 1822.888486209
@@ -24,6 +26,8 @@ class Molecule():
         self.natoms = natoms
         self.Nm = 3 * natoms - 6
         self.mass = mass
+        self.onemode_coeff = []
+        self.onemode_eig = []
 
         self.ngridpts = 12
 
@@ -51,7 +55,10 @@ class Molecule():
     def _nmode_potential(self, x):
         V = 0.0
         V += self.nm.V0
+        print('pre', x)
         q = self.nm._cart2normal(x)
+        print('pos', self.nm._normal2cart(q))
+
         if self.Order >= 1:
             for i in range(self.nm.nmodes):
                 V += self.nm.potential_1mode(i, q[i])
@@ -87,7 +94,15 @@ class Molecule():
         self.nmode = NModePotential(self.nm)
         self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
         for i in range(Order):
-            self.ints[i] = self.nmode.get_ints(i+1, ngridpts = self.ngridpts)
+            self.ints[i] = self.nmode.get_ints(i+1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+            if i == 0:
+                for j in range(self.Nm):
+                    OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
+                    OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
+                    e, v = np.linalg.eigh(OMH.todense())
+                    self.onemode_coeff.append(v)
+                    self.onemode_eig.append(e)
+
         #if Order >= 2:
         #    N = len(self.ints[0])
         #    for i in range(N):
@@ -109,8 +124,8 @@ class Molecule():
 
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
-        self.InitializeBasis()
-        self.ReorganizeBasis()
+        #self.InitializeBasis()
+        #self.ReorganizeBasis()
         # The NMode potential is done in HO basis, doesn't see product basis
         self.CalcNModePotential()
 
@@ -136,7 +151,7 @@ class NormalModes():
             x0 = np.random.random((natoms,3))
 
         pes = self.mol._potential
-        result = scipy.optimize.minimize(pes, x0)
+        result = scipy.optimize.minimize(pes, x0, tol = 1e-12)
         self.x0 = result.x.reshape((natoms,3))
         self.V0 = pes(self.x0.reshape(-1))
         
@@ -361,7 +376,7 @@ class NModePotential():
     def __init__(self, nm):
         self.nm = nm
 
-    def get_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None):
+    def get_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
         
         if optimized is False:
             if ngridpts is None:
@@ -394,17 +409,23 @@ class NModePotential():
         elif nmode == 2:
             ints = np.empty((nmodes,nmodes), dtype=object)
             for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
                     vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
-                    vij = np.einsum('gp,hq,gh,gr,hs->pqrs', coeff[i].T, coeff[j].T, vgrid, coeff[i].T, coeff[j].T, optimize=True)
+                    vij = np.einsum('gp,hq,gh,gr,hs->pqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
                     ints[i, j] = vij * constants.AU_TO_INVCM
+
         elif nmode == 3:
             ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
             for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
                     for k in range(nmodes):
+                        Ck = coeff[k].T @ onemode_coeff[k]
                         vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
-                        vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', coeff[i].T, coeff[j].T, coeff[k].T, vgrid, coeff[i].T, coeff[j].T, coeff[k].T, optimize=True)
+                        vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
                         ints[i, j, k] = vijk * constants.AU_TO_INVCM
 
         return ints
