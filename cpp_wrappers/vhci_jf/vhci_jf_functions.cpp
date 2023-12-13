@@ -4996,7 +4996,7 @@ double VCISparseHamNModeElement(WaveFunction &BasisSet1, WaveFunction &BasisSet2
 double VCISparseHamNModeElementFromOM(WaveFunction &BasisSet1, WaveFunction &BasisSet2, std::vector<double> &Frequencies, double V0, std::vector<Eigen::VectorXd> &OneModeEig, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential)
 {
     int MaxNMode = 3;
-    if (ThreeModePotential.size() == 1 and ThreeModePotential[0].size() == 1) MaxNMode = 2;
+    if ((ThreeModePotential.size() == 1 and ThreeModePotential[0].size() == 1) || ThreeModePotential.size() == 0) MaxNMode = 2;
     if (TwoModePotential.size() == 1 and TwoModePotential[0].size() == 1) MaxNMode = 1;
 
     double thr = 1e-4;
@@ -5007,21 +5007,6 @@ double VCISparseHamNModeElementFromOM(WaveFunction &BasisSet1, WaveFunction &Bas
     for (unsigned int m = 0; m < BasisSet2.Modes.size(); m++) ModeOccJ.push_back(BasisSet2.Modes[m].Quanta);
     std::vector<int> DiffModes = CalcDiffModes(BasisSet1, BasisSet2);
 
-    // Kinetic Energy Part
-    if (DiffModes.size() == 0)
-    {
-        for (unsigned int m = 0; m < Frequencies.size(); m++) Vij += Frequencies[m] / 2 * (ModeOccI[m] + 0.5);
-    }
-    else if (DiffModes.size() == 1)
-    {
-        if (abs(ModeOccI[DiffModes[0]] - ModeOccJ[DiffModes[0]]) == 2)
-        {
-            int N = std::max(ModeOccI[DiffModes[0]], ModeOccJ[DiffModes[0]]);
-            Vij += -1 * Frequencies[DiffModes[0]] / 4 * sqrt(N * (N - 1));
-        }
-    }
-
-    // Potential Energy Part
     if (DiffModes.size() > MaxNMode) 
     {
         return Vij;
@@ -5225,7 +5210,7 @@ std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, st
     return NewBasis;
 }
 
-std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &ConnectedBasis, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>>> &SortedIndices, Eigen::Ref<Eigen::VectorXd> C, double eps, bool ExactSingles){ // Expand basis via Heat Bath algorithm
+std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>>> &SortedIndices, Eigen::Ref<Eigen::VectorXd> C, double eps, bool ExactSingles){ // Expand basis via Heat Bath algorithm
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
     HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
     for( WaveFunction& wfn : BasisSet){
@@ -5245,19 +5230,22 @@ std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, 
             {
                 for (unsigned int m = 0; m < MaxQ * MaxQ; m++)
                 {
-                    int ni = BasisSet[CSortedInd[n]].Modes[i].Quanta;
-                    int nj = BasisSet[CSortedInd[n]].Modes[j].Quanta;
+                    //int ni = BasisSet[CSortedInd[n]].Modes[i].Quanta;
+                    //int nj = BasisSet[CSortedInd[n]].Modes[j].Quanta;
+                    int ni = BasisSet[n].Modes[i].Quanta;
+                    int nj = BasisSet[n].Modes[j].Quanta;
                     int mi = SortedIndices[i][j][ni][nj][m][0];
                     int mj = SortedIndices[i][j][ni][nj][m][1];
                     if (ExactSingles && (((ni == mi) && (nj != mj)) || ((ni != mi) && (nj == mj)))) continue;
-                    if (abs(CVec[C[CSortedInd[n]]] * TwoModePotential[i][j][ni][nj][mi][mj]) >= eps)
+                    if (abs(CVec[n] * TwoModePotential[i][j][ni][nj][mi][mj]) >= eps)
                     {
-                        WaveFunction tmp = BasisSet[CSortedInd[n]];
+                        //WaveFunction tmp = BasisSet[CSortedInd[n]];
+                        WaveFunction tmp = BasisSet[n];
                         tmp.Modes[i].Quanta = mi;
                         tmp.Modes[j].Quanta = mj;
                         if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
                     }
-                    else break;
+                    //else break;
                 }
             }
         }

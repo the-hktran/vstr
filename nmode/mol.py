@@ -80,12 +80,12 @@ class Molecule():
         self.nm = NormalModes(self)
         self.nm.kernel(x0 = x0)
         #debug!!
-        c = np.zeros((self.natoms * 3, self.nm.nmodes))
-        c[:3,:3] = np.eye(3)
-        self.nm.nm_coeff = c.reshape((self.natoms, 3, self.nm.nmodes))
-        print(self.nm.freqs)
-        self.potential_cart = ho_3d
-        self.nm.x0 = np.zeros_like(self.nm.x0)
+        #c = np.zeros((self.natoms * 3, self.nm.nmodes))
+        #c[:3,:3] = np.eye(3)
+        #self.nm.nm_coeff = c.reshape((self.natoms, 3, self.nm.nmodes))
+        #print(self.nm.freqs)
+        #self.potential_cart = ho_3d
+        #self.nm.x0 = np.zeros_like(self.nm.x0)
         # debug!!
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
         self.x0 = self.nm.x0 / constants.ANGSTROM_TO_AU
