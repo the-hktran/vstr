@@ -118,6 +118,8 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
     elif mVHCI.HBMethod == 'coupling':
         UniqueBasis = AddStatesHBStoreCoupling(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
         return UniqueBasis, len(UniqueBasis[0])
+    elif mVHCI.HBMethod == '2MODE':
+        pass
     elif mVHCI.HBMethod.upper() == 'CIPSI':
         ConnectedBasis = ConnectedStatesCIPSI(mVHCI.Basis, mVHCI.MaxQuanta, mVHCI.mol.Order)
         UniqueBasis = AddStatesCIPSI(mVHCI.Basis, ConnectedBasis, C, mVHCI.E, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0], mVHCI.mol.ints[1], mVHCI.mol.ints[2], eps)
@@ -482,7 +484,7 @@ class NModeVHCI(VHCI):
         self.NSamples = 50
         self.dE_PT2 = None
         self.sE_PT2 = None
-        self.HBMethod = 'qff' #['orig', 'max', 'exact']
+        self.HBMethod = 'qff' #['qff', '2mode']
 
         self.CHKFile = None
         self.ReadFromFile = False
@@ -514,6 +516,17 @@ class NModeVHCI(VHCI):
             self.Ys = [self.MakeAnharmTensor()] * self.NModes
         else:
             self.PotentialListFull = []
+
+        if self.HBMethod.upper() == '2MODE':
+            self.SortedVIndices = np.empty((self.mol.Nm, self.mol.Nm, self.mol.ngridpts, self.mol.ngridpts, self.mol.ngridpts**2, 2), dtype = object)
+            for i in range(self.mol.Nm):
+                for j in range(self.mol.Nm):
+                    for ni in range(self.mol.ngridpts):
+                        for nj in range(self.mol.ngridpts):
+                            Sorted = np.argsort(mol.ints[1][i, j][ni, nj].reshape(-1))
+                            Sorted = np.unravel_index(Sorted, (self.mol.ngridpts, self.mol.ngridpts))
+                            Sorted = np.vstack((Sorted[0], Sorted[1]))
+                            self.SortedVIndices[i, j, ni, nj] = Sorted.T
 
         if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)

@@ -73,4 +73,5 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("VCISparseHamNModeFromOM", VCISparseHamNModeFromOM, "Generates H using n-Mode potential in one mode eigenbasis.");
     m.def("ConnectedStatesCIPSI", ConnectedStatesCIPSI, "Finds all connected configurations given an n-mode potential to a space of configurations.");
     m.def("AddStatesCIPSI", AddStatesCIPSI, "Selects configurations based on the CIPSI criterion.");
+    m.def("AddStatesHB2Mode", AddStatesHB2Mode, "Selects configurations based on 2-mode potential sorting.");
 }

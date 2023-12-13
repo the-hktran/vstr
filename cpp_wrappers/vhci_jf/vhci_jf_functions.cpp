@@ -4690,7 +4690,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                     }
                 }
             }*/
-            else if (DiffModes.size() == 2) 
+            else if (DiffModes.size() == 2 && MaxNMode >= 2) 
             {
                 Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
                 if (MaxNMode >= 3)
@@ -4706,7 +4706,7 @@ SpMat VCISparseHamNMode(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFu
                     }
                 }
             }
-            else if (DiffModes.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
+            else if (DiffModes.size() == 3 && MaxNMode >= 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
            
             #pragma omp critical
             if (abs(Vij) > thr)
@@ -4753,7 +4753,7 @@ SpMat VCISparseHamNModeFromOM(std::vector<WaveFunction> &BasisSet1, std::vector<
     if (TwoModePotential.size() == 1 and TwoModePotential[0].size() == 1) MaxNMode = 1;
 
     double thr = 1e-4;
-    //#pragma omp parallel for
+    #pragma omp parallel for
     for (unsigned int i = 0; i < BasisSet1.size(); i++)
     {
         std::vector<int> ModeOccI;
@@ -4827,7 +4827,7 @@ SpMat VCISparseHamNModeFromOM(std::vector<WaveFunction> &BasisSet1, std::vector<
                     }
                 }
             }
-            else if (DiffModes.size() == 2) 
+            else if (DiffModes.size() == 2 && MaxNMode >= 2)
             {
                 Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
                 if (MaxNMode >= 3)
@@ -4843,7 +4843,7 @@ SpMat VCISparseHamNModeFromOM(std::vector<WaveFunction> &BasisSet1, std::vector<
                     }
                 }
             }
-            else if (DiffModes.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
+            else if (DiffModes.size() == 3 && MaxNMode >= 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
            
             #pragma omp critical
             if (abs(Vij) > thr)
@@ -4993,6 +4993,122 @@ double VCISparseHamNModeElement(WaveFunction &BasisSet1, WaveFunction &BasisSet2
     return Vij;
 }
 
+double VCISparseHamNModeElementFromOM(WaveFunction &BasisSet1, WaveFunction &BasisSet2, std::vector<double> &Frequencies, double V0, std::vector<Eigen::VectorXd> &OneModeEig, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential)
+{
+    int MaxNMode = 3;
+    if (ThreeModePotential.size() == 1 and ThreeModePotential[0].size() == 1) MaxNMode = 2;
+    if (TwoModePotential.size() == 1 and TwoModePotential[0].size() == 1) MaxNMode = 1;
+
+    double thr = 1e-4;
+    std::vector<int> ModeOccI;
+    for (unsigned int m = 0; m < BasisSet1.Modes.size(); m++) ModeOccI.push_back(BasisSet1.Modes[m].Quanta);
+    double Vij = 0.0;
+    std::vector<int> ModeOccJ;
+    for (unsigned int m = 0; m < BasisSet2.Modes.size(); m++) ModeOccJ.push_back(BasisSet2.Modes[m].Quanta);
+    std::vector<int> DiffModes = CalcDiffModes(BasisSet1, BasisSet2);
+
+    // Kinetic Energy Part
+    if (DiffModes.size() == 0)
+    {
+        for (unsigned int m = 0; m < Frequencies.size(); m++) Vij += Frequencies[m] / 2 * (ModeOccI[m] + 0.5);
+    }
+    else if (DiffModes.size() == 1)
+    {
+        if (abs(ModeOccI[DiffModes[0]] - ModeOccJ[DiffModes[0]]) == 2)
+        {
+            int N = std::max(ModeOccI[DiffModes[0]], ModeOccJ[DiffModes[0]]);
+            Vij += -1 * Frequencies[DiffModes[0]] / 4 * sqrt(N * (N - 1));
+        }
+    }
+
+    // Potential Energy Part
+    if (DiffModes.size() > MaxNMode) 
+    {
+        return Vij;
+    }
+
+    std::vector<long unsigned int> SortedDiffModes = SortIndices(DiffModes);
+
+    if (DiffModes.size() == 0)
+    {
+        Vij += V0;
+        if (MaxNMode >= 1)
+        {
+            for (unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                Vij += OneModeEig[m][ModeOccI[m]];
+            }
+        }
+        if (MaxNMode >= 2)
+        {
+            for (unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+                {
+                    Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
+                }
+            }
+        }
+        if (MaxNMode >= 3)
+        {
+            for (unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+                {
+                    for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+                    {
+                        Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                    }
+                }
+            }
+        }
+    }   
+    else if (DiffModes.size() == 1) 
+    {
+        unsigned int m = DiffModes[SortedDiffModes[0]];
+        if (MaxNMode >= 2)
+        {
+            for (unsigned int n = 0; n < Frequencies.size(); n++)
+            {
+                if (n != m)
+                {
+                    Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
+                    if (MaxNMode >= 3)
+                    {
+                        for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+                        {
+                            if (o != m && o != n)
+                            {
+                                Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else if (DiffModes.size() == 2) 
+    {
+        Vij += TwoModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]];
+        if (MaxNMode >= 3)
+        {
+            unsigned int m = DiffModes[SortedDiffModes[0]];
+            unsigned int n = DiffModes[SortedDiffModes[1]];
+            for (unsigned int o = 0; o < Frequencies.size(); o++)
+            {
+                if (o != m && o != n)
+                {
+                    Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+                }
+            }
+        }
+    }
+    else if (DiffModes.size() == 3) Vij += ThreeModePotential[DiffModes[SortedDiffModes[0]]][DiffModes[SortedDiffModes[1]]][DiffModes[SortedDiffModes[2]]][ModeOccI[DiffModes[SortedDiffModes[0]]]][ModeOccI[DiffModes[SortedDiffModes[1]]]][ModeOccI[DiffModes[SortedDiffModes[2]]]][ModeOccJ[DiffModes[SortedDiffModes[0]]]][ModeOccJ[DiffModes[SortedDiffModes[1]]]][ModeOccJ[DiffModes[SortedDiffModes[2]]]];
+   
+    return Vij;
+}
+
+
 /***********************************************************************************************/
 /************************************ CIPSI FUNCTIONS ******************************************/
 /***********************************************************************************************/
@@ -5108,3 +5224,91 @@ std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, st
     for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
     return NewBasis;
 }
+
+std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &ConnectedBasis, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>>> &SortedIndices, Eigen::Ref<Eigen::VectorXd> C, double eps, bool ExactSingles){ // Expand basis via Heat Bath algorithm
+    HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
+    HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
+    for( WaveFunction& wfn : BasisSet){
+        HashedBasisInit.insert(wfn); // Populate hashed unordered_set with initial basis states
+    }
+
+    int NModes = SortedIndices.size();
+    int MaxQ = SortedIndices[0][0].size();
+    std::vector<double> CVec;
+    for (unsigned int n = 0; n < C.rows(); n++) CVec.push_back(abs(C[n]));
+    std::vector<long unsigned int> CSortedInd = SortIndices(CVec);
+    for (unsigned int n = 0; n < CSortedInd.size(); n++)
+    {
+        for (unsigned int i = 0; i < NModes; i++)
+        {
+            for (unsigned int j = i + 1; j < NModes; j++)
+            {
+                for (unsigned int m = 0; m < MaxQ * MaxQ; m++)
+                {
+                    int ni = BasisSet[CSortedInd[n]].Modes[i].Quanta;
+                    int nj = BasisSet[CSortedInd[n]].Modes[j].Quanta;
+                    int mi = SortedIndices[i][j][ni][nj][m][0];
+                    int mj = SortedIndices[i][j][ni][nj][m][1];
+                    if (ExactSingles && (((ni == mi) && (nj != mj)) || ((ni != mi) && (nj == mj)))) continue;
+                    if (abs(CVec[C[CSortedInd[n]]] * TwoModePotential[i][j][ni][nj][mi][mj]) >= eps)
+                    {
+                        WaveFunction tmp = BasisSet[CSortedInd[n]];
+                        tmp.Modes[i].Quanta = mi;
+                        tmp.Modes[j].Quanta = mj;
+                        if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
+                    }
+                    else break;
+                }
+            }
+        }
+    }
+
+    if (ExactSingles) // We have to calculate the exact single Hamiltonian matrix elements
+    {
+        std::vector<int> MaxQuanta;
+        std::vector<double> Freq;
+        std::vector<Eigen::VectorXd> tmpvV;
+        std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> tmp3Mode;
+        for (unsigned int i = 0; i < NModes; i++) Freq.push_back(1.0);
+        for (unsigned int i = 0; i < NModes; i++) MaxQuanta.push_back(MaxQ);
+        for (unsigned int n = 0; n < CVec.size(); n++)
+        {
+            for (unsigned int i = 0; i < NModes; i++)
+            {
+                for (unsigned int j = i + 1; j < NModes; j++)
+                {
+                    int ni = BasisSet[n].Modes[i].Quanta;
+                    int nj = BasisSet[n].Modes[j].Quanta;
+                    for (unsigned int m = 0; m < MaxQ; m++)
+                    {
+                        if (m != ni)
+                        {
+                            WaveFunction tmp = BasisSet[n];
+                            tmp.Modes[i].Quanta = m;
+                            double Hnnmn = VCISparseHamNModeElementFromOM(BasisSet[n], tmp, Freq, 0.0, tmpvV, TwoModePotential, tmp3Mode);
+                            if (abs(CVec[n] * Hnnmn) >= eps)
+                            {
+                                if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
+                            }
+                        }
+                        if (m != nj)
+                        {
+                            WaveFunction tmp = BasisSet[n];
+                            tmp.Modes[j].Quanta = m;
+                            double Hnnmn = VCISparseHamNModeElementFromOM(BasisSet[n], tmp, Freq, 0.0, tmpvV, TwoModePotential, tmp3Mode);
+                            if (abs(CVec[n] * Hnnmn) >= eps)
+                            {
+                                if (HashedBasisInit.count(tmp) == 0) HashedNewStates.insert(tmp);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    std::vector<WaveFunction> NewBasis;
+    for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
+    return NewBasis;
+}
+

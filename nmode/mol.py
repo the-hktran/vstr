@@ -10,10 +10,13 @@ AU2CM = 219474.63
 AMU2AU = 1822.888486209
 
 def ho_3d(x):
-    w = [0.00751348, 0.01746552, 0.01797136]
+    w = [0.00751569, 0.01746802, 0.01797638]
+    D = 0.1
+    a = 1
     #w = [1642.62705755, 3825.7245683,  3929.27450625]
-    return (0.5 * (w[0]**2 * x[0, 0]**2 + w[1]**2 * x[0, 1]**2 + w[2]**2 * x[0, 2]**2) * 1836.15267389
-            + 0.25 * 100 * x[0, 1] * x[0, 1] * x[0, 2] * x[0, 2]) # + 0.001 * x[0, 0] * x[0, 1] * x[0, 2] + 0.01 * x[0, 0]**2 * x[0, 1]**2 * x[0, 2]**2)
+    return (0.5 * (w[1]**2 * x[0, 1]**2 + w[2]**2 * x[0, 2]**2) * 1836.15267389
+        + D * (1 - np.exp(-a * x[0, 0]))**2)
+#            + 0.25 * 100 * x[0, 1] * x[0, 1] * x[0, 2] * x[0, 2]) # + 0.001 * x[0, 0] * x[0, 1] * x[0, 2] + 0.01 * x[0, 0]**2 * x[0, 1]**2 * x[0, 2]**2)
 
 class Molecule():
     '''
@@ -77,12 +80,12 @@ class Molecule():
         self.nm = NormalModes(self)
         self.nm.kernel(x0 = x0)
         #debug!!
-        #c = np.zeros((self.natoms * 3, self.nm.nmodes))
-        #c[:3,:3] = np.eye(3)
-        #self.nm.nm_coeff = c.reshape((self.natoms, 3, self.nm.nmodes))
-        #print(self.nm.freqs)
-        #self.potential_cart = ho_3d
-        #self.nm.x0 = np.zeros_like(self.nm.x0)
+        c = np.zeros((self.natoms * 3, self.nm.nmodes))
+        c[:3,:3] = np.eye(3)
+        self.nm.nm_coeff = c.reshape((self.natoms, 3, self.nm.nmodes))
+        print(self.nm.freqs)
+        self.potential_cart = ho_3d
+        self.nm.x0 = np.zeros_like(self.nm.x0)
         # debug!!
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
         self.x0 = self.nm.x0 / constants.ANGSTROM_TO_AU
