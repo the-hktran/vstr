@@ -33,21 +33,11 @@ class Molecule():
         self.onemode_eig = []
 
         self.ngridpts = 12
-
         self.Order = 2
-
-        self.FullTotalQuanta = 5
-        self.InitTotalQuanta = 2
+        self.IntPath = './'
+        self.ReadInt = False
 
         self.__dict__.update(kwargs)
-
-        self.FullMaxQuanta = self.ngridpts
-        self.InitMaxQuanta = self.ngridpts
-
-        if (isinstance(self.FullMaxQuanta, (int, np.int))):
-            self.FullMaxQuanta = [self.FullMaxQuanta] * self.Nm
-        if (isinstance(self.InitMaxQuanta, (int, np.int))):
-            self.InitMaxQuanta = [self.InitMaxQuanta] * self.Nm
 
     def _potential(self, x):
         """
@@ -58,9 +48,7 @@ class Molecule():
     def _nmode_potential(self, x):
         V = 0.0
         V += self.nm.V0
-        print('pre', x)
         q = self.nm._cart2normal(x)
-        print('pos', self.nm._normal2cart(q))
 
         if self.Order >= 1:
             for i in range(self.nm.nmodes):
@@ -96,21 +84,18 @@ class Molecule():
             Order = self.Order
         self.nmode = NModePotential(self.nm)
         self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
-        for i in range(Order):
-            self.ints[i] = self.nmode.get_ints(i+1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
-            if i == 0:
-                for j in range(self.Nm):
-                    OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
-                    OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
-                    e, v = np.linalg.eigh(OMH.todense())
-                    self.onemode_coeff.append(v)
-                    self.onemode_eig.append(e)
-
-        #if Order >= 2:
-        #    N = len(self.ints[0])
-        #    for i in range(N):
-        #        for j in range(N):
-        #            self.ints[1][i,j] = self.ints[1][i,j] - self.ints[0][i] - self.ints[0][j]
+        if self.ReadInt:
+            self.ReadIntegrals()
+        else:
+            for i in range(Order):
+                self.ints[i] = self.nmode.get_ints(i+1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+                if i == 0:
+                    for j in range(self.Nm):
+                        OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
+                        OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
+                        e, v = np.linalg.eigh(OMH.todense())
+                        self.onemode_coeff.append(v)
+                        self.onemode_eig.append(e)
 
     def InitializeBasis(self):
         self.FullBasis = init_funcs.InitTruncatedBasis(self.Nm, self.Frequencies, self.FullMaxQuanta, self.FullTotalQuanta)
@@ -124,6 +109,24 @@ class Molecule():
         FullBasis = [self.FullBasis[i] for i in IndexBasis] + [self.FullBasis[i] for i in IndexOther]
         self.FullBasis = FullBasis
         return FullBasis, IndexBasis, IndexOther
+
+    def SaveIntegrals(self, IntPath = None, IntFile = 'ints'):
+        if IntPath is None:
+            IntPath = self.IntPath
+        for i in range(self.Order):
+            np.save(IntPath + '/' + IntFile + '_' + str(i + 1), self.ints[i])
+        np.save(IntPath + '/' + IntFile + '_eig', np.asarray(self.onemode_eig))
+
+    def ReadIntegrals(self, IntPath = None, IntFile = 'ints'):
+        if IntPath is None:
+            IntPath = self.IntPath
+        #self.ints = [None] * self.Order
+        for i in range(self.Order):
+            self.ints[i] = np.load(IntPath + '/' + IntFile + '_' + str(i + 1) + '.npy', allow_pickle = True)
+        self.onemode_eig = []
+        onemode_eig = np.load(IntPath + '/' + IntFile + '_eig.npy', allow_pickle = True)
+        for i in range(self.Nm):
+            self.onemode_eig.append(onemode_eig[i, :])
 
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)

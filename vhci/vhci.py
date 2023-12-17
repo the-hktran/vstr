@@ -462,16 +462,11 @@ class NModeVHCI(VHCI):
         self.mol = mol
         self.Frequencies = mol.Frequencies # 1D array of all harmonic frequencies.
         self.NModes = self.Frequencies.shape[0]
-        self.MaxQuanta = mol.InitMaxQuanta
-        #if isinstance(MaxQuanta, int):
-        #    self.MaxQuanta = [MaxQuanta] * self.NModes
+        self.MaxQuanta = [mol.ngridpts] * self.NModes
         
-        self.MaxTotalQuanta = mol.InitTotalQuanta
-        #self.MaxTotalQuanta = MaxTotalQuanta
-        assert(self.MaxTotalQuanta <= mol.InitTotalQuanta)
+        self.MaxTotalQuanta = 5
         for m in self.MaxQuanta:
             assert(m <= mol.ngridpts)
-        self._HighestQuanta = [mol.InitTotalQuanta] * self.NModes
         self.H = None
         self.eps1 = 0.1 # HB epsilon
         self.eps2 = 0.01 # PT2/SPT2 epsilon
