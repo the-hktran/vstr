@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, DoSpectralPT2
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, DoSpectralPT2, VCISparseHamNMode
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
 import matplotlib.pyplot as plt
@@ -27,6 +27,19 @@ def GetTransitionDipoleMatrix(mIR, xi = None, IncludeZeroth = False):
             Dx.setdiag(0)
         mIR.D[xi] = Dx
 
+def GetTransitionDipoleMatrixNMode(mIR, xi = None, IncludeZeroth = False):
+    if xi is None:
+        mIR.D = []
+        for x in range(3):
+            Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0, mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
+            if not IncludeZeroth:
+                Dx.setdiag(0)
+            mIR.D.append(Dx)
+    else:
+        Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0, mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
+        if not IncludeZeroth:
+            Dx.setdiag(0)
+        mIR.D[xi] = Dx
 
 def GetTransitionDipoleMatrixFromVSCF(mIR, xi = None, IncludeZeroth = False):
     X0 = []
@@ -73,6 +86,30 @@ def GetAb(mIR, w, Basis = None, xi = None):
     else:
         b[xi] = np.asarray(mIR.D[xi] @ C[:, 0]).T
     return A, b
+
+def GetAbNMode(mIR, w, Basis = None, xi = None):
+    if Basis is None:
+        H = mIR.mVCI.H
+        C = mIR.mVCI.C
+        E = mIR.mVCI.E
+    else:
+        H = VCISparseHamNMode(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.mu0, mIR.mVCI.mol.ints[0], mIR.mVCI.mol.ints[1], mIR.mVCI.mol.ints[2], True)
+        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
+
+    #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
+    HDiag = H.diagonal()
+    HDiag = (w + mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
+    A = -1 * H
+    A.setdiag(HDiag)
+    A = A.tocsr()
+    b = [None] * 3
+    if xi is None:
+        for x in range(3):
+            b[x] = np.asarray(mIR.D[x] @ C[:, 0]).T
+    else:
+        b[xi] = np.asarray(mIR.D[xi] @ C[:, 0]).T
+    return A, b
+
 
 def GetAbFromVSCF(mIR, w, Basis = None, xi = None):
     if Basis is None:
@@ -356,6 +393,33 @@ class VSCFLinearResponseIR(LinearResponseIR):
         self.Xs = mVCI.Xs
 
         self.__dict__.update(kwargs)
+
+class LinearResponseIRNMode(LinearResponseIR):
+    GetTransitionDipoleMatrix = GetTransitionDipoleMatrixNMode
+    GetAb = GetAbNMode
+    
+    def __init__(self, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, SpectralHBMethod = 2, **kwargs):
+        self.mVCI = mVCI
+        
+        self.SpectralHBMethod = SpectralHBMethod
+        
+        self.Basis0 = mVCI.Basis.copy()
+        self.H0 = mVCI.H.copy()
+        self.C0 = mVCI.C.copy()
+        self.E0 = mVCI.E.copy()
+        self.Frequencies = mVCI.Frequencies
+        self.eps1 = mVCI.eps1 / 100
+        self.eps2 = self.eps1 / 100
+        self.NormalModes = NormalModes
+        self.InitState = 0
+        self.FreqRange = FreqRange
+        self.NPoints = NPoints
+        self.eta = eta
+        self.Normalize = False
+        self.DoPT2 = False
+
+        self.__dict__.update(kwargs)
+
 
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes

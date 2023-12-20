@@ -1,9 +1,12 @@
+import sys
 import numpy as np
 import scipy
 import numdifftools as nd
 from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
+from vstr.spectra.dipole import GetDipole
+from pyscf import gto, scf, cc
 
 A2B = 1.88973
 AU2CM = 219474.63 
@@ -18,6 +21,35 @@ def ho_3d(x):
         + D * (1 - np.exp(-a * x[0, 0]))**2)
 #            + 0.25 * 100 * x[0, 1] * x[0, 1] * x[0, 2] * x[0, 2]) # + 0.001 * x[0, 0] * x[0, 1] * x[0, 2] + 0.01 * x[0, 0]**2 * x[0, 1]**2 * x[0, 2]**2)
 
+def PyPotential(x, pymol, Method = 'ccsd(t)'):
+    new_mol = pymol.copy()
+    new_mol.unit = 'B'
+    atom = []
+    for i in range(pymol.natm):
+        atom.append([pymol.atom_symbol(i), (x[i, 0], x[i, 1], x[i, 2])])
+    new_mol.atom = atom
+    new_mol.build()
+    mf = scf.RHF(new_mol)
+    mf.kernel(verbose = 0)
+    E = mf.e_tot
+    if Method == 'ccsd(t)':
+        mcc = cc.CCSD(mf).run(verbose = 0)
+        de = mcc.ccsd_t()
+        E = mcc.e_tot + de
+    return E
+
+def PyDipole(x, pymol, Method = 'rhf'):
+    new_mol = pymol.copy()
+    new_mol.unit = 'B'
+    atom = []
+    for i in range(pymol.natm):
+        atom.append([pymol.atom_symbol(i), (x[i, 0], x[i, 1], x[i, 2])])
+    new_mol.atom = atom
+    new_mol.build()
+    mf = scf.RHF(new_mol)
+    mf.kernel(verbose = 0)
+    return GetDipole(new_mol, mf, Method = Method)
+
 class Molecule():
     '''
     Atomic units are used throughout. 
@@ -26,6 +58,7 @@ class Molecule():
     def __init__(self, potential_cart, natoms, mass, **kwargs):
 
         self.potential_cart = potential_cart
+        self.dipole_cart = None
         self.natoms = natoms
         self.Nm = 3 * natoms - 6
         self.mass = mass
@@ -34,16 +67,32 @@ class Molecule():
 
         self.ngridpts = 12
         self.Order = 2
+        self.calc_dipole = False
         self.IntPath = './'
         self.ReadInt = False
+        self.ReadDip = False
 
         self.__dict__.update(kwargs)
+
+    def init_pypotential(self, pymol, Method = 'ccsd(t)'):
+        def pypot(x):
+            return PyPotential(x, pymol, Method = Method)
+        self.potential_cart = pypot
+
+    def init_pydipole(self, pymol, Method = 'rhf'):
+        self.calc_dipole = True
+        def pydip(x):
+            return PyDipole(x, pymol, Method = Method)
+        self.dipole_cart = pydip
 
     def _potential(self, x):
         """
         Calculate the potential with 3N-dimensional argument.
         """
         return self.potential_cart(x.reshape((self.natoms,3)))
+    
+    def _dipole(self, x):
+        return self.dipole_cart(x.reshape((self.natoms, 3)))
 
     def _nmode_potential(self, x):
         V = 0.0
@@ -78,6 +127,7 @@ class Molecule():
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
         self.x0 = self.nm.x0 / constants.ANGSTROM_TO_AU
         self.V0 = self.nm.V0 * constants.AU_TO_INVCM
+        self.mu0 = self.nm.mu0
 
     def CalcNModePotential(self, Order = None):
         if Order is None:
@@ -96,6 +146,30 @@ class Molecule():
                         e, v = np.linalg.eigh(OMH.todense())
                         self.onemode_coeff.append(v)
                         self.onemode_eig.append(e)
+
+    
+    def CalcNModeDipole(self, Order = None):
+        if Order is None:
+            Order = self.Order
+        
+        # Did not calculate one-mode integrals yet. Need to do that now
+        if len(self.onemode_coeff) == 0:
+            self.nmode = NModePotential(self.nm)
+            ints1 = self.nmode.get_ints(1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+            for j in range(self.Nm):
+                OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
+                OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], [[[[[[]]]]]], [[[[[[[[[]]]]]]]]], True)
+                e, v = np.linalg.eigh(OMH.todense())
+                self.onemode_coeff.append(v)
+                self.onemode_eig.append(e)
+
+        self.dip_ints = [np.asarray([[]]), np.asarray([[[[[[[]]]]]]]), np.asarray([[[[[[[[[[]]]]]]]]]])]
+        if self.ReadDip:
+            self.ReadDipole()
+        else:
+            for i in range(Order):
+                self.dips[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+
 
     def InitializeBasis(self):
         self.FullBasis = init_funcs.InitTruncatedBasis(self.Nm, self.Frequencies, self.FullMaxQuanta, self.FullTotalQuanta)
@@ -117,6 +191,12 @@ class Molecule():
             np.save(IntPath + '/' + IntFile + '_' + str(i + 1), self.ints[i])
         np.save(IntPath + '/' + IntFile + '_eig', np.asarray(self.onemode_eig))
 
+    def SaveDipoles(self, IntPath = None, IntFile = 'dips'):
+        if IntPath is None:
+            IntPath = self.IntPath
+        for i in range(self.Order):
+            np.save(IntPath + '/' + IntFile + '_' + str(i + 1), self.ints[i])
+
     def ReadIntegrals(self, IntPath = None, IntFile = 'ints'):
         if IntPath is None:
             IntPath = self.IntPath
@@ -127,6 +207,12 @@ class Molecule():
         onemode_eig = np.load(IntPath + '/' + IntFile + '_eig.npy', allow_pickle = True)
         for i in range(self.Nm):
             self.onemode_eig.append(onemode_eig[i, :])
+
+    def ReadDipoles(self, IntPath = None, IntFile = 'dips'):
+        if IntPath is None:
+            IntPath = self.IntPath
+        for i in range(self.Order):
+            self.dip_ints[i] = np.load(IntPath + '/' + IntFile + '_' + str(i + 1) + '.npy', allow_pickle = True)
 
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
@@ -157,9 +243,15 @@ class NormalModes():
             x0 = np.random.random((natoms,3))
 
         pes = self.mol._potential
+        print("Beginning geometry optimization...", flush = True)
         result = scipy.optimize.minimize(pes, x0, tol = 1e-12)
+        print("...geometry optimization complete.", flush = True)
         self.x0 = result.x.reshape((natoms,3))
         self.V0 = pes(self.x0.reshape(-1))
+        try:
+            self.mu0 = self.mol._dipole(x0)
+        except:
+            self.mu0 = 0
         
         hess0 = self.hessian(self.x0).reshape((natoms*3, natoms*3))
 
@@ -294,6 +386,36 @@ class NormalModes():
         x = self._normal2cart(q)
         return (self.mol.potential_cart(x) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(j, k, qj, qk) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk) - self.V0)
 
+    def dipole_1mode(self, i, qi):
+        """
+        Calculate the 1-mode potential.
+        
+        Parameters:
+        i (int): the mode index
+        qi (float): the normal mode coordinate
+        """
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        x = self._normal2cart(q)
+        return self.mol.dipole_cart(x) - self.mu0
+
+    def dipole_2mode(self, i, j, qi, qj):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        x = self._normal2cart(q)
+        return (self.mol.dipole_cart(x)
+                - self.dipole_1mode(i,qi) - self.dipole_1mode(j,qj) - self.mu0)
+
+    def dipole_3mode(self, i, j, k, qi, qj, qk):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        q[k] = qk
+        x = self._normal2cart(q)
+        return (self.mol.dipole_cart(x) - self.dipole_2mode(i, j, qi, qj) - self.dipole_2mode(i, k, qi, qk) - self.dipole_2mode(j, k, qj, qk) - self.dipole_1mode(i, qi) - self.dipole_1mode(j, qj) - self.dipole_1mode(k, qk) - self.mu0)
+
+
 def get_qmat_ho(omega, nmax):
     qmat = np.zeros((nmax,nmax))
     for n in range(nmax-1):
@@ -383,7 +505,7 @@ class NModePotential():
         self.nm = nm
 
     def get_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
-        
+        print("Calculating n-Mode integrals for n =", nmode, flush = True) 
         if optimized is False:
             if ngridpts is None:
                 ngridpts = [12]*self.nm.nmodes
@@ -431,10 +553,71 @@ class NModePotential():
                     for k in range(nmodes):
                         Ck = coeff[k].T @ onemode_coeff[k]
                         vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                        print("Size of vgrid", sys.getsizeof(vgrid))
                         vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
+                        print("Size of vijk", vijk.shape, sys.getsizeof(vijk), flush = True)
                         ints[i, j, k] = vijk * constants.AU_TO_INVCM
+                        print("Size of ints", sys.getsizeof(ints), flush = True)
 
         return ints
+
+    def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
+        print("Calculating n-Mode integrals for n =", nmode, flush = True) 
+        if optimized is False:
+            if ngridpts is None:
+                ngridpts = [12]*self.nm.nmodes
+            elif isinstance(ngridpts, (int, np.integer)):
+                ngridpts = [ngridpts]*self.nm.nmodes
+
+            gridpts, coeff = self.get_heg(ngridpts)
+
+        else:
+            if ngridpts is None:
+                ngridpts = [8]*self.nm.nmodes
+            elif isinstance(ngridpts, (int, np.integer)):
+                ngridpts = [ngridpts]*self.nm.nmodes
+
+            if ngridpts0 is None:
+                ngridpts0 = [12]*self.nm.nmodes
+            elif isinstance(ngridpts0, (int, np.integer)):
+                ngridpts0 = [ngridpts0]*self.nm.nmodes
+
+            gridpts, coeff = self.get_heg(ngridpts, optimized, ngridpts0)
+
+        nmodes = self.nm.nmodes
+        if nmode == 1:
+            ints = np.empty(nmodes, dtype=object)
+            for i in range(nmodes):
+                vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                Ci = coeff[i].T @ onemode_coeff[i]
+                vi = np.einsum('gp,gx,gp->xpq', Ci, vgrid, Ci, optimize=True)
+                vix = np.dot(coeff[i], np.dot(np.diag(vgrid[:,0]), coeff[i].T))
+                ints[i] = vi
+        elif nmode == 2:
+            ints = np.empty((nmodes,nmodes), dtype=object)
+            for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
+                for j in range(nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
+                    vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
+                    vij = np.einsum('gp,hq,ghx,gr,hs->xpqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
+                    ints[i, j] = vij
+
+        elif nmode == 3:
+            ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
+            for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
+                for j in range(nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
+                    for k in range(nmodes):
+                        Ck = coeff[k].T @ onemode_coeff[k]
+                        vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                        vijk = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+                        vijk = np.einsum('gp,hq,fr,ghfx,gs,ht,fu->xpqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
+                        ints[i, j, k] = vijk
+
+        return ints
+
 
 
     def get_heg(self, ngridpts, optimized=False, ngridpts0=None):
