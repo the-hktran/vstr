@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import scipy
 import numdifftools as nd
+import h5py
 from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
@@ -21,7 +22,7 @@ def ho_3d(x):
         + D * (1 - np.exp(-a * x[0, 0]))**2)
 #            + 0.25 * 100 * x[0, 1] * x[0, 1] * x[0, 2] * x[0, 2]) # + 0.001 * x[0, 0] * x[0, 1] * x[0, 2] + 0.01 * x[0, 0]**2 * x[0, 1]**2 * x[0, 2]**2)
 
-def PyPotential(x, pymol, Method = 'ccsd(t)'):
+def PyPotential(x, pymol, Method = 'rhf'):
     new_mol = pymol.copy()
     new_mol.unit = 'B'
     atom = []
@@ -68,7 +69,7 @@ class Molecule():
         self.ngridpts = 12
         self.Order = 2
         self.calc_dipole = False
-        self.IntPath = './'
+        self.IntsFile = "./ints.h5"
         self.ReadInt = False
         self.ReadDip = False
 
@@ -168,7 +169,7 @@ class Molecule():
             self.ReadDipole()
         else:
             for i in range(Order):
-                self.dips[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+                self.dip_ints[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
 
 
     def InitializeBasis(self):
@@ -184,42 +185,111 @@ class Molecule():
         self.FullBasis = FullBasis
         return FullBasis, IndexBasis, IndexOther
 
-    def SaveIntegrals(self, IntPath = None, IntFile = 'ints'):
-        if IntPath is None:
-            IntPath = self.IntPath
-        for i in range(self.Order):
-            np.save(IntPath + '/' + IntFile + '_' + str(i + 1), self.ints[i])
-        np.save(IntPath + '/' + IntFile + '_eig', np.asarray(self.onemode_eig))
+    def SaveIntegrals(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+        
+        with h5py.File(IntsFile, "a") as f:
+            if "ints" in f:
+                del f["ints"]
+            g = f.create_group("ints")
+            g1 = g.create_group("1")
+            for i in range(self.Nm):
+                g1.create_dataset("%d" % (i + 1), data = self.ints[0][i])
+            if self.Order >= 2:
+                g2 = g.create_group("2")
+                for i in range(self.Nm):
+                    for j in range(self.Nm):
+                        g2.create_dataset("%d_%d" % (i + 1, j + 1), data = self.ints[1][i, j])
+                if self.Order >= 3:
+                    g3 = g.create_group("3")
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                g3.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.ints[2][i, j, k])
 
-    def SaveDipoles(self, IntPath = None, IntFile = 'dips'):
-        if IntPath is None:
-            IntPath = self.IntPath
-        for i in range(self.Order):
-            np.save(IntPath + '/' + IntFile + '_' + str(i + 1), self.ints[i])
+            if "onemode_eig" in f:
+                del f["onemode_eig"]
+            f1e = f.create_group("onemode_eig")
+            for i in range(self.Nm):
+                f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
 
-    def ReadIntegrals(self, IntPath = None, IntFile = 'ints'):
+    def SaveDipoles(self, IntsPath = None):
         if IntPath is None:
             IntPath = self.IntPath
-        #self.ints = [None] * self.Order
-        for i in range(self.Order):
-            self.ints[i] = np.load(IntPath + '/' + IntFile + '_' + str(i + 1) + '.npy', allow_pickle = True)
-        self.onemode_eig = []
-        onemode_eig = np.load(IntPath + '/' + IntFile + '_eig.npy', allow_pickle = True)
-        for i in range(self.Nm):
-            self.onemode_eig.append(onemode_eig[i, :])
+        
+        with h5py.File(IntsFile, "a") as f:
+            if "dip_ints" in f:
+                del f["dip_ints"]
+            g = f.create_group("dip_ints")
+            g1 = g.create_group("1")
+            for i in range(self.Nm):
+                g1.create_dataset("%d" % (i + 1), data = self.dip_ints[0][i])
+            if self.Order >= 2:
+                g2 = g.create_group("2")
+                for i in range(self.Nm):
+                    for j in range(self.Nm):
+                        g2.create_dataset("%d_%d" % (i + 1, j + 1), data = self.dip_ints[1][i, j])
+                if self.Order >= 3:
+                    g3 = g.create_group("3")
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                g3.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.dip_ints[2][i, j, k])
 
-    def ReadDipoles(self, IntPath = None, IntFile = 'dips'):
-        if IntPath is None:
-            IntPath = self.IntPath
-        for i in range(self.Order):
-            self.dip_ints[i] = np.load(IntPath + '/' + IntFile + '_' + str(i + 1) + '.npy', allow_pickle = True)
+
+    def ReadIntegrals(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+
+        with h5py.File(IntsFile, "r") as f:
+            for n in range(self.Order):
+                if n == 0:
+                    self.ints[n] = np.empty(self.Nm, dtype = object)
+                    for i in range(self.Nm):
+                        self.ints[n][i] = f["ints/%d/%d" % (n + 1, i + 1)][()]
+                if n == 1:
+                    self.ints[n] = np.empty((self.Nm, self.Nm), dtype = object)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                if n == 2:
+                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype = object)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+            self.onemode_eig = []
+            for i in range(self.Nm):
+                self.onemode_eig.append(f["onemode_eig/%d" % (i + 1)][()])
+
+    def ReadDipoles(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+
+        with h5py.File(IntsFile, "r") as f:
+            for n in range(self.Order):
+                if n == 0:
+                    self.dip_ints[n] = np.empty(self.Nm, dtype = object)
+                    for i in range(self.Nm):
+                        self.ints[n][i] = f["dip_ints/%d/$d" % (n + 1, i + 1)][()]
+                if n == 1:
+                    self.dip_ints[n] = np.empty((self.Nm, self.Nm), dtype = object)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            self.ints[n][i, j] = f["dip_ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                if n == 2:
+                    self.dip_ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype = object)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                self.ints[n][i, j, k] = f["dip_ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
 
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
-        #self.InitializeBasis()
-        #self.ReorganizeBasis()
-        # The NMode potential is done in HO basis, doesn't see product basis
         self.CalcNModePotential()
+        if self.calc_dipole:
+            self.CalcNModeDipole()
 
 
 class NormalModes():
@@ -553,16 +623,13 @@ class NModePotential():
                     for k in range(nmodes):
                         Ck = coeff[k].T @ onemode_coeff[k]
                         vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
-                        print("Size of vgrid", sys.getsizeof(vgrid))
                         vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
-                        print("Size of vijk", vijk.shape, sys.getsizeof(vijk), flush = True)
                         ints[i, j, k] = vijk * constants.AU_TO_INVCM
-                        print("Size of ints", sys.getsizeof(ints), flush = True)
 
         return ints
 
     def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
-        print("Calculating n-Mode integrals for n =", nmode, flush = True) 
+        print("Calculating n-Mode dipole integrals for n =", nmode, flush = True) 
         if optimized is False:
             if ngridpts is None:
                 ngridpts = [12]*self.nm.nmodes
@@ -588,9 +655,10 @@ class NModePotential():
         if nmode == 1:
             ints = np.empty(nmodes, dtype=object)
             for i in range(nmodes):
-                vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                vgrid = np.array([self.nm.dipole_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                 Ci = coeff[i].T @ onemode_coeff[i]
-                vi = np.einsum('gp,gx,gp->xpq', Ci, vgrid, Ci, optimize=True)
+                print(vgrid.shape)
+                vi = np.einsum('gp,gx,gq->xpq', Ci, vgrid, Ci, optimize=True)
                 vix = np.dot(coeff[i], np.dot(np.diag(vgrid[:,0]), coeff[i].T))
                 ints[i] = vi
         elif nmode == 2:
@@ -599,7 +667,7 @@ class NModePotential():
                 Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
                     Cj = coeff[j].T @ onemode_coeff[j]
-                    vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
+                    vgrid = np.array([[self.nm.dipole_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
                     vij = np.einsum('gp,hq,ghx,gr,hs->xpqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
                     ints[i, j] = vij
 
@@ -611,7 +679,7 @@ class NModePotential():
                     Cj = coeff[j].T @ onemode_coeff[j]
                     for k in range(nmodes):
                         Ck = coeff[k].T @ onemode_coeff[k]
-                        vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                        vgrid = np.array([[[self.nm.dipole_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
                         vijk = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
                         vijk = np.einsum('gp,hq,fr,ghfx,gs,ht,fu->xpqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
                         ints[i, j, k] = vijk
@@ -655,3 +723,47 @@ class NModePotential():
 
         self.gridpts, self.coeff = gridpts, coeff
         return self.gridpts, self.coeff 
+
+if __name__ == '__main__':
+    from vstr.examples.potentials.h2o.h2o_pot import calc_h2o_pot
+    def pot_cart(coords):
+        if np.array(coords).ndim == 3:
+            return calc_h2o_pot(coords, len(coords))
+        else:
+            return calc_h2o_pot([coords], 1)[0]
+
+    x0 = np.array([
+        [0, -0.757, 0.587],
+        [0,  0.757, 0.587],
+        [0,  0    , 0    ]]) 
+    x0 *= constants.ANGSTROM_TO_AU
+    mass_h = 1836.152697 # in au
+    mass_o = 29148.94642
+
+    mass = [mass_h, mass_h, mass_o]
+
+    pymol = gto.M()
+    pymol.atom = 'H 0 -.757, .587; H 0 .757 .587; O 0 0 0'
+    pymol.basis = 'sto-3g'
+    pymol.build()
+
+    vmol = Molecule(pot_cart, x0.shape[0], mass, ngridpts = 2, Order = 3)
+    vmol.IntsFile = './ints.h5'
+    vmol.calc_dipole = True
+    vmol.init_pydipole(pymol)
+    vmol.kernel(x0 = x0)
+    vmol.SaveIntegrals()
+    vmol.SaveDipoles()
+
+    print(vmol.ints[0])
+    print(vmol.dip_ints[0])
+
+    vmol_read = Molecule(pot_cart, x0.shape[0], mass, ngridpts=2, Order = 3)
+    vmol_read.ReadInt = True
+    vmol_read.ReadDip = True
+    vmol.calc_dipole = True
+    vmol_read.IntsFile = './ints.h5'
+    vmol_read.kernel(x0 = x0)
+    
+    print(vmol_read.ints[0])
+    print(vmol_read.dip_ints[0])

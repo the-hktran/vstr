@@ -12,6 +12,7 @@
 * Matplotlib
 * Numdifftools
 * PySCF and its dependencies
+* h5py
 
 ### C++ Dependencies
 * Eigen
@@ -25,7 +26,7 @@
 * Epstein-Nesbet Pertubation Theory of Second Order on top of VHCI solutions done deterministically, stochastically, and semi-stochastically (**VHCI+PT2**)
 * Optimized Coordinates for VSCF (**OC-VSCF**)
 * Numerical PES derivatives computed at various levels of theory up to sextic through the use of PySCF
-* IR spectral intensities and frequencies determined from VHCI using a dipole surface expansion
+* IR spectral intensities and frequencies determined from VHCI using a dipole surface expansion or an n-Mode dipole surface
 
 ## Author
 
@@ -33,4 +34,5 @@ Written by Henry K. Tran (hkt2112@columbia.edu) based on code written by Jonatha
 
 ## Publications
 
-* VHCI and VHCI+PT2: Jonathan H. Fetherolf and Timothy C. Berkelbach, "Vibrational heat-bath configuration interaction", J. Chem. Phys. 154, 074104 (2021) https://doi.org/10.1063/5.0035454 
+* Semistochastic VHCI+PT2 and VSCF references: H. K. Tran and T. C. Berkelbach, "Vibrational heat-bath configuration interaction with semistochastic perturbation theory using harmonic oscillator or VSCF modals", J. Chem. Phys. 159, 194101 (2023) https://doi.org/10.1063/5.0172702
+* VHCI and VHCI+PT2: J. H. Fetherolf and T. C. Berkelbach, "Vibrational heat-bath configuration interaction", J. Chem. Phys. 154, 074104 (2021) https://doi.org/10.1063/5.0035454 
