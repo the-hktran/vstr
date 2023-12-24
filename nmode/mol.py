@@ -166,7 +166,7 @@ class Molecule():
 
         self.dip_ints = [np.asarray([[]]), np.asarray([[[[[[[]]]]]]]), np.asarray([[[[[[[[[[]]]]]]]]]])]
         if self.ReadDip:
-            self.ReadDipole()
+            self.ReadDipoles()
         else:
             for i in range(Order):
                 self.dip_ints[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
@@ -214,9 +214,9 @@ class Molecule():
             for i in range(self.Nm):
                 f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
 
-    def SaveDipoles(self, IntsPath = None):
-        if IntPath is None:
-            IntPath = self.IntPath
+    def SaveDipoles(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
         
         with h5py.File(IntsFile, "a") as f:
             if "dip_ints" in f:
@@ -272,18 +272,18 @@ class Molecule():
                 if n == 0:
                     self.dip_ints[n] = np.empty(self.Nm, dtype = object)
                     for i in range(self.Nm):
-                        self.ints[n][i] = f["dip_ints/%d/$d" % (n + 1, i + 1)][()]
+                        self.dip_ints[n][i] = f["dip_ints/%d/%d" % (n + 1, i + 1)][()]
                 if n == 1:
                     self.dip_ints[n] = np.empty((self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
-                            self.ints[n][i, j] = f["dip_ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                            self.dip_ints[n][i, j] = f["dip_ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
                 if n == 2:
                     self.dip_ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
                             for k in range(self.Nm):
-                                self.ints[n][i, j, k] = f["dip_ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+                                self.dip_ints[n][i, j, k] = f["dip_ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
 
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
@@ -761,7 +761,7 @@ if __name__ == '__main__':
     vmol_read = Molecule(pot_cart, x0.shape[0], mass, ngridpts=2, Order = 3)
     vmol_read.ReadInt = True
     vmol_read.ReadDip = True
-    vmol.calc_dipole = True
+    vmol_read.calc_dipole = True
     vmol_read.IntsFile = './ints.h5'
     vmol_read.kernel(x0 = x0)
     
