@@ -513,7 +513,7 @@ class NModeVHCI(VHCI):
             self.PotentialListFull = []
 
         if self.HBMethod.upper() == '2MODE':
-            self.Sorted2Mode = np.empty((self.mol.Nm, self.mol.Nm, self.mol.ngridpts, self.mol.ngridpts, self.mol.ngridpts**2, 2), dtype = object)
+            self.Sorted2Mode = np.empty((self.mol.Nm, self.mol.Nm, self.mol.ngridpts, self.mol.ngridpts, self.mol.ngridpts**2, 2), dtype = np.int8)
             for i in range(self.mol.Nm):
                 for j in range(self.mol.Nm):
                     for ni in range(self.mol.ngridpts):

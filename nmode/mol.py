@@ -68,6 +68,7 @@ class Molecule():
 
         self.ngridpts = 12
         self.Order = 2
+        self.calc_integrals = True
         self.calc_dipole = False
         self.IntsFile = "./ints.h5"
         self.ReadInt = False
@@ -208,11 +209,22 @@ class Molecule():
                             for k in range(self.Nm):
                                 g3.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.ints[2][i, j, k])
 
+            if "onemode_coeff" in f:
+                del f["onemode_coeff"]
+            f1c = f.create_group("onemode_coeff")
+            for i in range(self.Nm):
+                f1c.create_dataset("%d" % (i + 1), data = self.onemode_coeff[i])
             if "onemode_eig" in f:
                 del f["onemode_eig"]
             f1e = f.create_group("onemode_eig")
             for i in range(self.Nm):
                 f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
+            if "nm_coeff" in f:
+                del f["nm_coeff"]
+            f.create_dataset("nm_coeff", data = self.nm.nm_coeff)
+            if "freq" in f:
+                del f["freq"]
+            f.create_dataset("freq", self.Frequencies)
 
     def SaveDipoles(self, IntsFile = None):
         if IntsFile is None:
@@ -287,8 +299,11 @@ class Molecule():
 
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
-        self.CalcNModePotential()
+        if self.calc_integrals:
+            self.CalcNModePotential()
         if self.calc_dipole:
+            if not self.calc_integrals:
+                self.CalcNModePotential(Order = 1)
             self.CalcNModeDipole()
 
 
@@ -749,15 +764,16 @@ if __name__ == '__main__':
 
     vmol = Molecule(pot_cart, x0.shape[0], mass, ngridpts = 2, Order = 3)
     vmol.IntsFile = './ints.h5'
-    vmol.calc_dipole = True
-    vmol.init_pydipole(pymol)
+    #vmol.calc_dipole = True
+    #vmol.init_pydipole(pymol)
     vmol.kernel(x0 = x0)
     vmol.SaveIntegrals()
-    vmol.SaveDipoles()
+    #vmol.SaveDipoles()
 
     print(vmol.ints[0])
-    print(vmol.dip_ints[0])
+    #print(vmol.dip_ints[0])
 
+    '''
     vmol_read = Molecule(pot_cart, x0.shape[0], mass, ngridpts=2, Order = 3)
     vmol_read.ReadInt = True
     vmol_read.ReadDip = True
@@ -767,3 +783,4 @@ if __name__ == '__main__':
     
     print(vmol_read.ints[0])
     print(vmol_read.dip_ints[0])
+    '''
