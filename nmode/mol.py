@@ -31,15 +31,18 @@ def PyPotential(x, pymol, Method = 'rhf'):
     new_mol.atom = atom
     new_mol.build()
     mf = scf.RHF(new_mol)
-    mf.kernel(verbose = 0)
+    mf.kernel(verbose = 0, max_cycle = 10000)
     E = mf.e_tot
     if Method == 'ccsd(t)':
         mcc = cc.CCSD(mf).run(verbose = 0)
         de = mcc.ccsd_t()
         E = mcc.e_tot + de
+    elif Method == 'ccsd':
+        mcc = cc.CCSD(mf).run(verbose = 0)
+        E = mcc.e_tot
     return E
 
-def PyDipole(x, pymol, Method = 'rhf'):
+def PyDipole(x, pymol, Method = 'rhf', ReturnE = False):
     new_mol = pymol.copy()
     new_mol.unit = 'B'
     atom = []
@@ -48,8 +51,8 @@ def PyDipole(x, pymol, Method = 'rhf'):
     new_mol.atom = atom
     new_mol.build()
     mf = scf.RHF(new_mol)
-    mf.kernel(verbose = 0)
-    return GetDipole(new_mol, mf, Method = Method)
+    mf.kernel(verbose = 0, max_cycle = 10000)
+    return GetDipole(new_mol, mf, Method = Method, ReturnE = ReturnE)
 
 class Molecule():
     '''
@@ -70,22 +73,34 @@ class Molecule():
         self.Order = 2
         self.calc_integrals = True
         self.calc_dipole = False
+        self.usePyPotDip = False
         self.IntsFile = "./ints.h5"
         self.ReadInt = False
         self.ReadDip = False
 
         self.__dict__.update(kwargs)
 
-    def init_pypotential(self, pymol, Method = 'ccsd(t)'):
+    def init_pypotential(self, pymol, Method = 'rhf'):
         def pypot(x):
             return PyPotential(x, pymol, Method = Method)
         self.potential_cart = pypot
 
-    def init_pydipole(self, pymol, Method = 'rhf'):
+    def init_pydipole(self, pymol, Method = 'rhf', doPotDip = False):
         self.calc_dipole = True
+        if doPotDip:
+            self.calc_integrals = False
+            self.usePyPotDip = True
         def pydip(x):
-            return PyDipole(x, pymol, Method = Method)
+            return PyDipole(x, pymol, Method = Method, ReturnE = doPotDip)
         self.dipole_cart = pydip
+
+    '''
+    def init_pypotdip(self, pymol, Method = 'rhf'):
+        self.usePyPotDip = True
+        def pydip(x):
+            return PyDipole(x, pymol, Method = Method, ReturnE = True)
+        self.dipole_cart = pydip
+    '''
 
     def _potential(self, x):
         """
@@ -172,6 +187,28 @@ class Molecule():
             for i in range(Order):
                 self.dip_ints[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
 
+        # separate dipole and energy as necessary
+        if self.usePyPotDip and not self.ReadDip:
+            self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
+            for n in range(Order):
+                if n + 1 == 1:
+                    self.ints[n] = np.empty(self.Nm, dtype=object)
+                    for i in range(self.Nm):
+                        self.ints[n][i] = self.dip_ints[n][i][0] * constants.AU_TO_INVCM
+                        self.dip_ints[n][i] = self.dip_ints[n][i][1:]
+                if n + 1 == 2:
+                    self.ints[n] = np.empty((self.Nm, self.Nm), dtype=object)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            self.ints[n][i, j] = self.dip_ints[n][i, j][0] * constants.AU_TO_INVCM
+                            self.dip_ints[n][i, j] = self.dip_ints[n][i, j][1:]
+                if n + 1 == 3:
+                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype=object)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                self.ints[n][i, j, k] = self.dip_ints[n][i, j, k][0] * constants.AU_TO_INVCM
+                                self.dip_ints[n][i, j, k] = self.dip_ints[n][i, j, k][1:]
 
     def InitializeBasis(self):
         self.FullBasis = init_funcs.InitTruncatedBasis(self.Nm, self.Frequencies, self.FullMaxQuanta, self.FullTotalQuanta)
@@ -197,12 +234,12 @@ class Molecule():
             g1 = g.create_group("1")
             for i in range(self.Nm):
                 g1.create_dataset("%d" % (i + 1), data = self.ints[0][i])
-            if self.Order >= 2:
+            if self.Order >= 2 and self.calc_integrals:
                 g2 = g.create_group("2")
                 for i in range(self.Nm):
                     for j in range(self.Nm):
                         g2.create_dataset("%d_%d" % (i + 1, j + 1), data = self.ints[1][i, j])
-                if self.Order >= 3:
+                if self.Order >= 3 and self.calc_integrals:
                     g3 = g.create_group("3")
                     for i in range(self.Nm):
                         for j in range(self.Nm):
@@ -249,6 +286,22 @@ class Molecule():
                             for k in range(self.Nm):
                                 g3.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.dip_ints[2][i, j, k])
 
+            if "onemode_coeff" in f:
+                del f["onemode_coeff"]
+            f1c = f.create_group("onemode_coeff")
+            for i in range(self.Nm):
+                f1c.create_dataset("%d" % (i + 1), data = self.onemode_coeff[i])
+            if "onemode_eig" in f:
+                del f["onemode_eig"]
+            f1e = f.create_group("onemode_eig")
+            for i in range(self.Nm):
+                f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
+            if "nm_coeff" in f:
+                del f["nm_coeff"]
+            f.create_dataset("nm_coeff", data = self.nm.nm_coeff)
+            if "freq" in f:
+                del f["freq"]
+            f.create_dataset("freq", self.Frequencies)
 
     def ReadIntegrals(self, IntsFile = None):
         if IntsFile is None:
@@ -259,21 +312,33 @@ class Molecule():
                 if n == 0:
                     self.ints[n] = np.empty(self.Nm, dtype = object)
                     for i in range(self.Nm):
-                        self.ints[n][i] = f["ints/%d/%d" % (n + 1, i + 1)][()]
+                        if self.usePyPotDip:
+                            self.ints[n][i] = f["dips/%d/%d" % (n + 1, i + 1)][()][0]
+                        else:
+                            self.ints[n][i] = f["ints/%d/%d" % (n + 1, i + 1)][()]
                 if n == 1:
                     self.ints[n] = np.empty((self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
-                            self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                            if self.usePyPotDip:
+                                self.ints[n][i, j] = f["dips/%d/%d_%d" % (n + 1, i + 1, j + 1)][()][0]
+                            else:
+                                self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
                 if n == 2:
                     self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
                             for k in range(self.Nm):
-                                self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+                                if self.usePyPotDip:
+                                    self.ints[n][i, j, k] = f["dips/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()][0]
+                                else:
+                                    self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
             self.onemode_eig = []
             for i in range(self.Nm):
                 self.onemode_eig.append(f["onemode_eig/%d" % (i + 1)][()])
+            self.onemode_coeff = []
+            for i in range(self.Nm):
+                self.onemode_coeff.append(f["onemode_coeff/%d" % (i + 1)][()])
 
     def ReadDipoles(self, IntsFile = None):
         if IntsFile is None:
@@ -300,10 +365,12 @@ class Molecule():
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
         if self.calc_integrals:
+            print("Calculating integrals...", flush = True)
             self.CalcNModePotential()
         if self.calc_dipole:
             if not self.calc_integrals:
                 self.CalcNModePotential(Order = 1)
+            print("Calculating dipoles...", flush = True)
             self.CalcNModeDipole()
 
 
@@ -334,7 +401,7 @@ class NormalModes():
         self.x0 = result.x.reshape((natoms,3))
         self.V0 = pes(self.x0.reshape(-1))
         try:
-            self.mu0 = self.mol._dipole(x0)
+            self.mu0 = self.mol._dipole(self.x0)
         except:
             self.mu0 = 0
         
@@ -672,9 +739,7 @@ class NModePotential():
             for i in range(nmodes):
                 vgrid = np.array([self.nm.dipole_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                 Ci = coeff[i].T @ onemode_coeff[i]
-                print(vgrid.shape)
                 vi = np.einsum('gp,gx,gq->xpq', Ci, vgrid, Ci, optimize=True)
-                vix = np.dot(coeff[i], np.dot(np.diag(vgrid[:,0]), coeff[i].T))
                 ints[i] = vi
         elif nmode == 2:
             ints = np.empty((nmodes,nmodes), dtype=object)
@@ -762,16 +827,16 @@ if __name__ == '__main__':
     pymol.basis = 'sto-3g'
     pymol.build()
 
-    vmol = Molecule(pot_cart, x0.shape[0], mass, ngridpts = 2, Order = 3)
+    vmol = Molecule(pot_cart, x0.shape[0], mass, ngridpts = 2, Order = 2)
     vmol.IntsFile = './ints.h5'
-    #vmol.calc_dipole = True
-    #vmol.init_pydipole(pymol)
+    vmol.calc_dipole = True
+    vmol.init_pypotential(pymol)
+    vmol.init_pydipole(pymol, doPotDip = True)
     vmol.kernel(x0 = x0)
     vmol.SaveIntegrals()
-    #vmol.SaveDipoles()
+    vmol.SaveDipoles()
 
-    print(vmol.ints[0])
-    #print(vmol.dip_ints[0])
+    print(vmol.ints[1][0, 1])
 
     '''
     vmol_read = Molecule(pot_cart, x0.shape[0], mass, ngridpts=2, Order = 3)

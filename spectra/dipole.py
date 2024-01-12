@@ -38,23 +38,32 @@ def ScaleDipole(mu, Freq, Modes):
     # Units are now scaled by unitless factor. Dipole derivative has the same units as dipole.
     return ScaledMu
 
-def GetDipole(mol, mf, Method = 'rhf'):
+def GetDipole(mol, mf, Method = 'rhf', ReturnE = False):
     if Method == 'rhf':
-        return mf.dip_moment()
+        D = mf.dip_moment()
+        E = mf.e_tot
     elif Method == 'ccsd':
         mcc = cc.CCSD(mf)
         mcc.kernel()
         P = mcc.make_rdm1(ao_repr=True)
-        return mf.dip_moment(mol, P)
-    elif Method == 'ccsd_t':
+        D = mf.dip_moment(mol, P)
+        E = mcc.e_tot
+    elif Method == 'ccsd_t' or Method =='ccsd(t)':
         mcc = cc.CCSD(mf)
         mcc.kernel()
         eris = mcc.ao2mo()
         conv, l1, l2 = ccsd_t_lambda.kernel(mcc, eris, mcc.t1, mcc.t2)
         P = ccsd_t_rdm.make_rdm1(mcc, mcc.t1, mcc.t2, l1, l2, eris, ao_repr = True)
-        return mf.dip_moment(mol, P)
+        D = mf.dip_moment(mol, P)
+        if ReturnE:
+            E = mcc.e_tot + mcc.ccsd_t()
     else:
         raise RuntimeError("Unrecognized method for dipole calculation")
+
+    if ReturnE:
+        return np.asarray([E] + list(D))
+    else:
+        return D
 
 def PerturbDipole(X0, Modes, Coords, dx, atom0, mol, Method = 'rhf'):
     X = PerturbCoord(X0, Modes, Coords, dx)
