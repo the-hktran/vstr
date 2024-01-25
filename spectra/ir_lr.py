@@ -14,6 +14,7 @@ def GetTransitionDipoleMatrix(mIR, xi = None, IncludeZeroth = False):
                 D0 = Dx.diagonal()
                 D0 += mIR.DipoleSurface[x][0][0]
                 Dx.setdiag(D0)
+                print(Dx)
             #else:
             #    Dx.setdiag(0)
             mIR.D.append(Dx)
@@ -31,12 +32,12 @@ def GetTransitionDipoleMatrixNMode(mIR, xi = None, IncludeZeroth = False):
     if xi is None:
         mIR.D = []
         for x in range(3):
-            Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0, mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
+            Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[x], mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
             if not IncludeZeroth:
                 Dx.setdiag(0)
             mIR.D.append(Dx)
     else:
-        Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0, mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
+        Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[xi], mIR.mol.dip_ints[0][xi].tolist(), mIR.mol.dip_ints[1][xi].tolist(), mIR.mol.dip_ints[2][xi].tolist(), True)
         if not IncludeZeroth:
             Dx.setdiag(0)
         mIR.D[xi] = Dx
@@ -93,12 +94,13 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
         C = mIR.mVCI.C
         E = mIR.mVCI.E
     else:
-        H = VCISparseHamNMode(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.mu0, mIR.mVCI.mol.ints[0], mIR.mVCI.mol.ints[1], mIR.mVCI.mol.ints[2], True)
+        H = VCISparseHamNModeFromOM(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), True)
         E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
     HDiag = (w + mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
+    print(H)
     A = -1 * H
     A.setdiag(HDiag)
     A = A.tocsr()
@@ -398,8 +400,9 @@ class LinearResponseIRNMode(LinearResponseIR):
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrixNMode
     GetAb = GetAbNMode
     
-    def __init__(self, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, SpectralHBMethod = 2, **kwargs):
+    def __init__(self, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, SpectralHBMethod = 2, NormalModes = None, **kwargs):
         self.mVCI = mVCI
+        self.mol = mVCI.mol
         
         self.SpectralHBMethod = SpectralHBMethod
         
@@ -419,6 +422,22 @@ class LinearResponseIRNMode(LinearResponseIR):
         self.DoPT2 = False
 
         self.__dict__.update(kwargs)
+
+    def kernel(self):
+        self.GetTransitionDipoleMatrix(IncludeZeroth = False)
+
+        self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
+        self.ITensors = []
+        self.XString = [[], [], []]
+        for w in self.ws:
+            self.ITensors.append(self.Intensity(w))
+        self.Is = []
+        for I in self.ITensors:
+            self.Is.append(I[0, 0] + I[1, 1] + I[2, 2])
+
+        self.Is = np.asarray(self.Is)
+        if self.Normalize:
+            self.Is = np.asarray(self.Is) / max(self.Is)
 
 
 if __name__ == "__main__":

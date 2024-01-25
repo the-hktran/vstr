@@ -159,7 +159,13 @@ class Molecule():
                 if i == 0:
                     for j in range(self.Nm):
                         OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
+                        print(self.Frequencies)
+                        print(self.ints[0])
+                        print(self.ints[1])
+                        print(self.ints[2])
+                        print(self.V0)
                         OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
+                        print(OMH)
                         e, v = np.linalg.eigh(OMH.todense())
                         self.onemode_coeff.append(v)
                         self.onemode_eig.append(e)
@@ -180,7 +186,7 @@ class Molecule():
                 self.onemode_coeff.append(v)
                 self.onemode_eig.append(e)
 
-        self.dip_ints = [np.asarray([[]]), np.asarray([[[[[[[]]]]]]]), np.asarray([[[[[[[[[[]]]]]]]]]])]
+        self.dip_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3)]
         if self.ReadDip:
             self.ReadDipoles()
         else:
@@ -234,12 +240,12 @@ class Molecule():
             g1 = g.create_group("1")
             for i in range(self.Nm):
                 g1.create_dataset("%d" % (i + 1), data = self.ints[0][i])
-            if self.Order >= 2 and self.calc_integrals:
+            if self.Order >= 2:
                 g2 = g.create_group("2")
                 for i in range(self.Nm):
                     for j in range(self.Nm):
                         g2.create_dataset("%d_%d" % (i + 1, j + 1), data = self.ints[1][i, j])
-                if self.Order >= 3 and self.calc_integrals:
+                if self.Order >= 3:
                     g3 = g.create_group("3")
                     for i in range(self.Nm):
                         for j in range(self.Nm):
@@ -312,27 +318,19 @@ class Molecule():
                 if n == 0:
                     self.ints[n] = np.empty(self.Nm, dtype = object)
                     for i in range(self.Nm):
-                        if self.usePyPotDip:
-                            self.ints[n][i] = f["dips/%d/%d" % (n + 1, i + 1)][()][0]
-                        else:
-                            self.ints[n][i] = f["ints/%d/%d" % (n + 1, i + 1)][()]
+                        self.ints[n][i] = f["ints/%d/%d" % (n + 1, i + 1)][()]
                 if n == 1:
                     self.ints[n] = np.empty((self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
-                            if self.usePyPotDip:
-                                self.ints[n][i, j] = f["dips/%d/%d_%d" % (n + 1, i + 1, j + 1)][()][0]
-                            else:
-                                self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                            self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
                 if n == 2:
                     self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
                             for k in range(self.Nm):
-                                if self.usePyPotDip:
-                                    self.ints[n][i, j, k] = f["dips/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()][0]
-                                else:
-                                    self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+                                self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+
             self.onemode_eig = []
             for i in range(self.Nm):
                 self.onemode_eig.append(f["onemode_eig/%d" % (i + 1)][()])
