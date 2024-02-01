@@ -14,7 +14,6 @@ def GetTransitionDipoleMatrix(mIR, xi = None, IncludeZeroth = False):
                 D0 = Dx.diagonal()
                 D0 += mIR.DipoleSurface[x][0][0]
                 Dx.setdiag(D0)
-                print(Dx)
             #else:
             #    Dx.setdiag(0)
             mIR.D.append(Dx)
@@ -100,7 +99,6 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
     HDiag = (w + mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
-    print(H)
     A = -1 * H
     A.setdiag(HDiag)
     A = A.tocsr()

@@ -77,6 +77,7 @@ class Molecule():
         self.IntsFile = "./ints.h5"
         self.ReadInt = False
         self.ReadDip = False
+        self.ReadGeom = False
 
         self.__dict__.update(kwargs)
 
@@ -93,6 +94,13 @@ class Molecule():
         def pydip(x):
             return PyDipole(x, pymol, Method = Method, ReturnE = doPotDip)
         self.dipole_cart = pydip
+
+    def init_dipole(self, dipole_cart, doPotDip = False):
+        self.calc_dipole = True
+        self.dipole_cart = dipole_cart
+        if doPotDip:
+            self.calc_integrals = False
+            self.usePyPotDip = True
 
     '''
     def init_pypotdip(self, pymol, Method = 'rhf'):
@@ -132,7 +140,10 @@ class Molecule():
 
     def CalcNM(self, x0 = None):
         self.nm = NormalModes(self)
-        self.nm.kernel(x0 = x0)
+        if self.ReadGeom:
+            self.ReadGeometry()
+        else:
+            self.nm.kernel(x0 = x0)
         #debug!!
         #c = np.zeros((self.natoms * 3, self.nm.nmodes))
         #c[:3,:3] = np.eye(3)
@@ -159,13 +170,7 @@ class Molecule():
                 if i == 0:
                     for j in range(self.Nm):
                         OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
-                        print(self.Frequencies)
-                        print(self.ints[0])
-                        print(self.ints[1])
-                        print(self.ints[2])
-                        print(self.V0)
                         OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
-                        print(OMH)
                         e, v = np.linalg.eigh(OMH.todense())
                         self.onemode_coeff.append(v)
                         self.onemode_eig.append(e)
@@ -262,12 +267,21 @@ class Molecule():
             f1e = f.create_group("onemode_eig")
             for i in range(self.Nm):
                 f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
+            if "x0" in f:
+                del f["x0"]
+            f.create_dataset("x0", data = self.nm.x0)
+            if "V0" in f:
+                del f["V0"]
+            f.create_dataset("V0", data = self.nm.V0)
+            if "mu0" in f:
+                del f["mu0"]
+            f.create_dataset("mu0", data = self.nm.mu0)
             if "nm_coeff" in f:
                 del f["nm_coeff"]
             f.create_dataset("nm_coeff", data = self.nm.nm_coeff)
             if "freq" in f:
                 del f["freq"]
-            f.create_dataset("freq", self.Frequencies)
+            f.create_dataset("freq", data = self.Frequencies)
 
     def SaveDipoles(self, IntsFile = None):
         if IntsFile is None:
@@ -302,12 +316,32 @@ class Molecule():
             f1e = f.create_group("onemode_eig")
             for i in range(self.Nm):
                 f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
+            if "x0" in f:
+                del f["x0"]
+            f.create_dataset("x0", data = self.nm.x0)
+            if "V0" in f:
+                del f["V0"]
+            f.create_dataset("V0", data = self.nm.V0)
+            if "mu0" in f:
+                del f["mu0"]
+            f.create_dataset("mu0", data = self.nm.mu0)
             if "nm_coeff" in f:
                 del f["nm_coeff"]
             f.create_dataset("nm_coeff", data = self.nm.nm_coeff)
             if "freq" in f:
                 del f["freq"]
-            f.create_dataset("freq", self.Frequencies)
+            f.create_dataset("freq", data = self.Frequencies)
+
+    def ReadGeometry(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+
+        with h5py.File(IntsFile, "r") as f:
+            self.nm.x0 = f["x0"][()]
+            self.nm.nm_coeff = f["nm_coeff"][()]
+            self.nm.freqs = f["freq"][()] / constants.AU_TO_INVCM
+            self.nm.V0 = f["V0"][()]
+            self.nm.mu0 = f["mu0"][()]
 
     def ReadIntegrals(self, IntsFile = None):
         if IntsFile is None:
@@ -376,6 +410,9 @@ class NormalModes():
 
     def __init__(self, mol):
         self.mol = mol
+        self.V0 = 0
+        self.nm_coeff = None
+        self.freqs = None
 
         self.nmodes = 3*self.mol.natoms - 6
 
