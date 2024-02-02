@@ -24,4 +24,5 @@
   !x = x / auang
     
   call pot_gd(xx,eng,gd1,mu)
+  mu = mu / auang ! return mu in a.u.
   end
