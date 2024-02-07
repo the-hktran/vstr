@@ -1,0 +1,3 @@
+rm *.o *.mod
+gfortran -O -fPIC -fdefault-real-8 -fdefault-double-8 -c inv_share_d.f90  inv_mg411_d.f90 inv_mg321_d.f90 get*f90 h4o2*f90
+ar r libdms2b.a *.o

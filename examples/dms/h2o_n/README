@@ -1,0 +1,41 @@
+There are three main folders:
+(1) folder "coef" includes coefficients file for water dimer 2-body dipole moment 
+
+(2) folder "lib" includes compiled library files
+
+(3) folder "source_lib" includes source file to compile library files
+
+(4) folder "DMS" provides an example for compiling codes and calculating  dipole moment
+
+The following example are using ifort compiler, user can switch to other compilers like gfortran if needed.
+
+To run the code:
+
+(I) Go to source_lib folder
+
+    Compile the library source files through "./mke"
+
+    copy file "libdms2b.a" to folder "lib"
+
+(II) Go to "DMS" folder
+
+     1. Check "Makefile" to make sure you are using effective fortran compiler (we use ifort in this case)
+
+     2. chg.f90 and ltp2011_dms.f90 are for water 1-body dipole moment fitted by  Lodi and Tennyson
+
+     3. dms_shell.f90 includes subroutines that combines 1-body dipole and our 2-body dipole
+        subroutine dms_init() specifies the path of 2-body dipole coefficients. chage the path as needed
+
+     4. getdms.f90 is code to calculate dipole moment for coordinates in format of H H H H O O   
+
+     5. Compile the code through "make getdms.x"
+ 
+     6. Run the test code "./getdms dimer.xyz", you should obtain output like following:
+       1.01164139592570      -2.040879096140672E-006  1.969461833075527E-002 
+
+
+Any questions, contact qyu28@emory.edu
+
+For reference:
+H. Liu, Y. Wang and J. M. Bowman, J. Phys. Chem. B. 120(8),1735-1742,2016
+H. Liu, Y. Wang and J. M. Bowman, J. Chem. Phys. 142,194502,2015
