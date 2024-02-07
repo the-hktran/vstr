@@ -78,8 +78,47 @@ class Molecule():
         self.ReadInt = False
         self.ReadDip = False
         self.ReadGeom = False
+        self.doShiftPotential = True
 
         self.__dict__.update(kwargs)
+
+    def __str__(self):
+        '''
+        print("_______________________")
+        print("|                     |")
+        print("|      Molecule       |")
+        print("|_____________________|")
+        print("")
+        print("Number of Atoms       :", self.natoms)
+        print("Normal Mode Frequences:")
+        for w in self.Frequencies:
+            print("  ", w)
+        print("Order                 :", self.Order)
+        print("Number of Grid Points :", self.ngridpts)
+        print("Dipole                :", self.calc_dipole)
+        print("Intergral Path        :", self.IntsFile)
+        print("Minimum Energy        :", self.V0, "cm-1")
+        print("Minimum Geometry (A)  :\n", self.x0)
+        '''
+
+        mol_str = ""
+        mol_str += "_______________________\n"
+        mol_str += "|                     |\n"
+        mol_str += "|      Molecule       |\n"
+        mol_str += "|_____________________|\n\n"
+        mol_str += "Number of Atoms       : %d\n" % self.natoms
+        mol_str += "Normal Mode Frequences:\n"
+        for w in self.Frequencies:
+            mol_str += "    %.6f\n" % w
+        mol_str += "Order                 : %d\n" % self.Order
+        mol_str += "Number of Grid Points : %d\n" % self.ngridpts
+        mol_str += "Dipole                : %s\n" % self.calc_dipole
+        mol_str += "Intergral Path        : %s\n" % self.IntsFile
+        mol_str += "Minimum Energy        : %.6f cm-1\n" % self.V0
+        mol_str += "Minimum Geometry (A)  :\n"
+        for i in range(self.x0.shape[0]):
+            mol_str += "    %.6f    %.6f    %.6f\n" % (self.x0[i, 0], self.x0[i, 1], self.x0[i, 2])
+        return mol_str
 
     def init_pypotential(self, pymol, Method = 'rhf'):
         def pypot(x):
@@ -138,6 +177,12 @@ class Molecule():
                         V += self.nm.potential_3mode(i, j, k, q[i], q[j], q[k])
         return V
 
+    def ShiftPotential(self, V0):
+        orig_pot = self.potential_cart
+        def shifted_pot(coord):
+            return orig_pot(coord) - V0
+        self.potential_cart = shifted_pot
+
     def CalcNM(self, x0 = None):
         self.nm = NormalModes(self)
         if self.ReadGeom:
@@ -155,6 +200,10 @@ class Molecule():
         self.Frequencies = self.nm.freqs * constants.AU_TO_INVCM
         self.x0 = self.nm.x0 / constants.ANGSTROM_TO_AU
         self.V0 = self.nm.V0 * constants.AU_TO_INVCM
+        if self.doShiftPotential:
+            self.ShiftPotential(self.nm.V0)
+            self.nm.V0 = 0
+            self.V0 = 0
         self.mu0 = self.nm.mu0
 
     def CalcNModePotential(self, Order = None):
@@ -170,7 +219,7 @@ class Molecule():
                 if i == 0:
                     for j in range(self.Nm):
                         OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
-                        OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
+                        OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], 0.0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
                         e, v = np.linalg.eigh(OMH.todense())
                         self.onemode_coeff.append(v)
                         self.onemode_eig.append(e)
@@ -404,7 +453,7 @@ class Molecule():
                 self.CalcNModePotential(Order = 1)
             print("Calculating dipoles...", flush = True)
             self.CalcNModeDipole()
-
+        print(self)
 
 class NormalModes():
 
