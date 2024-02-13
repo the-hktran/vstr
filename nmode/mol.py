@@ -335,25 +335,32 @@ class Molecule():
     def SaveDipoles(self, IntsFile = None):
         if IntsFile is None:
             IntsFile = self.IntsFile
+        cart_coord = ['x', 'y', 'z']
         
         with h5py.File(IntsFile, "a") as f:
             if "dip_ints" in f:
                 del f["dip_ints"]
             g = f.create_group("dip_ints")
             g1 = g.create_group("1")
-            for i in range(self.Nm):
-                g1.create_dataset("%d" % (i + 1), data = self.dip_ints[0][i])
+            for x in range(3):
+                g1x = g1.create_group(cart_coord[x])
+                for i in range(self.Nm):
+                    g1x.create_dataset("%d" % (i + 1), data = self.dip_ints[0][x, i])
             if self.Order >= 2:
                 g2 = g.create_group("2")
-                for i in range(self.Nm):
-                    for j in range(self.Nm):
-                        g2.create_dataset("%d_%d" % (i + 1, j + 1), data = self.dip_ints[1][i, j])
-                if self.Order >= 3:
-                    g3 = g.create_group("3")
+                for x in range(3):
+                    g2x = g2.create_group(cart_coord[x])
                     for i in range(self.Nm):
                         for j in range(self.Nm):
-                            for k in range(self.Nm):
-                                g3.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.dip_ints[2][i, j, k])
+                            g2x.create_dataset("%d_%d" % (i + 1, j + 1), data = self.dip_ints[1][x, i, j])
+                if self.Order >= 3:
+                    g3 = g.create_group("3")
+                    for x in range(3):
+                        g3x = g3.create_group(cart_coord[x])
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    g3x.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.dip_ints[2][x, i, j, k])
 
             if "onemode_coeff" in f:
                 del f["onemode_coeff"]
@@ -424,24 +431,28 @@ class Molecule():
     def ReadDipoles(self, IntsFile = None):
         if IntsFile is None:
             IntsFile = self.IntsFile
+        cart_coord = ['x', 'y', 'z']
 
         with h5py.File(IntsFile, "r") as f:
             for n in range(self.Order):
                 if n == 0:
-                    self.dip_ints[n] = np.empty(self.Nm, dtype = object)
-                    for i in range(self.Nm):
-                        self.dip_ints[n][i] = f["dip_ints/%d/%d" % (n + 1, i + 1)][()]
+                    self.dip_ints[n] = np.empty((3, self.Nm), dtype = object)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            self.dip_ints[n][x, i] = f["dip_ints/%d/%s/%d" % (n + 1, cart_coord[x], i + 1)][()]
                 if n == 1:
-                    self.dip_ints[n] = np.empty((self.Nm, self.Nm), dtype = object)
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            self.dip_ints[n][i, j] = f["dip_ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm), dtype = object)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                self.dip_ints[n][x, i, j] = f["dip_ints/%d/%s/%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1)][()]
                 if n == 2:
-                    self.dip_ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype = object)
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            for k in range(self.Nm):
-                                self.dip_ints[n][i, j, k] = f["dip_ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm), dtype = object)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    self.dip_ints[n][x, i, j, k] = f["dip_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
 
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
@@ -487,7 +498,7 @@ class NormalModes():
         try:
             self.mu0 = self.mol._dipole(self.x0)
         except:
-            self.mu0 = 0
+            self.mu0 = np.asarray([0.0, 0.0, 0.0])
         
         hess0 = self.hessian(self.x0).reshape((natoms*3, natoms*3))
 
@@ -819,24 +830,32 @@ class NModePotential():
 
         nmodes = self.nm.nmodes
         if nmode == 1:
-            ints = np.empty(nmodes, dtype=object)
+            ints = np.empty((3, nmodes), dtype=object)
             for i in range(nmodes):
                 vgrid = np.array([self.nm.dipole_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                print(self.nm.dipole_1mode(i,gridpts[i][0]))
+                print(vgrid[i])
+                print(vgrid)
                 Ci = coeff[i].T @ onemode_coeff[i]
                 vi = np.einsum('gp,gx,gq->xpq', Ci, vgrid, Ci, optimize=True)
-                ints[i] = vi
+                print(vi)
+                ints[0, i] = vi[0]
+                ints[1, i] = vi[1]
+                ints[2, i] = vi[2]
         elif nmode == 2:
-            ints = np.empty((nmodes,nmodes), dtype=object)
+            ints = np.empty((3, nmodes, nmodes), dtype=object)
             for i in range(nmodes):
                 Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
                     Cj = coeff[j].T @ onemode_coeff[j]
                     vgrid = np.array([[self.nm.dipole_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
                     vij = np.einsum('gp,hq,ghx,gr,hs->xpqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
-                    ints[i, j] = vij
+                    ints[0, i, j] = vij[0]
+                    ints[1, i, j] = vij[1]
+                    ints[2, i, j] = vij[2]
 
         elif nmode == 3:
-            ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
+            ints = np.empty((3, nmodes, nmodes, nmodes), dtype=object)
             for i in range(nmodes):
                 Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
@@ -846,7 +865,9 @@ class NModePotential():
                         vgrid = np.array([[[self.nm.dipole_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
                         vijk = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
                         vijk = np.einsum('gp,hq,fr,ghfx,gs,ht,fu->xpqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
-                        ints[i, j, k] = vijk
+                        ints[0, i, j, k] = vijk[0]
+                        ints[1, i, j, k] = vijk[1]
+                        ints[2, i, j, k] = vijk[2]
 
         return ints
 

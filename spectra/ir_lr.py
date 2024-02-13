@@ -71,7 +71,7 @@ def GetAb(mIR, w, Basis = None, xi = None):
         E = mIR.mVCI.E
     else:
         H = GenerateSparseHamV(Basis, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3])
-        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
+        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SA')
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
@@ -94,20 +94,21 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
         E = mIR.mVCI.E
     else:
         H = VCISparseHamNModeFromOM(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), True)
-        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
+        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SA')
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
-    HDiag = (w + mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag
+    HDiag = np.array((w + mIR.mVCI.E[0]) + mIR.eta * 1.j - HDiag, dtype = np.cdouble) 
     A = -1 * H
+    A = A.astype(np.cdouble)
     A.setdiag(HDiag)
     A = A.tocsr()
     b = [None] * 3
     if xi is None:
         for x in range(3):
-            b[x] = np.asarray(mIR.D[x] @ C[:, 0]).T
+            b[x] = np.asarray(mIR.D[x] @ C[:, 0], dtype = np.cdouble).T
     else:
-        b[xi] = np.asarray(mIR.D[xi] @ C[:, 0]).T
+        b[xi] = np.asarray(mIR.D[xi] @ C[:, 0], dtype = np.cdouble).T
     return A, b
 
 
@@ -118,7 +119,7 @@ def GetAbFromVSCF(mIR, w, Basis = None, xi = None):
         E = mIR.mVCI.E
     else:
         H = VCISparseHamFromVSCF(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.Ys, mIR.Xs, True)
-        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SM')
+        E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SA')
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
@@ -206,9 +207,7 @@ def SpectralHCI(mIR, w, xi):
     NAdded = len(mIR.mVCI.Basis)
     it = 1
     while (float(NAdded) / float(len(mIR.mVCI.Basis))) > mIR.mVCI.tol:
-        print('begin hci', flush=True)
         mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, xi = xi, eps = mIR.eps1)
-        print('end hci', flush=True)
         #print("VHCI Iteration", it, "for w =", w, "complete with", NAdded, "new configurations and a total of", len(mIR.mVCI.Basis), flush = True)
         mIR.mVCI.SparseDiagonalize()
         it += 1
@@ -236,7 +235,6 @@ def Intensity(mIR, w):
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object 
     for xi in range(3):
         mIR.SpectralHCI(w, xi = xi)
-        print('hi', xi, flush = True)
         mIR.GetTransitionDipoleMatrix(IncludeZeroth = False)
         # Solve for intensity using updated VCI object
         A, b = mIR.GetAb(w)
@@ -425,9 +423,7 @@ class LinearResponseIRNMode(LinearResponseIR):
         self.__dict__.update(kwargs)
 
     def kernel(self):
-        print('do dipmatrix', flush=True)
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
-        print('done', flush = True)
 
         self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
         self.ITensors = []

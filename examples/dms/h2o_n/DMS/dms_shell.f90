@@ -18,6 +18,7 @@ contains
 
     ! 2-body init
     call predip('/burg/home/hkt2112/Code/vstr/examples/dms/h2o_n/coef/h4o2.dms2b.coeff.dat')
+    if(allocated(idx_2b)) deallocate(idx_2b)
     allocate(idx_2b(6,nw*(nw-1)/2))
     call map_2b(nw,idx_2b)
 
