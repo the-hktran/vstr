@@ -230,7 +230,7 @@ def ResetVCI(mIR):
     
     gc.collect()
 
-def Intensity(mIR, w):
+def Intensity(mIR, w, state_thr = 1e-6):
     I = np.zeros((3,3))
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object 
     for xi in range(3):
@@ -240,7 +240,7 @@ def Intensity(mIR, w):
         A, b = mIR.GetAb(w)
         x = SolveAxb(A, b[xi])
         x = np.asarray(x).ravel()
-        mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = 1e-3, C = np.reshape(abs(x), (x.shape[0], 1))))
+        mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = state_thr, C = np.reshape(abs(x), (x.shape[0], 1))))
         for xj in range(3):
             b[xj] = np.asarray(b[xj]).ravel()
             I[xj, xi] = (1.j * np.dot(b[xj], x)).real / np.pi

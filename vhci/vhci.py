@@ -236,14 +236,17 @@ def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
     return BasisWF
 
 def InitC(mVHCI):
-    from vscf.harmonic.harm_analysis import HarmonicEnergy
-    mVHCI.C = np.ones(len(mVHCI.Basis))
+    from vstr.harmonic.harm_analysis import HarmonicEnergy
+    mVHCI.C = np.eye(len(mVHCI.Basis))
     mVHCI.E = []
     ZPE = 0.0
     for w in mVHCI.Frequencies:
         ZPE += 0.5 * w
     for B in mVHCI.Basis:
-        mVHCI.E.append(HarmonicEnergy(mVHCI.Frequencies, B, ZPE = ZPE))
+        b = []
+        for i in range(len(B.Modes)):
+            b.append(B.Modes[i].Quanta)
+        mVHCI.E.append(HarmonicEnergy(mVHCI.Frequencies, b, ZPE = ZPE))
 
 def TranslateBasisToString(B):
     BString = ""

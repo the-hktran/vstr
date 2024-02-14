@@ -130,6 +130,22 @@ class VSCFIRSpectra(IRSpectra):
         self.Ys = mVHCI.Ys
         self.Xs = mVHCI.Xs
 
+class IRSpectraNMode(IRSpectra):
+    from vstr.spectra.ir_lr import GetTransitionDipoleMatrixNMode
+    GetTransitionDipoleMatrix = GetTransitionDipoleMatrixNMode
+
+    def __init__(self, mf, mVHCI, NormalModes = None, SpectralHBMethod = 2, **kwargs):
+        IRSpectra.__init__(self, mf, mVHCI, NormalModes = NormalModes)
+        self.__dict__.update(kwargs)
+        self.mVCI = mVHCI
+        self.mol = mVHCI.mol
+
+        self.DipoleSurface = [[], [], [], []]
+    
+    def kernel(self):
+        self.GetTransitionDipoleMatrix()
+        self.GetSpectralIntensities()
+
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
     from vstr.ff.force_field import GetFF
