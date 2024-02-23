@@ -149,6 +149,13 @@ class Molecule():
         self.dipole_cart = pydip
     '''
 
+    def calc_com(self, x):
+        com = np.zeros(3)
+        for i in range(self.natoms):
+            com += self.mass[i] * x[i]
+        com /= np.sum(self.mass)
+        return com
+
     def _potential(self, x):
         """
         Calculate the potential with 3N-dimensional argument.
@@ -176,6 +183,17 @@ class Molecule():
                     for k in range(j + 1, self.nm.nmodes):
                         V += self.nm.potential_3mode(i, j, k, q[i], q[j], q[k])
         return V
+    
+    def inverse_moment_of_inertia_cart(self, x):
+        I = np.zeros((3, 3))
+        for i in range(self.natoms):
+            r = x[i] - self.CoM
+            m = self.mass[i]
+            I += m * (np.dot(r, r) * np.eye(3) - np.outer(r, r))
+        return np.linalg.inv(I).reshape(-1)
+
+    def _inverse_moment_of_inertia(self, x):
+        return self.inverse_moment_of_inertia_cart(x.reshape((self.natoms, 3)))
 
     def ShiftPotential(self, V0):
         orig_pot = self.potential_cart
@@ -205,6 +223,8 @@ class Molecule():
             self.nm.V0 = 0
             self.V0 = 0
         self.mu0 = self.nm.mu0
+
+        self.CoM = self.calc_com(self.nm.x0)
 
     def CalcNModePotential(self, Order = None):
         if Order is None:
@@ -269,6 +289,28 @@ class Molecule():
                             for k in range(self.Nm):
                                 self.ints[n][i, j, k] = self.dip_ints[n][i, j, k][0] * constants.AU_TO_INVCM
                                 self.dip_ints[n][i, j, k] = self.dip_ints[n][i, j, k][1:]
+
+    def CalcNModeInvInertia(self, Order = None):
+        if Order is None:
+            Order = self.Order
+        
+        # Did not calculate one-mode integrals yet. Need to do that now
+        if len(self.onemode_coeff) == 0:
+            self.nmode = NModePotential(self.nm)
+            ints1 = self.nmode.get_ints(1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+            for j in range(self.Nm):
+                OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
+                OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], [[[[[[]]]]]], [[[[[[[[[]]]]]]]]], True)
+                e, v = np.linalg.eigh(OMH.todense())
+                self.onemode_coeff.append(v)
+                self.onemode_eig.append(e)
+
+        self.inv_inertia_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3)]
+        if self.ReadInvInertia:
+            self.ReadInvInertia()
+        else:
+            for i in range(Order):
+                self.inv_inertia_ints[i] = self.nmode.get_inv_inertia_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
 
     def InitializeBasis(self):
         self.FullBasis = init_funcs.InitTruncatedBasis(self.Nm, self.Frequencies, self.FullMaxQuanta, self.FullTotalQuanta)
@@ -388,6 +430,31 @@ class Molecule():
                 del f["freq"]
             f.create_dataset("freq", data = self.Frequencies)
 
+    def SaveInvInertia(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+        cart_coord = ['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz']
+
+        with h5py.File(IntsFile, "a") as f:
+            if "inv_inertia_ints" in f:
+                del f["inv_inertia_ints"]
+            g = f.create_group("inv_inertia_ints")
+            if self.Order >= 2:
+                g2 = g.create_group("2")
+                for x in range(9):
+                    g2x = g2.create_group(cart_coord[x])
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                             g2x.create_dataset("%d_%d" % (i + 1, j + 1), data = self.inv_inertia_ints[1][x, i, j])
+                if self.Order >= 3:
+                    g3 = g.create_group("3")
+                    for x in range(9):
+                        g3x = g3.create_group(cart_coord[x])
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    g3x.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.inv_inertia_ints[2][x, i, j, k])
+
     def ReadGeometry(self, IntsFile = None):
         if IntsFile is None:
             IntsFile = self.IntsFile
@@ -454,6 +521,27 @@ class Molecule():
                                 for k in range(self.Nm):
                                     self.dip_ints[n][x, i, j, k] = f["dip_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
 
+    def ReadInvInertia(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+        cart_coord = ['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz']
+
+        with h5py.File(IntsFile, "r") as f:
+            for n in range(self.Order):
+                if n == 1:
+                    self.inv_intertia_ints[n] = np.empty((9, self.Nm, self.Nm), dtype = object)
+                    for x in range(9):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                self.inv_inertia_ints[n][x, i, j] = f["inv_inertia_ints/%d/%s/%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1)][()]
+                if n == 2:
+                    self.dip_ints[n] = np.empty((9, self.Nm, self.Nm, self.Nm), dtype = object)
+                    for x in range(9):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    self.inv_inertia_ints[n][x, i, j, k] = f["inv_inertia_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
+
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
         if self.calc_integrals:
@@ -499,6 +587,10 @@ class NormalModes():
             self.mu0 = self.mol._dipole(self.x0)
         except:
             self.mu0 = np.asarray([0.0, 0.0, 0.0])
+        try:
+            self.B0 = self.mol._inv_moment_of_inertia(self.x0)
+        except:
+            self.B0 = np.zeros((9))
         
         hess0 = self.hessian(self.x0).reshape((natoms*3, natoms*3))
 
@@ -662,6 +754,34 @@ class NormalModes():
         x = self._normal2cart(q)
         return (self.mol.dipole_cart(x) - self.dipole_2mode(i, j, qi, qj) - self.dipole_2mode(i, k, qi, qk) - self.dipole_2mode(j, k, qj, qk) - self.dipole_1mode(i, qi) - self.dipole_1mode(j, qj) - self.dipole_1mode(k, qk) - self.mu0)
 
+    def inv_moment_of_inertia_1mode(self, i, qi):
+        """
+        Calculate the 1-mode potential.
+        
+        Parameters:
+        i (int): the mode index
+        qi (float): the normal mode coordinate
+        """
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        x = self._normal2cart(q)
+        return self.mol.inv_moment_of_inertia_cart(x) - self.B0
+
+    def inv_moment_of_inertia_2mode(self, i, j, qi, qj):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        x = self._normal2cart(q)
+        return (self.mol.inv_moment_of_inertia_cart(x)
+                - self.inv_moment_of_inertia_1mode(i,qi) - self.inv_moment_of_inertia_1mode(j,qj) - self.B0)
+
+    def inv_moment_of_inertia_3mode(self, i, j, k, qi, qj, qk):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        q[k] = qk
+        x = self._normal2cart(q)
+        return (self.mol.inv_moment_of_inertia_cart(x) - self.inv_moment_of_inertia_2mode(i, j, qi, qj) - self.inv_moment_of_inertia_2mode(i, k, qi, qk) - self.inv_moment_of_inertia_2mode(j, k, qj, qk) - self.inv_moment_of_inertia_1mode(i, qi) - self.inv_moment_of_inertia_1mode(j, qj) - self.inv_moment_of_inertia_1mode(k, qk) - self.B0)
 
 def get_qmat_ho(omega, nmax):
     qmat = np.zeros((nmax,nmax))
@@ -833,12 +953,8 @@ class NModePotential():
             ints = np.empty((3, nmodes), dtype=object)
             for i in range(nmodes):
                 vgrid = np.array([self.nm.dipole_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
-                print(self.nm.dipole_1mode(i,gridpts[i][0]))
-                print(vgrid[i])
-                print(vgrid)
                 Ci = coeff[i].T @ onemode_coeff[i]
                 vi = np.einsum('gp,gx,gq->xpq', Ci, vgrid, Ci, optimize=True)
-                print(vi)
                 ints[0, i] = vi[0]
                 ints[1, i] = vi[1]
                 ints[2, i] = vi[2]
@@ -871,6 +987,86 @@ class NModePotential():
 
         return ints
 
+    def get_inv_moment_of_inertia_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
+        print("Calculating n-Mode dipole integrals for n =", nmode, flush = True) 
+        if optimized is False:
+            if ngridpts is None:
+                ngridpts = [12]*self.nm.nmodes
+            elif isinstance(ngridpts, (int, np.integer)):
+                ngridpts = [ngridpts]*self.nm.nmodes
+
+            gridpts, coeff = self.get_heg(ngridpts)
+
+        else:
+            if ngridpts is None:
+                ngridpts = [8]*self.nm.nmodes
+            elif isinstance(ngridpts, (int, np.integer)):
+                ngridpts = [ngridpts]*self.nm.nmodes
+
+            if ngridpts0 is None:
+                ngridpts0 = [12]*self.nm.nmodes
+            elif isinstance(ngridpts0, (int, np.integer)):
+                ngridpts0 = [ngridpts0]*self.nm.nmodes
+
+            gridpts, coeff = self.get_heg(ngridpts, optimized, ngridpts0)
+
+        nmodes = self.nm.nmodes
+        if nmode == 1:
+            ints = np.empty((9, nmodes), dtype=object)
+            for i in range(nmodes):
+                vgrid = np.array([self.nm.inv_moment_of_inertia_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                Ci = coeff[i].T @ onemode_coeff[i]
+                vi = np.einsum('gp,gx,gq->xpq', Ci, vgrid, Ci, optimize=True)
+                ints[0, i] = vi[0]
+                ints[1, i] = vi[1]
+                ints[2, i] = vi[2]
+                ints[3, i] = vi[3]
+                ints[4, i] = vi[4]
+                ints[5, i] = vi[5]
+                ints[6, i] = vi[6]
+                ints[7, i] = vi[7]
+                ints[8, i] = vi[8]
+
+        elif nmode == 2:
+            ints = np.empty((3, nmodes, nmodes), dtype=object)
+            for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
+                for j in range(nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
+                    vgrid = np.array([[self.nm.inv_moment_of_inertia_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
+                    vij = np.einsum('gp,hq,ghx,gr,hs->xpqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
+                    ints[0, i, j] = vij[0]
+                    ints[1, i, j] = vij[1]
+                    ints[2, i, j] = vij[2]
+                    ints[3, i, j] = vij[3]
+                    ints[4, i, j] = vij[4]
+                    ints[5, i, j] = vij[5]
+                    ints[6, i, j] = vij[6]
+                    ints[7, i, j] = vij[7]
+                    ints[8, i, j] = vij[8]
+
+        elif nmode == 3:
+            ints = np.empty((3, nmodes, nmodes, nmodes), dtype=object)
+            for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
+                for j in range(nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
+                    for k in range(nmodes):
+                        Ck = coeff[k].T @ onemode_coeff[k]
+                        vgrid = np.array([[[self.nm.inv_moment_of_inertia_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                        vijk = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+                        vijk = np.einsum('gp,hq,fr,ghfx,gs,ht,fu->xpqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
+                        ints[0, i, j, k] = vijk[0]
+                        ints[1, i, j, k] = vijk[1]
+                        ints[2, i, j, k] = vijk[2]
+                        ints[3, i, j, k] = vijk[3]
+                        ints[4, i, j, k] = vijk[4]
+                        ints[5, i, j, k] = vijk[5]
+                        ints[6, i, j, k] = vijk[6]
+                        ints[7, i, j, k] = vijk[7]
+                        ints[8, i, j, k] = vijk[8]
+
+        return ints
 
 
     def get_heg(self, ngridpts, optimized=False, ngridpts0=None):
