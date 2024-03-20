@@ -65,12 +65,14 @@ class Molecule():
         self.dipole_cart = None
         self.natoms = natoms
         self.Nm = 3 * natoms - 6
+        self.LowFrequencyCutoff = None
         self.mass = mass
         self.onemode_coeff = []
         self.onemode_eig = []
 
         self.ngridpts = 12
         self.Order = 2
+        self.OrderPlus = None
         self.calc_integrals = True
         self.calc_dipole = False
         self.usePyPotDip = False
@@ -207,6 +209,7 @@ class Molecule():
             self.ReadGeometry()
         else:
             self.nm.kernel(x0 = x0)
+        self.Nm = self.nm.freqs.shape[0]
         #debug!!
         #c = np.zeros((self.natoms * 3, self.nm.nmodes))
         #c[:3,:3] = np.eye(3)
@@ -226,9 +229,11 @@ class Molecule():
 
         self.CoM = self.calc_com(self.nm.x0)
 
-    def CalcNModePotential(self, Order = None):
+    def CalcNModePotential(self, Order = None, OrderPlus = None):
         if Order is None:
             Order = self.Order
+        if OrderPlus is None:
+            OrderPlus = self.OrderPlus
         self.nmode = NModePotential(self.nm)
         self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
         if self.ReadInt:
@@ -243,7 +248,11 @@ class Molecule():
                         e, v = np.linalg.eigh(OMH.todense())
                         self.onemode_coeff.append(v)
                         self.onemode_eig.append(e)
-
+            if OrderPlus is not None:
+                for i in range(Order, OrderPlus):
+                    if i == 2:
+                        self.Divergent3Modes = self.FindDivergent3Modes()
+                    self.ints[i] = self.nmode.get_ints(OrderPlus, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff, modes = self.Divergent3Modes)
     
     def CalcNModeDipole(self, Order = None):
         if Order is None:
@@ -328,6 +337,11 @@ class Molecule():
     def SaveIntegrals(self, IntsFile = None):
         if IntsFile is None:
             IntsFile = self.IntsFile
+
+        if self.OrderPlus is None:
+            MaxOrder = self.Order
+        else:
+            MaxOrder = self.OrderPlus
         
         with h5py.File(IntsFile, "a") as f:
             if "ints" in f:
@@ -336,12 +350,12 @@ class Molecule():
             g1 = g.create_group("1")
             for i in range(self.Nm):
                 g1.create_dataset("%d" % (i + 1), data = self.ints[0][i])
-            if self.Order >= 2:
+            if MaxOrder >= 2:
                 g2 = g.create_group("2")
                 for i in range(self.Nm):
                     for j in range(self.Nm):
                         g2.create_dataset("%d_%d" % (i + 1, j + 1), data = self.ints[1][i, j])
-                if self.Order >= 3:
+                if MaxOrder >= 3:
                     g3 = g.create_group("3")
                     for i in range(self.Nm):
                         for j in range(self.Nm):
@@ -469,9 +483,12 @@ class Molecule():
     def ReadIntegrals(self, IntsFile = None):
         if IntsFile is None:
             IntsFile = self.IntsFile
+        MaxOrder = self.Order
+        if self.OrderPlus is not None:
+            MaxOrder = self.OrderPlus
 
         with h5py.File(IntsFile, "r") as f:
-            for n in range(self.Order):
+            for n in range(MaxOrder):
                 if n == 0:
                     self.ints[n] = np.empty(self.Nm, dtype = object)
                     for i in range(self.Nm):
@@ -542,11 +559,148 @@ class Molecule():
                                 for k in range(self.Nm):
                                     self.inv_inertia_ints[n][x, i, j, k] = f["inv_inertia_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
 
+    def ZeroCoupling(self, FreqTol = 1000, NCutoff = 0):
+        LowFreqModes = np.where(self.Frequencies < FreqTol)[0]
+        HighFreqModes = np.where(self.Frequencies > FreqTol)[0]
+        for i in LowFreqModes:
+            for j in HighFreqModes:
+                '''
+                D = np.diagonal(np.diagonal(np.diagonal(self.ints[1][i, j])))
+                self.ints[1][i, j] = np.zeros_like(self.ints[1][i, j])
+                self.ints[1][j, i] = np.zeros_like(self.ints[1][j, i])
+                np.fill_diagonal(self.ints[1][i, j], D)
+                '''
+                for n in range(self.ints[1][i, j].shape[0]):
+                    for m in range(self.ints[1][i, j].shape[3]):
+                        '''
+                        self.ints[1][i, j][n, :, :, m] = np.zeros_like(self.ints[1][i, j][n, :, :, m])
+                        self.ints[1][j, i][n, :, :, m] = np.zeros_like(self.ints[1][j, i][n, :, :, m])
+                        self.ints[1][i, j][:, n, m, :] = np.zeros_like(self.ints[1][i, j][:, n, m, :])
+                        self.ints[1][j, i][:, n, m, :] = np.zeros_like(self.ints[1][j, i][:, n, m, :])
+                        '''
+                        self.ints[1][i, j][n, :, :, m] *= np.tri(self.ints[1][i, j].shape[1], k = NCutoff)
+                        self.ints[1][i, j][n, :, :, m] *= np.tri(self.ints[1][i, j].shape[1], k = NCutoff).T
+                        self.ints[1][j, i][n, :, :, m] *= np.tri(self.ints[1][j, i].shape[1], k = NCutoff)
+                        self.ints[1][j, i][n, :, :, m] *= np.tri(self.ints[1][j, i].shape[1], k = NCutoff).T
+                        self.ints[1][i, j][:, n, m, :] *= np.tri(self.ints[1][i, j].shape[1], k = NCutoff)
+                        self.ints[1][i, j][:, n, m, :] *= np.tri(self.ints[1][i, j].shape[1], k = NCutoff).T
+                        self.ints[1][j, i][:, n, m, :] *= np.tri(self.ints[1][j, i].shape[1], k = NCutoff)
+                        self.ints[1][j, i][:, n, m, :] *= np.tri(self.ints[1][j, i].shape[1], k = NCutoff).T
+
+    def ZeroCoupling2(self, FreqTol1 = 1200, FreqTol2 = 2000):
+        LowFreqModes = np.where(self.Frequencies < FreqTol1)[0]
+        MidFreqModes = np.where((self.Frequencies > FreqTol1) & (self.Frequencies < FreqTol2))[0]
+        HighFreqModes = np.where(self.Frequencies > FreqTol2)[0]
+        for i in LowFreqModes:
+            for j in HighFreqModes:
+                if i != j:
+                    self.ints[1][i, j] = np.zeros_like(self.ints[1][i, j])
+                    self.ints[1][j, i] = np.zeros_like(self.ints[1][j, i])
+        for i in MidFreqModes:
+            for j in HighFreqModes:
+                if i != j:
+                    self.ints[1][i, j] = np.zeros_like(self.ints[1][i, j])
+                    self.ints[1][j, i] = np.zeros_like(self.ints[1][j, i])
+        for i in LowFreqModes:
+            for j in MidFreqModes:
+                if i != j:
+                    self.ints[1][i, j] = np.zeros_like(self.ints[1][i, j])
+                    self.ints[1][j, i] = np.zeros_like(self.ints[1][j, i])
+    
+    def ZeroDivergentCoupling(self, FreqTol = 1000):
+        Divergent3Modes = self.FindDivergent3Modes()
+        LowFreqModes = np.where(self.Frequencies < FreqTol)[0]
+        HighFreqModes = np.where(self.Frequencies > FreqTol)[0]
+        for i in LowFreqModes:
+            for j in HighFreqModes:
+                for Triplet in Divergent3Modes:
+                    if i in Triplet and j in Triplet:
+                        self.ints[1][i, j] = np.zeros_like(self.ints[1][i, j])
+                        self.ints[1][j, i] = np.zeros_like(self.ints[1][j, i])
+                        break
+
+    def ScanPES(self, Modes, Range = None, PlottedModes = None, NPoints = 10, SavePES = None):
+        if Range is None:
+            Range = [[-50, 50]] * len(Modes)
+        ModePts = []
+        for r in Range:
+            ModePts.append(np.linspace(r[0], r[1], NPoints))
+
+        xs = np.empty([NPoints] * len(Modes), dtype = object)
+        PESNMode = np.empty([NPoints] * len(Modes), dtype = object)
+        PESTrue = np.empty([NPoints] * len(Modes), dtype = object)
+        qind = [0] * len(Modes)
+
+        while(True):
+            q = np.zeros(self.Nm)
+            print(qind, flush = True)
+            for m in range(len(Modes)):
+                q[Modes[m]] = ModePts[m][qind[m]]
+            x = self.nm._normal2cart(q)
+
+            xs[tuple(qind)] = x
+            PESTrue[tuple(qind)] = self.potential_cart(x)
+            PESNMode[tuple(qind)] = self._nmode_potential(x)
+
+            qind[0] = qind[0] + 1
+            for m in range(len(Modes) - 1):
+                if qind[m] == NPoints:
+                    qind[m] = 0
+                    qind[m + 1] = qind[m + 1] + 1
+            if qind[-1] == NPoints:
+                break
+
+        if SavePES is not None:
+            with h5py.File(SavePES, "a") as f:
+                f.create_dataset("xs", data = xs)
+                f.create_dataset("pes_nmode", data = PESNMode)
+                f.create_dataset("pes_true", data = PESTrue)
+        if PlottedModes is not None:
+            midpt = NPoints // 2
+            if len(PlottedModes) == 2:
+                xax = ModePts[PlottedModes[0]]
+                yax = ModePts[PlottedModes[1]]
+            plot_pes_nmode = np.zeros((NPoints, NPoints))
+            plot_pes_true = np.zeros((NPoints, NPoints))
+            for i in range(NPoints):
+                for j in range(NPoints):
+                    ind = [midpt] * len(Modes)
+                    ind[PlottedModes[0]] = i
+                    ind[PlottedModes[1]] = j
+                    plot_pes_nmode[i, j] = PESNMode[tuple(ind)]
+                    plot_pes_true[i, j] = PESTrue[tuple(ind)]
+            import matplotlib.pyplot as plt
+            Y, X = np.meshgrid(xax, yax)
+            plt.pcolormesh(X, Y, plot_pes_true, cmap = 'RdBu')
+            plt.colorbar()
+            plt.title('True PES')
+            plt.savefig("pes_true.png")
+            plt.pcolormesh(X, Y, plot_pes_nmode, cmap = 'RdBu')
+            plt.title('NMode PES')
+            plt.savefig("pes_nmode.png")
+
+    def FindDivergent3Modes(self):
+        DivergentTriplets = []
+        V0 = self._nmode_potential(self.nm.x0)
+        for i in range(self.Nm):
+            for j in range(i + 1, self.Nm):
+                for k in range(j + 1, self.Nm):
+                    q = np.zeros(self.Nm)
+                    q[i] = 1
+                    q[j] = 1
+                    q[k] = 1
+                    q = q * 50
+                    x = self.nm._normal2cart(q)
+                    if (self._nmode_potential(x) - V0) < 0:
+                        print("Divergent triplet found: ", i, j, k, flush=True)
+                        DivergentTriplets.append((i, j, k))
+        return DivergentTriplets
+
     def kernel(self, x0 = None):
         self.CalcNM(x0 = x0)
         if self.calc_integrals:
             print("Calculating integrals...", flush = True)
-            self.CalcNModePotential()
+            self.CalcNModePotential(OrderPlus = self.OrderPlus)
         if self.calc_dipole:
             if not self.calc_integrals:
                 self.CalcNModePotential(Order = 1)
@@ -598,6 +752,10 @@ class NormalModes():
         e, v = e[6:], v[:,6:] # remove translations and rotations
         v = v.reshape((natoms,3,self.nmodes))
         self.freqs, self.nm_coeff = np.sqrt(e), v
+        if self.mol.LowFrequencyCutoff is not None:
+            Cutoff = self.mol.LowFrequencyCutoff / constants.AU_TO_INVCM
+            self.freqs = self.freqs[self.freqs > Cutoff]
+            self.nm_coeff = self.nm_coeff[:,:,self.freqs > Cutoff]
         
         return self.freqs, self.nm_coeff
 
@@ -871,7 +1029,7 @@ class NModePotential():
     def __init__(self, nm):
         self.nm = nm
 
-    def get_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
+    def get_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None, modes = None):
         print("Calculating n-Mode integrals for n =", nmode, flush = True) 
         if optimized is False:
             if ngridpts is None:
@@ -895,33 +1053,59 @@ class NModePotential():
             gridpts, coeff = self.get_heg(ngridpts, optimized, ngridpts0)
 
         nmodes = self.nm.nmodes
-        if nmode == 1:
-            ints = np.empty(nmodes, dtype=object)
-            for i in range(nmodes):
-                vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
-                vi = np.dot(coeff[i], np.dot(np.diag(vgrid), coeff[i].T))
-                ints[i] = vi * constants.AU_TO_INVCM
-        elif nmode == 2:
-            ints = np.empty((nmodes,nmodes), dtype=object)
-            for i in range(nmodes):
-                Ci = coeff[i].T @ onemode_coeff[i]
-                for j in range(nmodes):
-                    Cj = coeff[j].T @ onemode_coeff[j]
-                    vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
-                    vij = np.einsum('gp,hq,gh,gr,hs->pqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
-                    ints[i, j] = vij * constants.AU_TO_INVCM
+        if modes is None:
+            if nmode == 1:
+                ints = np.empty(nmodes, dtype=object)
+                for i in range(nmodes):
+                    vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
+                    vi = np.dot(coeff[i], np.dot(np.diag(vgrid), coeff[i].T))
+                    ints[i] = vi * constants.AU_TO_INVCM
+            elif nmode == 2:
+                ints = np.empty((nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    Ci = coeff[i].T @ onemode_coeff[i]
+                    for j in range(nmodes):
+                        Cj = coeff[j].T @ onemode_coeff[j]
+                        vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
+                        vij = np.einsum('gp,hq,gh,gr,hs->pqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
+                        ints[i, j] = vij * constants.AU_TO_INVCM
 
-        elif nmode == 3:
-            ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
-            for i in range(nmodes):
-                Ci = coeff[i].T @ onemode_coeff[i]
-                for j in range(nmodes):
-                    Cj = coeff[j].T @ onemode_coeff[j]
-                    for k in range(nmodes):
-                        Ck = coeff[k].T @ onemode_coeff[k]
-                        vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
-                        vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
-                        ints[i, j, k] = vijk * constants.AU_TO_INVCM
+            elif nmode == 3:
+                ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    Ci = coeff[i].T @ onemode_coeff[i]
+                    for j in range(nmodes):
+                        Cj = coeff[j].T @ onemode_coeff[j]
+                        for k in range(nmodes):
+                            Ck = coeff[k].T @ onemode_coeff[k]
+                            vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                            vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
+                            ints[i, j, k] = vijk * constants.AU_TO_INVCM
+        else:
+            if nmode == 3:
+                ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    Ci = coeff[i].T @ onemode_coeff[i]
+                    for j in range(i, nmodes):
+                        Cj = coeff[j].T @ onemode_coeff[j]
+                        for k in range(j, nmodes):
+                            Ck = coeff[k].T @ onemode_coeff[k]
+                            if (i, j, k) in modes:
+                                vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                                vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
+                                ints[i, j, k] = vijk * constants.AU_TO_INVCM
+                                ints[j, i, k] = vijk * constants.AU_TO_INVCM
+                                ints[i, k, j] = vijk * constants.AU_TO_INVCM
+                                ints[k, i, j] = vijk * constants.AU_TO_INVCM
+                                ints[j, k, i] = vijk * constants.AU_TO_INVCM
+                                ints[k, j, i] = vijk * constants.AU_TO_INVCM
+                            else:
+                                ints[i, j, k] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+                                ints[j, i, k] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+                                ints[i, k, j] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+                                ints[k, i, j] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+                                ints[j, k, i] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+                                ints[k, j, i] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
 
         return ints
 
@@ -987,8 +1171,8 @@ class NModePotential():
 
         return ints
 
-    def get_inv_moment_of_inertia_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
-        print("Calculating n-Mode dipole integrals for n =", nmode, flush = True) 
+    def get_inv_inertia_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
+        print("Calculating n-Mode inverse inertia integrals for n =", nmode, flush = True) 
         if optimized is False:
             if ngridpts is None:
                 ngridpts = [12]*self.nm.nmodes

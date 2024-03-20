@@ -248,6 +248,27 @@ def InitC(mVHCI):
             b.append(B.Modes[i].Quanta)
         mVHCI.E.append(HarmonicEnergy(mVHCI.Frequencies, b, ZPE = ZPE))
 
+def ExpectedQ(mVHCI, State = 0):
+    MaxQ = [mVHCI.MaxQuanta[0]]
+    Freq = [1.0]
+    GenericBasis = init_funcs.InitGridBasis(Freq, MaxQ)[0]
+
+    ExpQ = []
+    NModes = mVHCI.Frequencies.shape[0]
+    for i in range(NModes):
+        W = FConst(1.0, [i], False)
+        W = [W]
+        W.append(FConst(0.0, [0] * 6, False))
+        CubicFC = []
+        QuarticFC = []
+        QuinticFC = []
+        SexticFC = []
+        CubicFC = W.copy()
+        Q = GenerateSparseHamV(mVHCI.Basis, mVHCI.Frequencies, W, CubicFC, QuarticFC, QuinticFC, SexticFC)
+        QBar = mVHCI.C[:, State].T @ Q @ mVHCI.C[:, State]
+        ExpQ.append(QBar)
+    return np.array(ExpQ)
+
 def TranslateBasisToString(B):
     BString = ""
     for j, HO in enumerate(B.Modes):
@@ -325,6 +346,7 @@ class VHCI:
     PT2 = PT2
     InitTruncatedBasis = InitTruncatedBasis
     InitC = InitC
+    ExpectedQ = ExpectedQ
     PrintResults = PrintResults
     LCLine = LCLine
     PrintParameters = PrintParameters
