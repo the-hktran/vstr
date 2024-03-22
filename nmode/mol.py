@@ -754,8 +754,10 @@ class NormalModes():
         self.freqs, self.nm_coeff = np.sqrt(e), v
         if self.mol.LowFrequencyCutoff is not None:
             Cutoff = self.mol.LowFrequencyCutoff / constants.AU_TO_INVCM
-            self.freqs = self.freqs[self.freqs > Cutoff]
-            self.nm_coeff = self.nm_coeff[:,:,self.freqs > Cutoff]
+            Keep = self.freqs > Cutoff
+            self.freqs = self.freqs[Keep]
+            self.nm_coeff = self.nm_coeff[:, :, Keep]
+            self.nmodes = self.nm_coeff.shape[2]
         
         return self.freqs, self.nm_coeff
 
