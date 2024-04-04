@@ -7,12 +7,15 @@
 ### Python Dependencies
 * NumPy
 * SciPy
+* Cython
 * Pybind11
 * Eigen
 * Matplotlib
 * Numdifftools
 * PySCF and its dependencies
 * h5py
+* maxvolpy
+* TnTorch
 
 ### C++ Dependencies
 * Eigen

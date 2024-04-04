@@ -274,7 +274,7 @@ class Molecule():
             self.ReadDipoles()
         else:
             for i in range(Order):
-                self.dip_ints[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+                self.dip_ints[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff, usePyPotDip = self.usePyPotDip)
 
         # separate dipole and energy as necessary
         if self.usePyPotDip and not self.ReadDip:
@@ -283,21 +283,21 @@ class Molecule():
                 if n + 1 == 1:
                     self.ints[n] = np.empty(self.Nm, dtype=object)
                     for i in range(self.Nm):
-                        self.ints[n][i] = self.dip_ints[n][i][0] * constants.AU_TO_INVCM
-                        self.dip_ints[n][i] = self.dip_ints[n][i][1:]
+                        self.ints[n][i] = self.dip_ints[n][0][i] * constants.AU_TO_INVCM
+                    self.dip_ints[n] = np.delete(self.dip_ints[n], (0), axis = 0)
                 if n + 1 == 2:
                     self.ints[n] = np.empty((self.Nm, self.Nm), dtype=object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
-                            self.ints[n][i, j] = self.dip_ints[n][i, j][0] * constants.AU_TO_INVCM
-                            self.dip_ints[n][i, j] = self.dip_ints[n][i, j][1:]
+                            self.ints[n][i, j] = self.dip_ints[n][0][i, j] * constants.AU_TO_INVCM
+                    self.dip_ints[n] = np.delete(self.dip_ints[n], (0), axis = 0)
                 if n + 1 == 3:
                     self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype=object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
                             for k in range(self.Nm):
-                                self.ints[n][i, j, k] = self.dip_ints[n][i, j, k][0] * constants.AU_TO_INVCM
-                                self.dip_ints[n][i, j, k] = self.dip_ints[n][i, j, k][1:]
+                                self.ints[n][i, j, k] = self.dip_ints[n][0][i, j, k] * constants.AU_TO_INVCM
+                    self.dip_ints[n] = np.delete(self.dip_ints[n], (0), axis = 0)
 
     def CalcNModeInvInertia(self, Order = None):
         if Order is None:
@@ -1111,7 +1111,7 @@ class NModePotential():
 
         return ints
 
-    def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
+    def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None, usePyPotDip = False):
         print("Calculating n-Mode dipole integrals for n =", nmode, flush = True) 
         if optimized is False:
             if ngridpts is None:
@@ -1137,6 +1137,8 @@ class NModePotential():
         nmodes = self.nm.nmodes
         if nmode == 1:
             ints = np.empty((3, nmodes), dtype=object)
+            if usePyPotDip:
+                ints = np.empty((4, nmodes), dtype=object)
             for i in range(nmodes):
                 vgrid = np.array([self.nm.dipole_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                 Ci = coeff[i].T @ onemode_coeff[i]
@@ -1144,8 +1146,12 @@ class NModePotential():
                 ints[0, i] = vi[0]
                 ints[1, i] = vi[1]
                 ints[2, i] = vi[2]
+                if usePyPotDip:
+                    ints[3, i] = vi[3]
         elif nmode == 2:
             ints = np.empty((3, nmodes, nmodes), dtype=object)
+            if usePyPotDip:
+                ints = np.empty((4, nmodes, nmodes), dtype=object)
             for i in range(nmodes):
                 Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
@@ -1155,9 +1161,13 @@ class NModePotential():
                     ints[0, i, j] = vij[0]
                     ints[1, i, j] = vij[1]
                     ints[2, i, j] = vij[2]
+                    if usePyPotDip:
+                        ints[3, i, j] = vij[3]
 
         elif nmode == 3:
             ints = np.empty((3, nmodes, nmodes, nmodes), dtype=object)
+            if usePyPotDip:
+                ints = np.empty((4, nmodes, nmodes, nmodes), dtype=object)
             for i in range(nmodes):
                 Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
@@ -1170,6 +1180,8 @@ class NModePotential():
                         ints[0, i, j, k] = vijk[0]
                         ints[1, i, j, k] = vijk[1]
                         ints[2, i, j, k] = vijk[2]
+                        if usePyPotDip:
+                            ints[3, i, j, k] = vijk[3]
 
         return ints
 
