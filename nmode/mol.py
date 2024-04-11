@@ -80,6 +80,7 @@ class Molecule():
         self.ReadInt = False
         self.ReadDip = False
         self.ReadGeom = False
+        self.doGeomOpt = True
         self.doShiftPotential = True
 
         self.__dict__.update(kwargs)
@@ -208,7 +209,7 @@ class Molecule():
         if self.ReadGeom:
             self.ReadGeometry()
         else:
-            self.nm.kernel(x0 = x0)
+            self.nm.kernel(x0 = x0, doGeomOpt = self.doGeomOpt)
         self.Nm = self.nm.freqs.shape[0]
         #debug!!
         #c = np.zeros((self.natoms * 3, self.nm.nmodes))
@@ -718,7 +719,7 @@ class NormalModes():
 
         self.nmodes = 3*self.mol.natoms - 6
 
-    def kernel(self, x0=None):
+    def kernel(self, x0=None, doGeomOpt = True):
         """
         Calculate the normal modes of the potential defined in mol.
     
@@ -732,10 +733,13 @@ class NormalModes():
             x0 = np.random.random((natoms,3))
 
         pes = self.mol._potential
-        print("Beginning geometry optimization...", flush = True)
-        result = scipy.optimize.minimize(pes, x0, tol = 1e-12)
-        print("...geometry optimization complete.", flush = True)
-        self.x0 = result.x.reshape((natoms,3))
+        if doGeomOpt:
+            print("Beginning geometry optimization...", flush = True)
+            result = scipy.optimize.minimize(pes, x0, tol = 1e-12)
+            print("...geometry optimization complete.", flush = True)
+            self.x0 = result.x.reshape((natoms,3))
+        else:
+            self.x0 = x0.reshape((natoms,3))
         self.V0 = pes(self.x0.reshape(-1))
         try:
             self.mu0 = self.mol._dipole(self.x0)
