@@ -9,6 +9,9 @@ from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
 from vstr.spectra.dipole import GetDipole
 from pyscf import gto, scf, cc
 
+import tntorch as tn
+import torch
+
 A2B = 1.88973
 AU2CM = 219474.63 
 AMU2AU = 1822.888486209
@@ -946,6 +949,36 @@ class NormalModes():
         q[k] = qk
         x = self._normal2cart(q)
         return (self.mol.inv_moment_of_inertia_cart(x) - self.inv_moment_of_inertia_2mode(i, j, qi, qj) - self.inv_moment_of_inertia_2mode(i, k, qi, qk) - self.inv_moment_of_inertia_2mode(j, k, qj, qk) - self.inv_moment_of_inertia_1mode(i, qi) - self.inv_moment_of_inertia_1mode(j, qj) - self.inv_moment_of_inertia_1mode(k, qk) - self.B0)
+
+    def potential_nm(self, q):
+        x = self._normal2cart(q)
+        return self.mol.potential_cart(x)
+
+    def potential_nm_i(self, *argv):
+        q = np.zeros(self.nmodes)
+        for i in range(self.nmodes):
+            q[i] = argv[i]
+        return self.potential_nm(q)
+
+    def potential_nm_torch(self, *argv):
+        argv_np = [arg.detach().numpy() for arg in argv]
+        potential_nm_vec = np.vectorize(self.potential_nm_i)
+        return torch.tensor(potential_nm_vec(*argv_np))
+
+    '''
+    def get_heg(self, ngridpts = None):
+        nmode = NModePotential(self)
+        if ngridpts is None:
+            ngridpts = [12]*self.nmodes
+        elif isinstance(ngridpts, (int, np.integer)):
+            ngridpts = [ngridpts]*self.nmodes
+        self.gridpts, self.dvr_coeff = nmode.get_heg(ngridpts)
+    '''
+
+    def do_tci(self, gridpts):
+        gridpts_torch = [torch.tensor(grid) for grid in gridpts]
+        t = tn.cross(function = self.potential_nm_torch, domain = gridpts_torch)
+        return t.cores
 
 def get_qmat_ho(omega, nmax):
     qmat = np.zeros((nmax,nmax))
