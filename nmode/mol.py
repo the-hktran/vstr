@@ -1363,7 +1363,8 @@ if __name__ == '__main__':
     pymol.basis = 'sto-3g'
     pymol.build()
 
-    vmol = Molecule(pot_cart, x0.shape[0], mass, ngridpts = 2, Order = 2)
+    vmol = Molecule(pot_cart, x0.shape[0], mass, ngridpts = 8, Order = 3)
+    '''
     vmol.IntsFile = './ints.h5'
     vmol.calc_dipole = True
     vmol.init_pypotential(pymol)
@@ -1373,6 +1374,12 @@ if __name__ == '__main__':
     vmol.SaveDipoles()
 
     print(vmol.ints[1][0, 1])
+    '''
+    
+    vmol.kernel(x0 = x0)
+    from vstr.mf.vscf import NModeVSCF
+    mf = NModeVSCF(vmol, DoDIIS = False)
+    mf.kernel()
 
     '''
     vmol_read = Molecule(pot_cart, x0.shape[0], mass, ngridpts=2, Order = 3)

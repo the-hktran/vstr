@@ -45,6 +45,8 @@ Headers, libraries, and data structures for VHCI
 #include <boost/functional/hash.hpp>
 #include <numeric>
 #include <random>
+//#include <torch/torch.h>
+//#include <torch/extension.h>
 
 //Set namespaces for common libraries
 using namespace Eigen;
@@ -347,3 +349,6 @@ SpMat VCISparseHamNModeFromOM(std::vector<WaveFunction> &BasisSet1, std::vector<
 std::vector<WaveFunction> ConnectedStatesCIPSI(std::vector<WaveFunction> &BasisSet, std::vector<int> MaxQuanta, int Order);
 std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, std::vector<WaveFunction> &ConnectedBasis, Eigen::VectorXd &C, Eigen::VectorXd &EVal, std::vector<double> &Frequencies, double V0, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, double eps);
 std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>>> &SortedIndices, Eigen::Ref<Eigen::VectorXd> C, double eps, bool ExactSingles);
+
+//SpMat VCISparseHamTCI(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, double V0, std::vector<torch::Tensor> CoreTensors, bool DiagonalBlock);
+SpMat VCISparseT(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, bool DiagonalBlock);

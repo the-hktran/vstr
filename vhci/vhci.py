@@ -2,7 +2,7 @@ import numpy as np
 from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNModeFromOM, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNModeFromOM, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode, VCISparseT
 from functools import reduce
 import itertools
 import math
@@ -209,6 +209,50 @@ def SparseDiagonalizeNMode(mVHCI):
     mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
+def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
+    T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
+    N1 = len(Basis1)
+    N2 = len(Basis2)
+    V = sparse.csr_matrix((N1, N2))
+    print(T)
+    thr = 1e-4
+    if OffDiagonal:
+        for i, B1 in enumerate(Basis1):
+            for j, B2 in enumerate(Basis2):
+                G = CoreTensors[0][:, :, B1.Modes[0].Quanta, B2.Modes[0].Quanta]
+                for m in range(Frequencies.shape[0] - 1):
+                    G = G @ CoreTensors[m + 1][:, :, B1.Modes[m + 1].Quanta, B2.Modes[m + 1].Quanta]
+                Vij = G[0, 0]
+                if abs(Vij) > thr:
+                    V[i, j] = Vij
+    else:
+        for i in range(N1):
+            for j in range(i, N2):
+                G = CoreTensors[0][:, :, Basis1[i].Modes[0].Quanta, Basis2[j].Modes[0].Quanta]
+                for m in range(Frequencies.shape[0] - 1):
+                    G = G @ CoreTensors[m + 1][:, :, Basis1[i].Modes[m + 1].Quanta, Basis2[j].Modes[m + 1].Quanta]
+                Vij = G[0, 0]
+                if abs(Vij) > thr:
+                    V[i, j] = Vij
+                    V[j, i] = Vij
+    print(V)
+    return T + V
+
+def SparseDiagonalizeTCI(mVHCI):
+    mVHCI.Timer.start(1)
+    if mVHCI.H is None:
+        mVHCI.H = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, True)
+    else:
+        if len(mVHCI.NewBasis) != 0:
+            HIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
+            HJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, True)
+            mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
+            mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
+    mVHCI.Timer.stop(1)
+    mVHCI.Timer.start(0)
+    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SA')
+    mVHCI.Timer.stop(0)
+    mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
 def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
     Basis = []
@@ -516,6 +560,118 @@ class NModeVHCI(VHCI):
         self.Timer = TIMER(6)
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
 
+    def kernel(self, doVCI = True, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
+        if self.HBMethod.upper() == 'QFF':
+            V3, V4 = self.mol.nm.get_ff()
+            self.Potential = [[]] * 4 # Cubic, quartic, quintic, sextic
+            for V in [V3, V4]:
+                Wp = self.FormW(V)
+                self.Potential[Wp[0].Order - 3] = Wp
+            self.FormWSD()
+
+            self.PotentialListFull = []
+            for Wp in self.PotentialSD:
+                self.PotentialListFull += Wp
+            self.PotentialList = []
+            for Wp in self.Potential:
+                self.PotentialList += Wp
+                self.PotentialListFull += Wp
+            self.PotentialListFull = HeatBath_Sort_FC(self.PotentialListFull) # Only need to sort these once
+            self.Ys = [self.MakeAnharmTensor()] * self.NModes
+        else:
+            self.PotentialListFull = []
+
+        if self.HBMethod.upper() == '2MODE':
+            self.Sorted2Mode = np.empty((self.mol.Nm, self.mol.Nm, self.mol.ngridpts, self.mol.ngridpts, self.mol.ngridpts**2, 2), dtype = np.int8)
+            for i in range(self.mol.Nm):
+                for j in range(self.mol.Nm):
+                    for ni in range(self.mol.ngridpts):
+                        for nj in range(self.mol.ngridpts):
+                            Sorted = np.argsort(-abs(self.mol.ints[1][i, j][ni, nj].reshape(-1)))
+                            Sorted = np.unravel_index(Sorted, (self.mol.ngridpts, self.mol.ngridpts))
+                            Sorted = np.vstack((Sorted[0], Sorted[1]))
+                            self.Sorted2Mode[i, j, ni, nj] = Sorted.T
+
+        if self.SaveToFile or self.ReadFromFile:
+            assert(self.CHKFile is not None)
+
+        if self.ReadFromFile:
+            self.ReadBasisFromFile(self.CHKFile)
+        else:
+            self.Basis = init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
+
+        self.PrintParameters()
+
+        if doVCI:
+            self.Timer.start(0)
+            self.SparseDiagonalize()
+            print("===== VCI RESULTS =====", flush = True)
+            self.PrintResults()
+            print("")
+            self.Timer.stop(0)
+        
+        if doVHCI:
+            print("===== VHCI RESULTS =====", flush = True)
+            self.HCI()
+            self.PrintResults()
+            print("")
+
+        if doPT2:
+            print("===== VHCI+PT2 RESULTS =====", flush = True)
+            self.PT2(doStochastic = False)
+            self.PrintResults()
+            print("")
+        if doSPT2:
+            print("===== VHCI+SPT2 RESULTS =====", flush = True)
+            self.PT2(doStochastic = True)
+            self.PrintResults()
+            print("")
+        if ComparePT2:
+            print("===== VHCI+SSPT2 RESULTS =====", flush = True)
+            eps = self.eps2
+            self.eps2 *= 10
+            self.eps3 = eps
+            self.PrintParameters()
+            self.PT2(doStochastic = True)
+            self.PrintResults()
+            print("")
+        self.Timer.report(self.TimerNames)
+
+class TCIVHCI(VHCI):
+    SparseDiagonalize = SparseDiagonalizeTCI
+    def __init__(self, mol, NStates = 10, **kwargs):
+        self.mol = mol
+        self.Frequencies = mol.Frequencies # 1D array of all harmonic frequencies.
+        self.NModes = self.Frequencies.shape[0]
+        self.MaxQuanta = [mol.ngridpts] * self.NModes
+        
+        self.MaxTotalQuanta = 5
+        for m in self.MaxQuanta:
+            assert(m <= mol.ngridpts)
+        self.H = None
+        self.eps1 = 0.1 # HB epsilon
+        self.eps2 = 0.01 # PT2/SPT2 epsilon
+        self.eps3 = -1.0 # SSPT2 epsilon, < 0 means do not do semi-stochastic
+        self.tol = 0.01
+        self.MaxIter = 1000
+        self.NStates = NStates
+        self.NStatesPT2 = NStates
+        self.NWalkers = 200
+        self.NSamples = 50
+        self.dE_PT2 = None
+        self.sE_PT2 = None
+        self.HBMethod = 'pass' #['qff', '2mode']
+
+        self.CHKFile = None
+        self.ReadFromFile = False
+        self.SaveToFile = False
+        self.PrintHCISteps = False
+
+        self.__dict__.update(kwargs)
+
+        self.Timer = TIMER(6)
+        self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
+    
     def kernel(self, doVCI = True, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
         if self.HBMethod.upper() == 'QFF':
             V3, V4 = self.mol.nm.get_ff()

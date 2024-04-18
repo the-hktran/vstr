@@ -231,7 +231,8 @@ def GetHCore(mVSCF, Cs = None, HamHO = None):
 def CalcESCF(mVSCF, ModeOcc = None, V0 = None):
     if ModeOcc is None:
         ModeOcc = mVSCF.ModeOcc
-    V0 = mVSCF.GetVEff(ModeOcc1 = ModeOcc, FirstV = True)[0]
+    if V0 is None:
+        V0 = mVSCF.GetVEff(ModeOcc1 = ModeOcc, FirstV = True)[0]
     DC = (mVSCF.Cs[0][:, ModeOcc[0]].T @ V0 @ mVSCF.Cs[0][:, ModeOcc[0]])
     E_SCF = 0.0
     for Mode, E in enumerate(mVSCF.Es):
@@ -320,6 +321,70 @@ def GetFock(mVSCF, hs = None, Cs = None, CalcE = False):
         Fs.append(hs[Mode] + Vs[Mode])
     return Fs
 
+def GetFockNMode(mVSCF, ModeOcc1 = None, ModeOcc2 = None, Cs = None, CalcE = False):
+    if ModeOcc1 is None:
+        ModeOcc1 = mVSCF.ModeOcc
+    if ModeOcc2 is None:
+        ModeOcc2 = ModeOcc1
+
+    if Cs is None:
+        Cs = mVSCF.Cs
+
+    ints = mVSCF.ContractIntegrals(Cs)[0]
+    Vmf = np.zeros((mVSCF.MaxQuanta[0], mVSCF.MaxQuanta[0]))
+    for n in range(mVSCF.mol.Order):
+        if n == 1:
+            for j in range(1, mVSCF.NModes):
+                Vmf += ints[n][0, j][:, ModeOcc1[j], :, ModeOcc2[j]]
+        if n == 2:
+            for j in range(1, mVSCF.NModes):
+                for k in range(j + 1, mVSCF.NModes):
+                    Vmf += ints[n][0, j, k][:, ModeOcc1[j], ModeOcc1[k], :, ModeOcc2[j], ModeOcc2[k]]
+
+    Fs = []
+    for i in range(mVSCF.NModes):
+        F = np.zeros((mVSCF.MaxQuanta[i], mVSCF.MaxQuanta[i]))
+        np.fill_diagonal(F, mVSCF.mol.onemode_eig[i])
+        #F = ints[0][i]
+        #Vmf += (F - np.diag(np.diag(F)))
+        '''
+        if CalcE:
+            V0 = mVSCF.mol.V0
+            if mVSCF.mol.Order > 0:
+                for j in range(mVSCF.NModes):
+                    if j != i:
+                        if ModeOcc1[j] == ModeOcc2[j]:
+                            V0 += ints[0][j][ModeOcc1[j], ModeOcc2[j]]
+            if mVSCF.mol.Order > 1:
+                for j in range(mVSCF.NModes):
+                    for k in range(mVSCF.NModes):
+                        if j != i and k != i:
+                            V0 += ints[1][j, k][ModeOcc1[j], ModeOcc1[k], ModeOcc2[j], ModeOcc2[k]]
+            if mVSCF.mol.Order > 2:
+                for j in range(mVSCF.NModes):
+                    for k in range(mVSCF.NModes):
+                        for l in range(mVSCF.NModes):
+                            if j != i and k != i and l != i:
+                                V0 += ints[2][j, k, l][ModeOcc1[j], ModeOcc1[k], ModeOcc1[l], ModeOcc2[j], ModeOcc2[k], ModeOcc2[l]]
+            #F += np.eye(mVSCF.MaxQuanta[i]) * V0
+        '''
+        if mVSCF.mol.Order > 1:
+            for j in range(mVSCF.NModes):
+                if j != i:
+                    F += ints[1][i, j][:, ModeOcc1[j], :, ModeOcc2[j]]
+        if mVSCF.mol.Order > 2:
+            for j in range(mVSCF.NModes):
+                for k in range(j + 1, mVSCF.NModes):
+                    if j != i and k != i:
+                        F += ints[2][i, j, k][:, ModeOcc1[j], ModeOcc1[k], :, ModeOcc2[j], ModeOcc2[k]]
+        #if i == 0:
+        #    Vmf += np.eye(mVSCF.MaxQuanta[0]) * mVSCF.mol.V0
+        Fs.append(F)
+        if CalcE:
+            mVSCF.ESCF = mVSCF.CalcESCF(ModeOcc = ModeOcc1, V0 = Vmf)
+
+    return Fs
+
 def FockError(F, C):
     return C @ C.T @ F - F @ C @ C.T
 
@@ -399,6 +464,26 @@ def SCF(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
         if It > mVSCF.MaxIterations:
             raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
     mVSCF.Converged = True
+
+def SCFNMode(mVSCF, DoDIIS = True, tol = 1e-8, etol = 1e-6):
+    if DoDIIS:
+        mVSCF.AllFs = []
+        mVSCF.AllErrs = []
+
+    ConvErr = 1
+    It = 1
+    EnergyErr = 1
+    while(ConvErr > tol or EnergyErr > etol):
+        EnergyErr = mVSCF.ESCF
+        ConvErr = mVSCF.SCFIteration(It, DoDIIS = DoDIIS)
+        EnergyErr = abs(EnergyErr - mVSCF.ESCF)
+        if mVSCF.verbose > 0:
+            print("VSCF Iteration %d complete with an SCF error of %.12f/%.12f and SCF Energy of %.6f" % (It, ConvErr, EnergyErr, mVSCF.ESCF), flush = True)
+        It += 1
+        if It > mVSCF.MaxIterations:
+            raise RuntimeError("Maximum number of SCF iterations reached without convergence.")
+    mVSCF.Converged = True
+
 
 def LCLine(mVSCF, ModeOcc, thr = 2.5e-1):
     def BasisToString(B):
@@ -645,6 +730,76 @@ class VSCF:
         if self.verbose > 1:
             self.Timer.report(self.TimerNames)
         return self.ESCF
+
+class NModeVSCF(VSCF):
+    GetFock = GetFockNMode
+    SCF = SCFNMode
+
+    def __init__(self, mol, **kwargs):
+        self.mol = mol
+        self.Frequencies = mol.Frequencies
+        self.NModes = self.Frequencies.shape[0]
+        self.Es = mol.onemode_eig
+
+        self.Timer = TIMER(5)
+        self.Timer.set_overhead(self.Timer.estimate_overhead())
+        self.TimerNames = ["Basis Init", "Anharm Pot Init", "Fock Generation", "DIIS", "Solve Fock"]
+        self.MaxQuanta = [mol.ngridpts] * self.NModes
+        self.ModeOcc = [0] * self.NModes
+        self.ESCF = 0.0
+        self.Cs = self.InitCs()
+
+        self.DoDIIS = False
+        self.DIISSpace = 5
+        self.DIISStart = 10
+        self.MaxIterations = 1000
+
+        self.verbose = 2
+        self.Converged = False
+
+        self.__dict__.update(kwargs)
+
+    def ContractIntegrals(self, Cs = None, withDipole = False):
+        if Cs is None:
+            Cs = self.Cs
+        ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
+        for n in range(self.mol.Order):
+            if n == 0:
+                ints[0] = np.empty(self.NModes, dtype = object)
+                for i in range(self.NModes):
+                    ints[0][i] = self.Cs[i].T @ np.diag(self.mol.onemode_eig[i]) @ self.Cs[i]
+            if n == 1:
+                ints[1] = np.empty((self.NModes, self.NModes), dtype = object)
+                for i in range(self.NModes):
+                    for j in range(self.NModes):
+                        ints[1][i, j] = np.einsum('ip,jq,ijkl,kr,ls->pqrs', self.Cs[i], self.Cs[j], self.mol.ints[1][i, j], self.Cs[i], self.Cs[j], optimize = True)
+            if n == 2:
+                ints[2] = np.empty((self.NModes, self.NModes, self.NModes), dtype = object)
+                for i in range(self.NModes):
+                    for j in range(self.NModes):
+                        for k in range(self.NModes):
+                            ints[2][i, j, k] = np.einsum('ip,jq,kr,ijklmn,ls,mt,nu->pqrstu', self.Cs[i], self.Cs[j], self.Cs[k], self.mol.ints[2][i, j, k], self.Cs[i], self.Cs[j], self.Cs[k], optimize = True)
+        
+        dip_ints = None
+        if withDipole:
+            dip_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3)]
+            for n in range(self.mol.Order):
+                if n == 0:
+                    dip_ints[0] = np.empty((3, self.NModes), dtype = object)
+                    for i in range(self.NModes):
+                        dip_ints[0][i] = np.einsum('ip,jq,xij->xpq', self.Cs[i], self.Cs[i], self.mol.dip_ints[i], optimize = True)
+                if n == 1:
+                    dip_ints[1] = np.empty((3, self.NModes, self.NModes), dtype = object)
+                    for i in range(self.NModes):
+                        for j in range(self.NModes):
+                            dip_ints[1][i, j] = np.einsum('ip,jq,xijkl,kr,ls->xpqrs', self.Cs[i], self.Cs[j], self.mol.dip_ints[1][i, j], self.Cs[i], self.Cs[j], optimize = True)
+                if n == 2:
+                    dip_ints[2] = np.empty((3, self.NModes, self.NModes, self.NModes), dtype = object)
+                    for i in range(self.NModes):
+                        for j in range(self.NModes):
+                            for k in range(self.NModes):
+                                dip_ints[2][i, j, k] = np.einsum('ip,jq,kr,xijklm,ls,mt,nu->xpqrstu', self.Cs[i], self.Cs[j], self.Cs[k], self.mol.dip_ints[2][i, j, k], self.Cs[i], self.Cs[j], self.Cs[k], optimize = True)
+        return ints, dip_ints
 
 if __name__ == "__main__":
     from vstr.utils.read_jf_input import Read
