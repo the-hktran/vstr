@@ -1,6 +1,7 @@
 import numpy as np
 from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
+from vstr.utils import constants
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNModeFromOM, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode, VCISparseT
 from functools import reduce
@@ -235,6 +236,7 @@ def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
                 if abs(Vij) > thr:
                     V[i, j] = Vij
                     V[j, i] = Vij
+    V = V * constants.AU_TO_INVCM
     print(V)
     return T + V
 
