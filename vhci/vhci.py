@@ -214,8 +214,7 @@ def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
     T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
     N1 = len(Basis1)
     N2 = len(Basis2)
-    V = sparse.csr_matrix((N1, N2))
-    print(T)
+    V = sparse.lil_matrix((N1, N2))
     thr = 1e-4
     if OffDiagonal:
         for i, B1 in enumerate(Basis1):
@@ -237,7 +236,6 @@ def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
                     V[i, j] = Vij
                     V[j, i] = Vij
     V = V * constants.AU_TO_INVCM
-    print(V)
     return T + V
 
 def SparseDiagonalizeTCI(mVHCI):

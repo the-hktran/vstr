@@ -11,6 +11,7 @@ from pyscf import gto, scf, cc
 
 import tntorch as tn
 import torch
+import xfacpy
 
 A2B = 1.88973
 AU2CM = 219474.63 
@@ -975,10 +976,45 @@ class NormalModes():
         self.gridpts, self.dvr_coeff = nmode.get_heg(ngridpts)
     '''
 
-    def do_tci(self, gridpts):
+    def do_tci(self, gridpts, maxit = 121, tol = 1e-6):
+        # tntorch implementation
+        '''
         gridpts_torch = [torch.tensor(grid) for grid in gridpts]
         t = tn.cross(function = self.potential_nm_torch, domain = gridpts_torch)
+        print(t)
         return t.cores
+        '''
+        # xfacpy implementation
+        def f(x):
+            f.neval += 1
+            return self.potential_nm_i(*x)
+        f.neval = 0
+        ci = xfacpy.CTensorCI1(f, gridpts)
+        print("rank neval pivotError")
+        err = 1
+        i = 0
+        while(err > tol and i < maxit):
+            i += 1
+            ci.iterate()
+            err = ci.pivotError[-1]
+            print(i, f.neval, ci.pivotError[-1])
+        return ci.get_TensorTrain().core
+
+    def do_tt(self, gridpts, rank = 10):
+        gridpts_torch = [torch.tensor(grid) for grid in gridpts]
+        gridpts_mesh = torch.meshgrid(*gridpts_torch)
+        gridpts_mesh_flatten = []
+        Shape = [len(grid) for grid in gridpts]
+        for gridpt in gridpts_mesh:
+            gridpts_mesh_flatten.append(gridpt.reshape(-1))
+        V = self.potential_nm_torch(*gridpts_mesh_flatten)
+        V = V.reshape(Shape)
+        t = tn.Tensor(V, ranks_tt = rank)
+        print(t)
+        for core in t.cores:
+            print(core.shape)
+        return t.cores
+        
 
 def get_qmat_ho(omega, nmax):
     qmat = np.zeros((nmax,nmax))
@@ -1377,6 +1413,9 @@ if __name__ == '__main__':
     '''
     
     vmol.kernel(x0 = x0)
+    V3, V4 = vmol.nm.get_ff(dx = 1e-1)
+    print(V3)
+    print(V4)
     from vstr.mf.vscf import NModeVSCF
     mf = NModeVSCF(vmol, DoDIIS = False)
     mf.kernel()

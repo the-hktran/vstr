@@ -14,8 +14,9 @@
 * Numdifftools
 * PySCF and its dependencies
 * h5py
-* maxvolpy
-* TnTorch
+<!--* maxvolpy
+* TnTorch-->
+* xfacpy
 
 ### C++ Dependencies
 * Eigen
