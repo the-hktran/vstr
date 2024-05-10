@@ -1169,9 +1169,6 @@ class NModePotential():
                         for k in range(nmodes):
                             Ck = coeff[k].T @ onemode_coeff[k]
                             vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
-                            if i == 0 and j == 1 and k == 2:
-                                vg = np.array([[[self.nm.pot_test(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
-                                print(vg)
                             vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
                             ints[i, j, k] = vijk * constants.AU_TO_INVCM
         else:

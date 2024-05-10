@@ -158,6 +158,8 @@ class IRSpectraNMode(IRSpectra):
         self.GetSpectralIntensities()
         self.Timer.stop(1)
 
+        self.Timer.report(self.TimerNames)
+
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes
     from vstr.ff.force_field import GetFF

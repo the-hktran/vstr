@@ -222,7 +222,7 @@ def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
     N1 = len(Basis1)
     N2 = len(Basis2)
     V = sparse.lil_matrix((N1, N2))
-    thr = 1e-4
+    thr = 1e-12
     if OffDiagonal:
         for i, B1 in enumerate(Basis1):
             for j, B2 in enumerate(Basis2):
@@ -248,11 +248,11 @@ def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
 def SparseDiagonalizeTCI(mVHCI):
     mVHCI.Timer.start(1)
     if mVHCI.H is None:
-        mVHCI.H = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, True)
+        mVHCI.H = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
     else:
         if len(mVHCI.NewBasis) != 0:
-            HIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
-            HJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, True)
+            HIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, True)
+            HJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
