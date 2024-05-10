@@ -1,6 +1,7 @@
 import numpy as np
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, VCISparseHamFromVSCF
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
+from vstr.utils.perf_utils import TIMER
 from scipy import sparse
 import matplotlib.pyplot as plt
 
@@ -88,6 +89,9 @@ class IRSpectra:
         
         self.__dict__.update(kwargs)
 
+        self.Timer = TIMER(2)
+        self.TimerNames = ["Generate Dipole Matrix", "Plot Spectrum"]
+
     def kernel(self):
         if self.DipoleSurface is None:
             mu_raw = GetDipoleSurface(self.mf, self.NormalModes, Freq = self.Frequencies, Order = self.Order, dx = 1e-1)
@@ -117,8 +121,12 @@ class IRSpectra:
             self.DipoleSurface[x][2] = []
             self.DipoleSurfaceList[x].append(FConst(0.0, [0] * 6, False))
 
+        self.Timer.start(0)
         self.GetTransitionDipoleMatrix()
+        self.Timer.stop(0)
+        self.Timer.start(1)
         self.GetSpectralIntensities()
+        self.Timer.stop(1)
 
 class VSCFIRSpectra(IRSpectra):
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrixFromVSCF
@@ -143,8 +151,12 @@ class IRSpectraNMode(IRSpectra):
         self.DipoleSurface = [[], [], [], []]
     
     def kernel(self):
+        self.Timer.start(0)
         self.GetTransitionDipoleMatrix()
+        self.Timer.stop(0)
+        self.Timer.start(1)
         self.GetSpectralIntensities()
+        self.Timer.stop(1)
 
 if __name__ == "__main__":
     from vstr.ff.normal_modes import GetNormalModes

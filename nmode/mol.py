@@ -73,6 +73,7 @@ class Molecule():
         self.mass = mass
         self.onemode_coeff = []
         self.onemode_eig = []
+        self.use_onemode_states = True
 
         self.ngridpts = 12
         self.Order = 2
@@ -246,13 +247,15 @@ class Molecule():
         else:
             for i in range(Order):
                 self.ints[i] = self.nmode.get_ints(i+1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
-                if i == 0:
+                if i == 0 and self.use_onemode_states:
                     for j in range(self.Nm):
                         OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
                         OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], 0.0, [self.ints[0][j].tolist()], self.ints[1].tolist(), self.ints[2].tolist(), True)
                         e, v = np.linalg.eigh(OMH.todense())
                         self.onemode_coeff.append(v)
                         self.onemode_eig.append(e)
+                if i == 0 and not self.use_onemode_states:
+                    self.onemode_coeff = [np.eye(self.ngridpts)] * self.Nm
             if OrderPlus is not None:
                 for i in range(Order, OrderPlus):
                     if i == 2:
@@ -893,6 +896,14 @@ class NormalModes():
         x = self._normal2cart(q)
         return (self.mol.potential_cart(x) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(j, k, qj, qk) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk) - self.V0)
 
+    def pot_test(self, i, j, k, qi, qj, qk):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        q[k] = qk
+        x = self._normal2cart(q)
+        return (self.mol.potential_cart(x))
+
     def dipole_1mode(self, i, qi):
         """
         Calculate the 1-mode potential.
@@ -960,6 +971,10 @@ class NormalModes():
         for i in range(self.nmodes):
             q[i] = argv[i]
         return self.potential_nm(q)
+
+    def potential_nm_vec(self, *argv):
+        pot_vec = np.vectorize(self.potential_nm_i)
+        return pot_vec(*argv)
 
     def potential_nm_torch(self, *argv):
         argv_np = [arg.detach().numpy() for arg in argv]
@@ -1154,6 +1169,9 @@ class NModePotential():
                         for k in range(nmodes):
                             Ck = coeff[k].T @ onemode_coeff[k]
                             vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                            if i == 0 and j == 1 and k == 2:
+                                vg = np.array([[[self.nm.pot_test(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                                print(vg)
                             vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
                             ints[i, j, k] = vijk * constants.AU_TO_INVCM
         else:

@@ -5210,7 +5210,7 @@ std::vector<WaveFunction> AddStatesCIPSI(std::vector<WaveFunction> &BasisSet, st
     return NewBasis;
 }
 
-std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>>> &SortedIndices, Eigen::Ref<Eigen::VectorXd> C, double eps, bool ExactSingles){ // Expand basis via Heat Bath algorithm
+std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>>> &SortedIndices, Eigen::VectorXd C, double eps, bool ExactSingles){ // Expand basis via Heat Bath algorithm
     HashedStates HashedBasisInit; // hashed unordered_set containing BasisSet to check for duplicates
     HashedStates HashedNewStates; // hashed unordered_set of new states that only allows unique states to be inserted
     for( WaveFunction& wfn : BasisSet){
@@ -5299,6 +5299,37 @@ std::vector<WaveFunction> AddStatesHB2Mode(std::vector<WaveFunction> &BasisSet, 
     for (const WaveFunction &WF : HashedNewStates) NewBasis.push_back(WF);
     return NewBasis;
 }
+
+complex<double> DoSpectralPT2NMode(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& C, std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, double V0, std::vector<Eigen::VectorXd> &OneModeEig, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<int>>>>>> &SortedIndices, double PT2_Eps, int NEig, double w, double eta)
+{
+    int N_opt;
+    if(NEig > BasisSet.size()){ // If we don't have enough states to optimize for yet
+        N_opt = BasisSet.size();
+    }else{ // If number of states exceeds the number selected to optimize
+        N_opt = NEig;
+    }
+
+    vector<std::complex<double>> DeltaE(N_opt,0.);  // Vector will contain the PT correction for each eigenvalue
+
+    for (unsigned int n = 0; n < N_opt; n++)
+    {
+        std::vector<WaveFunction> PTBasisSet = AddStatesHB2Mode(BasisSet, TwoModePotential, SortedIndices, Evecs.col(n).real(), PT2_Eps, true);
+        std::cout << " Perturbative space for state " << n << " contains " << PTBasisSet.size() << " basis states." << std::endl;
+
+        SpMat HIA = VCISparseHamNModeFromOM(BasisSet, PTBasisSet, Frequencies, V0, OneModeEig, TwoModePotential, ThreeModePotential, false);
+        Eigen::VectorXcd Hx = HIA.transpose() * Evecs.col(n);
+
+        #pragma omp parallel for
+        for (unsigned int a = 0; a < PTBasisSet.size(); a++)
+        {
+            double Ea = VCISparseHamNModeElementFromOM(PTBasisSet[a], PTBasisSet[a], Frequencies, V0, OneModeEig, TwoModePotential, ThreeModePotential);
+            #pragma omp critical // Will cause floating point error if blindly done in parallel
+            DeltaE[n] += pow(std::norm(Hx[a]), 2) / (w - (Evals(n) - Ea) + std::complex<double>(0, eta));
+        }
+    }
+    return DeltaE[0];    
+}
+
 
 /***********************************************************************************************/
 /************************************* TCI FUNCTIONS *******************************************/
