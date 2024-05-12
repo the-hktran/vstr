@@ -26,7 +26,10 @@
 ## Features
 
 * Vibrational Self-Consistent Field (**VSCF**)
-* Vibrational Heat-Bath Configuration Interaction (**VHCI**) in harmonic oscillator product bases and VSCF modal bases using both Taylor Series PES and n-Mode PES
+* Vibrational Heat-Bath Configuration Interaction (**VHCI**) in harmonic oscillator product bases and VSCF modal bases using the following potentials:
+    * Taylor Series PES
+    * n-Mode Potential (up to 3-Mode)
+    * Approximate Tensor Train Potential using Cross Approximation
 * Epstein-Nesbet Pertubation Theory of Second Order on top of VHCI solutions done deterministically, stochastically, and semi-stochastically (**VHCI+PT2**)
 * Optimized Coordinates for VSCF (**OC-VSCF**)
 * Numerical PES derivatives computed at various levels of theory up to sextic through the use of PySCF

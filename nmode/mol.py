@@ -7,6 +7,7 @@ from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
 from vstr.spectra.dipole import GetDipole
+from vstr.utils.perf_utils import TIMER
 from pyscf import gto, scf, cc
 
 import tntorch as tn
@@ -89,6 +90,9 @@ class Molecule():
         self.doShiftPotential = True
 
         self.__dict__.update(kwargs)
+
+        self.Timer = TIMER(7)
+        self.TimerNames = ["Opt + NM", "1-Mode Ints", "2-Mode Ints", "3-Mode Ints", "1-Mode Dips", "2-Mode Dips", "3-Mode Dips"]
 
     def __str__(self):
         '''
@@ -246,7 +250,9 @@ class Molecule():
             self.ReadIntegrals()
         else:
             for i in range(Order):
+                self.Timer.start(i + 1)
                 self.ints[i] = self.nmode.get_ints(i+1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+                self.Timer.stop(i + 1)
                 if i == 0 and self.use_onemode_states:
                     for j in range(self.Nm):
                         OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
@@ -282,7 +288,9 @@ class Molecule():
             self.ReadDipoles()
         else:
             for i in range(Order):
+                self.Timer.start(i + 4)
                 self.dip_ints[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff, usePyPotDip = self.usePyPotDip)
+                self.Timer.stop(i + 4)
 
         # separate dipole and energy as necessary
         if self.usePyPotDip and not self.ReadDip:
@@ -705,7 +713,9 @@ class Molecule():
         return DivergentTriplets
 
     def kernel(self, x0 = None):
+        self.Timer.start(0)
         self.CalcNM(x0 = x0)
+        self.Timer.stop(0)
         if self.calc_integrals:
             print("Calculating integrals...", flush = True)
             self.CalcNModePotential(OrderPlus = self.OrderPlus)
@@ -715,6 +725,8 @@ class Molecule():
             print("Calculating dipoles...", flush = True)
             self.CalcNModeDipole()
         print(self)
+        
+        self.Timer.report(self.TimerNames)
 
 class NormalModes():
 
