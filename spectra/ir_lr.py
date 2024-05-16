@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, GenerateSparseHamVOD, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, VCISparseHamNMode, VCISparseHamNModeFromOM
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, GenerateSparseHamVOD, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, VCISparseHamNMode, VCISparseHamNModeFromOM, VCISparseHamDiagonalNModeFromOM
 from vstr.utils.perf_utils import TIMER
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
@@ -168,15 +168,13 @@ def DoSpectralPT2NMode(mIR, w, x, eta = None, eps_pt2 = None):
     PTBasis, N_PT = mIR.SpectralScreenBasis(C = x.real, eps = eps_pt2)
     HAI = VCISparseHamNModeFromOM(PTBasis, mIR.mVCI.Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), False)
     dE_PT2 = 0.0
+    HAA = VCISparseHamDiagonalNModeFromOM(PTBasis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist())
     for a in range(N_PT):
-        Haa = VCISparseHamNModeFromOM([PTBasis[a]], [PTBasis[a]], mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), False)[0, 0]
-        dE_PT2 += (np.abs(HAI[a,:] @ x)**2.0) / (w - (Haa - mIR.mVCI.E[0]) + 1.j * eta)
+        dE_PT2 += (np.abs(HAI[a,:] @ x)**2.0) / (w - (HAA[a] - mIR.mVCI.E[0]) + 1.j * eta)
     return dE_PT2
 
 def SolveAxb(A, b):
-    mIR.Timer.start(2)
     x = sparse.linalg.spsolve(A, b)
-    mIR.Timer.stop(2)
     return x
 
 def ApproximateAInv(mIR, w, Order = 1):
@@ -214,7 +212,9 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         mIR.GetTransitionDipoleMatrix(xi = xi)
         A, b = mIR.GetAb(w, xi = xi)
         b[xi] = b[xi].ravel()
+        mIR.Timer.start(2)
         x = SolveAxb(A, b[xi])
+        mIR.Timer.stop(2)
         D = np.sqrt((w - mIR.mVCI.H.diagonal() + mIR.mVCI.E[0])**2.0 + mIR.eta**2.0)
         bD = abs(b[xi] / D)
         NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = bD, eps = eps, InitState = InitState)
@@ -235,7 +235,9 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         mIR.GetTransitionDipoleMatrix(xi = xi)
         A, b = mIR.GetAb(w, xi = xi)
         b[xi] = b[xi].ravel()
+        mIR.Timer.start(2)
         x = SolveAxb(A, b[xi])
+        mIR.Timer.stop(2)
         mIR.Timer.start(3)
         NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.real), eps = eps, InitState = InitState)
         mIR.Timer.stop(3)
@@ -282,7 +284,9 @@ def Intensity(mIR, w, state_thr = 1e-6):
         mIR.GetTransitionDipoleMatrix(IncludeZeroth = False)
         # Solve for intensity using updated VCI object
         A, b = mIR.GetAb(w)
+        mIR.Timer.start(2)
         x = SolveAxb(A, b[xi])
+        mIR.Timer.stop(2)
         x = np.asarray(x).ravel()
         mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = state_thr, C = np.reshape(abs(x), (x.shape[0], 1))))
         for xj in range(3):
@@ -294,7 +298,7 @@ def Intensity(mIR, w, state_thr = 1e-6):
                 # Only do it for diagonal elements
                 if xj == xi:
                     mIR.Timer.start(5)
-                    I[xj, xi] += DoSpectralPT2(x.reshape(x.shape[0], 1), w, eta = mIR.eta, eps_pt2 = mIT.eps2).real / np.pi #DoSpectralPT2(x.reshape(x.shape[0], 1), mIR.mVCI.E, mIR.mVCI.C, mIR.mVCI.Basis, mIR.mVCI.PotentialListFull, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.DipoleSurfaceList[xi], mIR.mVCI.Ys, mIR.eps2, 1, w, mIR.eta).real / np.pi
+                    I[xj, xi] += mIR.DoSpectralPT2(w, x.reshape(x.shape[0], 1), eta = mIR.eta, eps_pt2 = mIR.eps2).real / np.pi #DoSpectralPT2(x.reshape(x.shape[0], 1), mIR.mVCI.E, mIR.mVCI.C, mIR.mVCI.Basis, mIR.mVCI.PotentialListFull, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.DipoleSurfaceList[xi], mIR.mVCI.Ys, mIR.eps2, 1, w, mIR.eta).real / np.pi
                     mIR.Timer.stop(5)
         # Reset VCI object
         mIR.ResetVCI()
@@ -481,6 +485,7 @@ class LinearResponseIRNMode(LinearResponseIR):
 
     def kernel(self):
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
+        self.DipoleSurfaceList = []
 
         self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
         self.ITensors = []

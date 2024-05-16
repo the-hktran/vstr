@@ -75,6 +75,7 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("AddStatesCIPSI", AddStatesCIPSI, "Selects configurations based on the CIPSI criterion.");
     m.def("AddStatesHB2Mode", AddStatesHB2Mode, "Selects configurations based on 2-mode potential sorting.");
     m.def("DoSpectralPT2NMode", DoSpectralPT2NMode, "Runs spectral PT2 corrections for nMode potential");
+    m.def("VCISparseHamDiagonalNModeFromOM", VCISparseHamDiagonalNModeFromOM, "Generates H diagonal elements using n-Mode potential in one mode eigenbasis");
     m.def("VCISparseT", VCISparseT, "Generates kinetic energy in HO basis.");
     //m.def("VCISparseHamTCI", VCISparseHamTCI, "Generates H using TCI potential.");
 }

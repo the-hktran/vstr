@@ -4877,6 +4877,63 @@ SpMat VCISparseHamNModeFromOM(std::vector<WaveFunction> &BasisSet1, std::vector<
         100*(1.-(double)H.nonZeros()/(double)H.size()) << "% sparse." << endl;
     return H;
 }
+
+std::vector<double> VCISparseHamDiagonalNModeFromOM(std::vector<WaveFunction> &BasisSet, std::vector<double> &Frequencies, double V0, std::vector<Eigen::VectorXd> &OneModeEig, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential)
+{
+	std::vector<double> HamDiag(BasisSet.size());
+
+	std::vector<int> MaxQuanta;
+
+	int MaxNMode = 3;
+	if (ThreeModePotential.size() == 1 and ThreeModePotential[0].size() == 1) MaxNMode = 2;
+	if (TwoModePotential.size() == 1 and TwoModePotential[0].size() == 1) MaxNMode = 1;
+
+	double thr = 1e-4;
+#pragma omp parallel for
+	for (unsigned int i = 0; i < BasisSet.size(); i++)
+	{
+		std::vector<int> ModeOccI;
+		for (unsigned int m = 0; m < BasisSet[i].Modes.size(); m++) ModeOccI.push_back(BasisSet[i].Modes[m].Quanta);
+                std::vector<int> ModeOccJ = ModeOccI;
+		double Vij = 0;
+		Vij += V0;
+		if (MaxNMode >= 1)
+		{
+			for (unsigned int m = 0; m < Frequencies.size(); m++)
+			{
+				Vij += OneModeEig[m][ModeOccI[m]];
+			}
+		}
+		if (MaxNMode >= 2)
+		{
+			for (unsigned int m = 0; m < Frequencies.size(); m++)
+			{
+				for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+				{
+					Vij += TwoModePotential[m][n][ModeOccI[m]][ModeOccI[n]][ModeOccJ[m]][ModeOccJ[n]];
+				}
+			}
+		}
+		if (MaxNMode >= 3)
+		{
+			for (unsigned int m = 0; m < Frequencies.size(); m++)
+			{
+				for (unsigned int n = m + 1; n < Frequencies.size(); n++)
+				{
+					for (unsigned int o = n + 1; o < Frequencies.size(); o++)
+					{
+						Vij += ThreeModePotential[m][n][o][ModeOccI[m]][ModeOccI[n]][ModeOccI[o]][ModeOccJ[m]][ModeOccJ[n]][ModeOccJ[o]];
+					}
+				}
+			}
+		}
+#pragma omp critical
+		HamDiag[i] = Vij;
+	}
+
+	return HamDiag;
+}
+
 double VCISparseHamNModeElement(WaveFunction &BasisSet1, WaveFunction &BasisSet2, std::vector<double> &Frequencies, double V0, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential)
 {
     int MaxNMode = 3;
