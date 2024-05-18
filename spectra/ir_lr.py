@@ -152,7 +152,7 @@ def DoSpectralPT2(mIR, w, x, eta = None, eps_pt2 = None):
         eta = mIR.eta
     if eps_pt2 is None:
         eps_pt2 = mIR.eps2
-    PTBasis, N_PT = mIR.SpectralScreenBasis(C = x.real, eps = eps_pt2)
+    PTBasis, N_PT = mIR.SpectralScreenBasis(C = x.imag, eps = eps_pt2)
     HAI = GenerateSparseHamVOD(PTBasis, mIR.mVCI.Basis, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3])
     dE_PT2 = 0.0
     for a in range(N_PT):
@@ -165,7 +165,7 @@ def DoSpectralPT2NMode(mIR, w, x, eta = None, eps_pt2 = None):
         eta = mIR.eta
     if eps_pt2 is None:
         eps_pt2 = mIR.eps2
-    PTBasis, N_PT = mIR.SpectralScreenBasis(C = x.real, eps = eps_pt2)
+    PTBasis, N_PT = mIR.SpectralScreenBasis(C = x.imag, eps = eps_pt2)
     HAI = VCISparseHamNModeFromOM(PTBasis, mIR.mVCI.Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), False)
     dE_PT2 = 0.0
     HAA = VCISparseHamDiagonalNModeFromOM(PTBasis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist())
@@ -239,7 +239,7 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         x = SolveAxb(A, b[xi])
         mIR.Timer.stop(2)
         mIR.Timer.start(3)
-        NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.real), eps = eps, InitState = InitState)
+        NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.imag), eps = eps, InitState = InitState)
         mIR.Timer.stop(3)
         mIR.mVCI.Basis += NewBasis
 
@@ -298,7 +298,7 @@ def Intensity(mIR, w, state_thr = 1e-6):
                 # Only do it for diagonal elements
                 if xj == xi:
                     mIR.Timer.start(5)
-                    I[xj, xi] += mIR.DoSpectralPT2(w, x.reshape(x.shape[0], 1), eta = mIR.eta, eps_pt2 = mIR.eps2).real / np.pi #DoSpectralPT2(x.reshape(x.shape[0], 1), mIR.mVCI.E, mIR.mVCI.C, mIR.mVCI.Basis, mIR.mVCI.PotentialListFull, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.DipoleSurfaceList[xi], mIR.mVCI.Ys, mIR.eps2, 1, w, mIR.eta).real / np.pi
+                    I[xj, xi] -= mIR.DoSpectralPT2(w, x.reshape(x.shape[0], 1), eta = mIR.eta, eps_pt2 = mIR.eps2).imag / np.pi #DoSpectralPT2(x.reshape(x.shape[0], 1), mIR.mVCI.E, mIR.mVCI.C, mIR.mVCI.Basis, mIR.mVCI.PotentialListFull, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.DipoleSurfaceList[xi], mIR.mVCI.Ys, mIR.eps2, 1, w, mIR.eta).real / np.pi
                     mIR.Timer.stop(5)
         # Reset VCI object
         mIR.ResetVCI()
