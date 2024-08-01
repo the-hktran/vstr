@@ -48,6 +48,7 @@ class TCIMolecule(Molecule):
         self.ReadGeom = False
         self.doGeomOpt = True
         self.doShiftPotential = True
+        self.ReadTensors = False
 
         self.__dict__.update(kwargs)
 
@@ -182,13 +183,16 @@ class TCIMolecule(Molecule):
             IntsFile = self.IntsFile
 
         with h5py.File(IntsFile, "r") as f:
-            self.core_tensors = [f["core_tensors/%d" % i][()] for i in range(len(self.Nm))]
+            self.core_tensors = [f["core_tensors/%d" % i][()] for i in range(self.Nm)]
 
     def kernel(self, x0 = None):
         self.Timer.start(0)
         self.CalcNM(x0 = x0)
         self.Timer.stop(0)
-        self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol)
+        if not self.ReadTensors:
+            self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol)
+        else:
+            self.ReadCoreTensors()
         print(self)
 
         self.Timer.report(self.TimerNames)
@@ -199,12 +203,12 @@ if __name__ == "__main__":
 
     mass_h = 1836.152697 # in au
     mass_o = 32810.46286
+    '''
     natoms = 3
     mass = [mass_h, mass_h, mass_o]
     '''
     natoms = 6
     mass = [mass_h, mass_h, mass_h, mass_h, mass_o, mass_o]
-    '''
     '''
     def potential_cart_h2o(coords):
         if np.array(coords).ndim == 3:
@@ -218,6 +222,7 @@ if __name__ == "__main__":
 
     mol = TCIMolecule(potential_cart_h2o, natoms, mass, ngridpts = 5)
 
+    '''
     x0 = np.array([
         [0, -0.757, 0.587],
         [0,  0.757, 0.587],
@@ -231,7 +236,6 @@ if __name__ == "__main__":
       [-1.46030412,  -0.00000130,  -0.00111733],
       [1.46515384,  -0.00000381,   0.001]])
     x0 *= A2B
-    '''
 
     mol.kernel(x0=x0)
 

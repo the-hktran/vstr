@@ -69,6 +69,14 @@ def SaveSpectrum(mIR, SaveName):
     A[:, 0] = mIR.ws
     A[:, 1] = mIR.Is
     np.savetxt(SaveName + ".csv", A, delimiter=",")
+    
+    Intensities = np.zeros((len(mIR.Excitations)))
+    for n in range(len(mIR.Excitations)):
+        Intensities[n] = mIR.Intensities[0][n] + mIR.Intensities[1][n] + mIR.Intensities[2][n]
+    B = np.zeros((len(mIR.Excitations), 2))
+    B[:, 0] = mIR.Excitations
+    B[:, 1] = Intensities
+    np.savetxt(SaveName + "_excitations.csv", B, delimiter=",")
 
 class IRSpectra:
     GetTransitionDipoleMatrix = GetTransitionDipoleMatrix

@@ -475,6 +475,7 @@ class VHCI:
             self.Timer.start(0)
             self.SparseDiagonalize()
             print("===== VCI RESULTS =====", flush = True)
+            print("Initial Basis Size:", len(self.Basis))
             self.PrintResults()
             print("")
             self.Timer.stop(0)
@@ -613,6 +614,7 @@ class NModeVHCI(VHCI):
             self.Timer.start(0)
             self.SparseDiagonalize()
             print("===== VCI RESULTS =====", flush = True)
+            print("Initial Basis Size:", len(self.Basis))
             self.PrintResults()
             print("")
             self.Timer.stop(0)
@@ -680,36 +682,9 @@ class TCIVHCI(VHCI):
         self.TimerNames = ['Diagonalize', 'Form Hamiltonian', 'Screen Basis', 'PT2 correction', 'SPT2 correction', 'SSPT2 correction']
     
     def kernel(self, doVCI = True, doVHCI = True, doPT2 = False, doSPT2 = False, ComparePT2 = False):
-        if self.HBMethod.upper() == 'QFF':
-            V3, V4 = self.mol.nm.get_ff()
-            self.Potential = [[]] * 4 # Cubic, quartic, quintic, sextic
-            for V in [V3, V4]:
-                Wp = self.FormW(V)
-                self.Potential[Wp[0].Order - 3] = Wp
-            self.FormWSD()
-
-            self.PotentialListFull = []
-            for Wp in self.PotentialSD:
-                self.PotentialListFull += Wp
-            self.PotentialList = []
-            for Wp in self.Potential:
-                self.PotentialList += Wp
-                self.PotentialListFull += Wp
-            self.PotentialListFull = HeatBath_Sort_FC(self.PotentialListFull) # Only need to sort these once
-            self.Ys = [self.MakeAnharmTensor()] * self.NModes
-        else:
-            self.PotentialListFull = []
-
-        if self.HBMethod.upper() == '2MODE':
-            self.Sorted2Mode = np.empty((self.mol.Nm, self.mol.Nm, self.mol.ngridpts, self.mol.ngridpts, self.mol.ngridpts**2, 2), dtype = np.int8)
-            for i in range(self.mol.Nm):
-                for j in range(self.mol.Nm):
-                    for ni in range(self.mol.ngridpts):
-                        for nj in range(self.mol.ngridpts):
-                            Sorted = np.argsort(-abs(self.mol.ints[1][i, j][ni, nj].reshape(-1)))
-                            Sorted = np.unravel_index(Sorted, (self.mol.ngridpts, self.mol.ngridpts))
-                            Sorted = np.vstack((Sorted[0], Sorted[1]))
-                            self.Sorted2Mode[i, j, ni, nj] = Sorted.T
+        if self.HBMethod.upper() == 'MAXTENSOR':
+            self.MaxTensors = [abs(G.reshape(G.shape[0] * G.shape[1], G.shape[2], G.shape[3])).max(axis = 0) for G in self.mol.core_tensors]
+            self.MSortedIndices = [np.argsort(-abs(M), axis = 0) for M in self.MaxTensors]
 
         if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)
@@ -725,6 +700,7 @@ class TCIVHCI(VHCI):
             self.Timer.start(0)
             self.SparseDiagonalize()
             print("===== VCI RESULTS =====", flush = True)
+            print("Initial Basis Size:", len(self.Basis))
             self.PrintResults()
             print("")
             self.Timer.stop(0)

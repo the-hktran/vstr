@@ -153,6 +153,7 @@ def DoSpectralPT2(mIR, w, x, eta = None, eps_pt2 = None):
     if eps_pt2 is None:
         eps_pt2 = mIR.eps2
     PTBasis, N_PT = mIR.SpectralScreenBasis(C = x.imag, eps = eps_pt2)
+    print("-- PT2 Basis Size:", N_PT)
     HAI = GenerateSparseHamVOD(PTBasis, mIR.mVCI.Basis, mIR.mVCI.Frequencies, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3])
     dE_PT2 = 0.0
     for a in range(N_PT):
@@ -166,6 +167,7 @@ def DoSpectralPT2NMode(mIR, w, x, eta = None, eps_pt2 = None):
     if eps_pt2 is None:
         eps_pt2 = mIR.eps2
     PTBasis, N_PT = mIR.SpectralScreenBasis(C = x.imag, eps = eps_pt2)
+    print("-- PT2 Basis Size:", N_PT)
     HAI = VCISparseHamNModeFromOM(PTBasis, mIR.mVCI.Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), False)
     dE_PT2 = 0.0
     HAA = VCISparseHamDiagonalNModeFromOM(PTBasis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist())

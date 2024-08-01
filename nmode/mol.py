@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import scipy
 import numdifftools as nd
@@ -88,6 +89,7 @@ class Molecule():
         self.ReadGeom = False
         self.doGeomOpt = True
         self.doShiftPotential = True
+        self.doSaveIntsOTF = False
 
         self.__dict__.update(kwargs)
 
@@ -520,7 +522,7 @@ class Molecule():
                         for j in range(self.Nm):
                             for k in range(self.Nm):
                                 self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
-
+    
             self.onemode_eig = []
             for i in range(self.Nm):
                 self.onemode_eig.append(f["onemode_eig/%d" % (i + 1)][()])
@@ -694,6 +696,32 @@ class Molecule():
             plt.pcolormesh(X, Y, plot_pes_nmode, cmap = 'RdBu')
             plt.title('NMode PES')
             plt.savefig("pes_nmode.png")
+
+    def Scan1DPES(self, Modes, Range = None, NPoints = 10, SavePES = None):
+        if Range is None:
+            Range = [0, 50]
+        ModePts = np.linspace(Range[0], Range[1], NPoints)
+        V_nm = []
+        V_ex = []
+
+        for X in ModePts:
+            q = np.zeros(self.Nm)
+            for m in Modes:
+                q[m] = 1
+            q = q * X
+            x = self.nm._normal2cart(q)
+            V_ex.append(self.potential_cart(x))
+            V_nm.append(self._nmode_potential(x) - (self._nmode_potential(self.nm.x0) - self.potential_cart(self.nm.x0)))
+
+        V_ex = np.asarray(V_ex)
+        V_nm = np.asarray(V_nm)
+
+        if SavePES is not None:
+            import matplotlib.pyplot as plt
+            plt.plot(ModePts, V_ex, label = 'Exact')
+            plt.plot(ModePts, V_nm, label = 'NMode')
+            plt.legend()
+            plt.savefig(SavePES)
 
     def FindDivergent3Modes(self):
         DivergentTriplets = []
@@ -1024,7 +1052,7 @@ class NormalModes():
             i += 1
             ci.iterate()
             err = ci.pivotError[-1]
-            print(i, f.neval, ci.pivotError[-1])
+            print(i, f.neval, ci.pivotError[-1], flush=True)
         return ci.get_TensorTrain().core
 
     def do_tt(self, gridpts, rank = 10):
@@ -1159,30 +1187,62 @@ class NModePotential():
             if nmode == 1:
                 ints = np.empty(nmodes, dtype=object)
                 for i in range(nmodes):
+                    if self.nm.mol.doSaveIntsOTF:
+                        intotf_name = "ints1_" + str(i) + ".h5"
+                        if os.path.exists(intotf_name):
+                            continue
                     vgrid = np.array([self.nm.potential_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                     vi = np.dot(coeff[i], np.dot(np.diag(vgrid), coeff[i].T))
-                    ints[i] = vi * constants.AU_TO_INVCM
+                    if self.nm.mol.doSaveIntsOTF:
+                        intotf_name = "ints1_" + str(i) + ".h5"
+                        with h5py.File(intotf_name, "w") as f:
+                            f.create_dataset("ints", data = vi * constants.AU_TO_INVCM)
+                    else:
+                        ints[i] = vi * constants.AU_TO_INVCM
             elif nmode == 2:
                 ints = np.empty((nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
                     Ci = coeff[i].T @ onemode_coeff[i]
                     for j in range(nmodes):
+                        if self.nm.mol.doSaveIntsOTF:
+                            intotf_name = "ints2_" + str(i) + "_" + str(j) + ".h5"
+                            if os.path.exists(intotf_name):
+                                continue
                         Cj = coeff[j].T @ onemode_coeff[j]
                         vgrid = np.array([[self.nm.potential_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
                         vij = np.einsum('gp,hq,gh,gr,hs->pqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
-                        ints[i, j] = vij * constants.AU_TO_INVCM
+                        if self.nm.mol.doSaveIntsOTF:
+                            intotf_name = "ints2_" + str(i) + "_" + str(j) + ".h5"
+                            with h5py.File(intotf_name, "w") as f:
+                                f.create_dataset("ints", data = vij * constants.AU_TO_INVCM)    
+                        else:
+                            ints[i, j] = vij * constants.AU_TO_INVCM
 
             elif nmode == 3:
                 ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
                     Ci = coeff[i].T @ onemode_coeff[i]
-                    for j in range(nmodes):
+                    for j in range(i, nmodes):
                         Cj = coeff[j].T @ onemode_coeff[j]
-                        for k in range(nmodes):
+                        for k in range(j, nmodes):
+                            if self.nm.mol.doSaveIntsOTF:
+                                intotf_name = "ints3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
+                                if os.path.exists(intotf_name):
+                                    continue
                             Ck = coeff[k].T @ onemode_coeff[k]
                             vgrid = np.array([[[self.nm.potential_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
                             vijk = np.einsum('gp,hq,fr,ghf,gs,ht,fu->pqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
-                            ints[i, j, k] = vijk * constants.AU_TO_INVCM
+                            if self.nm.mol.doSaveIntsOTF:
+                                intotf_name = "ints3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
+                                with h5py.File(intotf_name, "w") as f:
+                                    f.create_dataset("ints", data = vijk * constants.AU_TO_INVCM)
+                            else:   
+                                ints[i, j, k] = vijk * constants.AU_TO_INVCM
+                                ints[j, i, k] = vijk * constants.AU_TO_INVCM
+                                ints[i, k, j] = vijk * constants.AU_TO_INVCM
+                                ints[k, i, j] = vijk * constants.AU_TO_INVCM
+                                ints[j, k, i] = vijk * constants.AU_TO_INVCM
+                                ints[k, j, i] = vijk * constants.AU_TO_INVCM
         else:
             if nmode == 3:
                 ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
@@ -1208,6 +1268,35 @@ class NModePotential():
                                 ints[k, i, j] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
                                 ints[j, k, i] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
                                 ints[k, j, i] = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
+
+        if self.nm.mol.doSaveIntsOTF:
+            if nmode == 1:
+                ints = np.empty(nmodes, dtype=object)
+                for i in range(nmodes):
+                    intotf_name = "ints1_" + str(i) + ".h5"
+                    with h5py.File(intotf_name, "r") as f:
+                        ints[i] = f["ints"][:]
+            elif nmode == 2:
+                ints = np.empty((nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(nmodes):
+                        intotf_name = "ints2_" + str(i) + "_" + str(j) + ".h5"
+                        with h5py.File(intotf_name, "r") as f:
+                            ints[i, j] = f["ints"][:]
+            elif nmode == 3:
+                ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(i, nmodes):
+                        for k in range(j, nmodes):
+                            intotf_name = "ints3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
+                            with h5py.File(intotf_name, "r") as f:
+                                ints[i, j, k] = f["ints"][:]
+                                ints[j, i, k] = f["ints"][:]
+                                ints[i, k, j] = f["ints"][:]
+                                ints[k, i, j] = f["ints"][:]
+                                ints[j, k, i] = f["ints"][:]
+                                ints[k, j, i] = f["ints"][:]
+                            
 
         return ints
 
@@ -1240,14 +1329,23 @@ class NModePotential():
             if usePyPotDip:
                 ints = np.empty((4, nmodes), dtype=object)
             for i in range(nmodes):
+                if self.nm.mol.doSaveIntsOTF:
+                    intotf_name = "dips1_" + str(i) + ".h5"
+                    if os.path.exists(intotf_name):
+                        continue
                 vgrid = np.array([self.nm.dipole_1mode(i,qi) for qi in gridpts[i]]) # this should be vectorized
                 Ci = coeff[i].T @ onemode_coeff[i]
                 vi = np.einsum('gp,gx,gq->xpq', Ci, vgrid, Ci, optimize=True)
-                ints[0, i] = vi[0]
-                ints[1, i] = vi[1]
-                ints[2, i] = vi[2]
-                if usePyPotDip:
-                    ints[3, i] = vi[3]
+                if self.nm.mol.doSaveIntsOTF:
+                    intotf_name = "dips1_" + str(i) + ".h5"
+                    with h5py.File(intotf_name, "w") as f:
+                        f.create_dataset("dips", data = vi)
+                else:
+                    ints[0, i] = vi[0]
+                    ints[1, i] = vi[1]
+                    ints[2, i] = vi[2]
+                    if usePyPotDip:
+                        ints[3, i] = vi[3]
         elif nmode == 2:
             ints = np.empty((3, nmodes, nmodes), dtype=object)
             if usePyPotDip:
@@ -1255,14 +1353,23 @@ class NModePotential():
             for i in range(nmodes):
                 Ci = coeff[i].T @ onemode_coeff[i]
                 for j in range(nmodes):
+                    if self.nm.mol.doSaveIntsOTF:
+                        intotf_name = "dips2_" + str(i) + "_" + str(j) + ".h5"
+                        if os.path.exists(intotf_name):
+                            continue
                     Cj = coeff[j].T @ onemode_coeff[j]
                     vgrid = np.array([[self.nm.dipole_2mode(i,j,qi,qj) for qj in gridpts[j]] for qi in gridpts[i]]) # this should be vectorized
                     vij = np.einsum('gp,hq,ghx,gr,hs->xpqrs', Ci, Cj, vgrid, Ci, Cj, optimize=True)
-                    ints[0, i, j] = vij[0]
-                    ints[1, i, j] = vij[1]
-                    ints[2, i, j] = vij[2]
-                    if usePyPotDip:
-                        ints[3, i, j] = vij[3]
+                    if self.nm.mol.doSaveIntsOTF:
+                        intotf_name = "dips2_" + str(i) + "_" + str(j) + ".h5"
+                        with h5py.File(intotf_name, "w") as f:
+                            f.create_dataset("dips", data = vij)
+                    else:
+                        ints[0, i, j] = vij[0]
+                        ints[1, i, j] = vij[1]
+                        ints[2, i, j] = vij[2]
+                        if usePyPotDip:
+                            ints[3, i, j] = vij[3]
 
         elif nmode == 3:
             ints = np.empty((3, nmodes, nmodes, nmodes), dtype=object)
@@ -1270,18 +1377,108 @@ class NModePotential():
                 ints = np.empty((4, nmodes, nmodes, nmodes), dtype=object)
             for i in range(nmodes):
                 Ci = coeff[i].T @ onemode_coeff[i]
-                for j in range(nmodes):
+                for j in range(i, nmodes):
                     Cj = coeff[j].T @ onemode_coeff[j]
-                    for k in range(nmodes):
+                    for k in range(j, nmodes):
+                        if self.nm.mol.doSaveIntsOTF:
+                            intotf_name = "dips3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
+                            if os.path.exists(intotf_name):
+                                continue
                         Ck = coeff[k].T @ onemode_coeff[k]
                         vgrid = np.array([[[self.nm.dipole_3mode(i,j,k,qi,qj,qk) for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
                         vijk = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[i], ngridpts[j], ngridpts[k]))
                         vijk = np.einsum('gp,hq,fr,ghfx,gs,ht,fu->xpqrstu', Ci, Cj, Ck, vgrid, Ci, Cj, Ck, optimize=True)
-                        ints[0, i, j, k] = vijk[0]
-                        ints[1, i, j, k] = vijk[1]
-                        ints[2, i, j, k] = vijk[2]
+                        if self.nm.mol.doSaveIntsOTF:
+                            intotf_name = "dips3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
+                            with h5py.File(intotf_name, "w") as f:
+                                f.create_dataset("dips", data = vijk)
+                        else:
+                            ints[0, i, j, k] = vijk[0]
+                            ints[1, i, j, k] = vijk[1]
+                            ints[2, i, j, k] = vijk[2]
+                            ints[0, j, i, k] = vijk[0]
+                            ints[1, j, i, k] = vijk[1]
+                            ints[2, j, i, k] = vijk[2]
+                            ints[0, i, k, j] = vijk[0]
+                            ints[1, i, k, j] = vijk[1]
+                            ints[2, i, k, j] = vijk[2]
+                            ints[0, k, i, j] = vijk[0]
+                            ints[1, k, i, j] = vijk[1]
+                            ints[2, k, i, j] = vijk[2]
+                            ints[0, j, k, i] = vijk[0]
+                            ints[1, j, k, i] = vijk[1]
+                            ints[2, j, k, i] = vijk[2]
+                            ints[0, k, j, i] = vijk[0]
+                            ints[1, k, j, i] = vijk[1]
+                            ints[2, k, j, i] = vijk[2]
+                            if usePyPotDip:
+                                ints[3, i, j, k] = vijk[3]
+                                ints[3, j, i, k] = vijk[3]
+                                ints[3, i, k, j] = vijk[3]
+                                ints[3, k, i, j] = vijk[3]
+                                ints[3, j, k, i] = vijk[3]
+                                ints[3, k, j, i] = vijk[3]
+
+        if self.nm.mol.doSaveIntsOTF:
+            if nmode == 1:
+                ints = np.empty((3, nmodes), dtype=object)
+                if usePyPotDip:
+                    ints = np.empty((4, nmodes), dtype=object)
+                for i in range(nmodes):
+                    intotf_name = "dips1_" + str(i) + ".h5"
+                    with h5py.File(intotf_name, "r") as f:
+                        ints[0, i] = f["dips"][0]
+                        ints[1, i] = f["dips"][1]
+                        ints[2, i] = f["dips"][2]
                         if usePyPotDip:
-                            ints[3, i, j, k] = vijk[3]
+                            ints[3, i] = f["dips"][3]
+            elif nmode == 2:
+                ints = np.empty((3, nmodes, nmodes), dtype=object)
+                if usePyPotDip:
+                    ints = np.empty((4, nmodes, nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(nmodes):
+                        intotf_name = "dips2_" + str(i) + "_" + str(j) + ".h5"
+                        with h5py.File(intotf_name, "r") as f:
+                            ints[0, i, j] = f["dips"][0]
+                            ints[1, i, j] = f["dips"][1]
+                            ints[2, i, j] = f["dips"][2]
+                            if usePyPotDip:
+                                ints[3, i, j] = f["dips"][3]
+            elif nmode == 3:
+                ints = np.empty((3, nmodes, nmodes, nmodes), dtype=object)
+                if usePyPotDip:
+                    ints = np.empty((4, nmodes, nmodes, nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(i, nmodes):
+                        for k in range(j, nmodes):
+                            intotf_name = "dips3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
+                            with h5py.File(intotf_name, "r") as f:
+                                ints[0, i, j, k] = f["dips"][0]
+                                ints[1, i, j, k] = f["dips"][1]
+                                ints[2, i, j, k] = f["dips"][2]
+                                ints[0, j, i, k] = f["dips"][0]
+                                ints[1, j, i, k] = f["dips"][1]
+                                ints[2, j, i, k] = f["dips"][2]
+                                ints[0, i, k, j] = f["dips"][0]
+                                ints[1, i, k, j] = f["dips"][1]
+                                ints[2, i, k, j] = f["dips"][2]
+                                ints[0, k, i, j] = f["dips"][0]
+                                ints[1, k, i, j] = f["dips"][1]
+                                ints[2, k, i, j] = f["dips"][2]
+                                ints[0, j, k, i] = f["dips"][0]
+                                ints[1, j, k, i] = f["dips"][1]
+                                ints[2, j, k, i] = f["dips"][2]
+                                ints[0, k, j, i] = f["dips"][0]
+                                ints[1, k, j, i] = f["dips"][1]
+                                ints[2, k, j, i] = f["dips"][2]
+                                if usePyPotDip:
+                                    ints[3, i, j, k] = f["dips"][3]
+                                    ints[3, j, i, k] = f["dips"][3]
+                                    ints[3, i, k, j] = f["dips"][3]
+                                    ints[3, k, i, j] = f["dips"][3]
+                                    ints[3, j, k, i] = f["dips"][3]
+                                    ints[3, k, j, i] = f["dips"][3]
 
         return ints
 
