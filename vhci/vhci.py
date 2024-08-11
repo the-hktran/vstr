@@ -3,7 +3,7 @@ from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.utils import constants
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode, VCISparseHamNModeFromOM, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode, VCISparseT
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode, VCISparseHamNModeFromOM, VCISparseHamNModeFromOMArray, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode, VCISparseT
 from functools import reduce
 import itertools
 import math
@@ -194,18 +194,115 @@ def SparseDiagonalize(mVHCI):
     mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
 
+def pyCalcDiffModes(B1, B2):
+    Diffs = []
+    for i in range(len(B1.Modes)):
+        if B1.Modes[i].Quanta != B2.Modes[i].Quanta:
+            Diffs.append(i)
+    return Diffs
+
+def pyVCISparseHamNMode(Basis1, Basis2, Frequencies, V0, onemode_eig, ints, isDiagonalBlock, MaxNMode):
+    H = sparse.lil_matrix((len(Basis1), len(Basis2))) 
+    thr = 1e-12
+    for i in range(len(Basis1)):
+        ModeOccI = []
+        for m in range(len(Basis1[i].Modes)):
+            ModeOccI.append(Basis1[i].Modes[m].Quanta)
+        jstart = 0
+        if isDiagonalBlock:
+            jstart = i
+        for j in range(jstart, len(Basis2)):
+            ModeOccJ = []
+            for m in range(len(Basis2[j].Modes)):
+                ModeOccJ.append(Basis2[j].Modes[m].Quanta)
+            DiffModes = pyCalcDiffModes(Basis1[i], Basis2[j])
+            SortedDiffModes = sorted(DiffModes)
+            Vij = 0.0
+
+            if len(DiffModes) == 0:
+                Vij += V0
+                if MaxNMode >= 1:
+                    for m in range(Frequencies.shape[0]):
+                        Vij += onemode_eig[m][ModeOccI[m]]
+                if MaxNMode >= 2:
+                    for m in range(Frequencies.shape[0] - 1):
+                        for n in range(m + 1, Frequencies.shape[0]):
+                            Vij += ints[1][m, n][ModeOccI[m], ModeOccI[n], ModeOccJ[m], ModeOccJ[n]]
+                if MaxNMode >= 3:
+                    for m in range(Frequencies.shape[0] - 2):
+                        for n in range(m + 1, Frequencies.shape[0] - 1):
+                            for o in range(n + 1, Frequencies.shape[0]):
+                                Vij += ints[2][m, n, o][ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o]]
+            elif len(DiffModes) == 1:
+                if MaxNMode >= 2:
+                    for n in range(Frequencies.shape[0]):
+                        if n != m:
+                            Vij += ints[1][m, n][ModeOccI[m], ModeOccI[n], ModeOccJ[m], ModeOccJ[n]]
+                            if MaxNMode >= 3:
+                                for o in range(n + 1, Frequencies.shape[0]):
+                                    if o != m and o != n:
+                                        Vij += ints[2][m, n, o][ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o]]
+            elif len(DiffModes) == 2 and MaxNMode >= 2:
+                Vij += ints[1][SortedDiffModes[0], SortedDiffModes[1]][ModeOccI[SortedDiffModes[0]], ModeOccI[SortedDiffModes[1]], ModeOccJ[SortedDiffModes[0]], ModeOccJ[SortedDiffModes[1]]]
+                if MaxNMode >= 3:
+                    m = SortedDiffModes[0]
+                    n = SortedDiffModes[1]
+                    for o in range(Frequencies.shape[0]):
+                        if o != m and o != n:
+                            Vij += ints[2][m, n, o][ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o]]
+            elif len(DiffModes) == 3 and MaxNMode >= 3:
+                m = SortedDiffModes[0]
+                n = SortedDiffModes[1]
+                o = SortedDiffModes[2]
+                Vij += ints[2][m, n, o][ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o]]
+            if abs(Vij) > thr:
+                if isDiagonalBlock:
+                    H[i, j] = Vij
+                    H[j, i] = Vij
+                else:
+                    H[i, j] = Vij
+
+    return H
+
 def SparseDiagonalizeNMode(mVHCI):
     mVHCI.Timer.start(1)
+    
+    #flatten arrays
+    K = mVHCI.mol.ints[1][0, 0].shape[0]
+    N = mVHCI.mol.ints[1].shape[0]
+
+    K4 = K * K * K * K
+    N2 = N * N
+    TwoModeInts = np.zeros((N2, K4))
+    ints1ravel = mVHCI.mol.ints[1].ravel()
+    for i in range(N2):
+        TwoModeInts[i] = ints1ravel[i].ravel()
+    TwoModeInts = TwoModeInts.ravel()
+
+    K6 = K * K * K * K * K * K
+    N3 = N * N * N
+    ThreeModeInts = np.zeros((N3, K6))
+    ints2ravel = mVHCI.mol.ints[2].ravel()
+    if ints2ravel.shape[0] != 0:
+        for i in range(N3):
+            ThreeModeInts[i] = ints2ravel[i].ravel()
+        ThreeModeInts = ThreeModeInts.ravel()
+    else:
+        ThreeModeInts = np.array([0.0])
+
     if mVHCI.H is None:
         if mVHCI.mol.use_onemode_states:
-            mVHCI.H = VCISparseHamNModeFromOM(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+            #mVHCI.H = VCISparseHamNModeFromOM(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+            mVHCI.H = VCISparseHamNModeFromOMArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, TwoModeInts, ThreeModeInts, True, mVHCI.mol.Order, K)
         else:
             mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
     else:
         if len(mVHCI.NewBasis) != 0:
             if mVHCI.mol.use_onemode_states:
-                HIJ = VCISparseHamNModeFromOM(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
-                HJJ = VCISparseHamNModeFromOM(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+                #HIJ = VCISparseHamNModeFromOM(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
+                HIJ = VCISparseHamNModeFromOMArray(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, TwoModeInts, ThreeModeInts, False, mVHCI.mol.Order, K)
+                #HJJ = VCISparseHamNModeFromOM(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+                HJJ = VCISparseHamNModeFromOMArray(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, TwoModeInts, ThreeModeInts, True, mVHCI.mol.Order, K)
             else:
                 HIJ = VCISparseHamNMode(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
                 HJJ = VCISparseHamNMode(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)

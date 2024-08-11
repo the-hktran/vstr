@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, GenerateSparseHamVOD, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, VCISparseHamNMode, VCISparseHamNModeFromOM, VCISparseHamDiagonalNModeFromOM
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, GenerateSparseHamVOD, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, VCISparseHamNMode, VCISparseHamNModeArray, VCISparseHamNModeFromOM, VCISparseHamDiagonalNModeFromOM, VCISparseHamNModeFromOMArray
 from vstr.utils.perf_utils import TIMER
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from scipy import sparse
@@ -35,12 +35,14 @@ def GetTransitionDipoleMatrixNMode(mIR, xi = None, IncludeZeroth = False):
     if xi is None:
         mIR.D = []
         for x in range(3):
-            Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[x], mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
+            #Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[x], mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
+            Dx = VCISparseHamNModeArray(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[x], mIR.dip_ints_array[0][x], mIR.dip_ints_array[1][x], mIR.dip_ints_array[2][x], True, mIR.mol.Order, mIR.mol.ints[1][0, 0].shape[0])
             if not IncludeZeroth:
                 Dx.setdiag(0)
             mIR.D.append(Dx)
     else:
-        Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[xi], mIR.mol.dip_ints[0][xi].tolist(), mIR.mol.dip_ints[1][xi].tolist(), mIR.mol.dip_ints[2][xi].tolist(), True)
+        #Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[xi], mIR.mol.dip_ints[0][xi].tolist(), mIR.mol.dip_ints[1][xi].tolist(), mIR.mol.dip_ints[2][xi].tolist(), True)
+        Dx = VCISparseHamNModeArray(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[xi], mIR.dip_ints_array[0][xi], mIR.dip_ints_array[1][xi], mIR.dip_ints_array[2][xi], True, mIR.mol.Order, mIR.mol.ints[1][0, 0].shape[0])
         if not IncludeZeroth:
             Dx.setdiag(0)
         mIR.D[xi] = Dx
@@ -102,7 +104,8 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
         C = mIR.mVCI.C
         E = mIR.mVCI.E
     else:
-        H = VCISparseHamNModeFromOM(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), True)
+        #H = VCISparseHamNModeFromOM(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), True)
+        H = VCISparseHamNModeFromOMArray(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.ints_array[1], mIR.ints_array[2], True, mIR.mol.Order, mIR.mol.ints[1][0, 0].shape[0])
         E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SA')
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
@@ -486,6 +489,56 @@ class LinearResponseIRNMode(LinearResponseIR):
 
 
     def kernel(self):
+        self.ints_array = [None] * 3
+
+        K = self.mol.ints[1][0, 0].shape[0]
+        N = self.mol.ints[1].shape[0]
+
+        K4 = K * K * K * K
+        N2 = N * N
+        self.ints_array[1] = np.zeros((N2, K4))
+        ints1ravel = self.mol.ints[1].ravel()
+        for i in range(N2):
+            self.ints_array[1][i] = ints1ravel[i].ravel()
+        self.ints_array[1] = self.ints_array[1].ravel()
+
+        K6 = K * K * K * K * K * K
+        N3 = N * N * N
+        self.ints_array[2] = np.zeros((N3, K6))
+        ints2ravel = self.mol.ints[2].ravel()
+        if ints2ravel.shape[0] != 0:
+            for i in range(N3):
+                self.ints_array[2][i] = ints2ravel[i].ravel()
+            self.ints_array[2] = self.ints_array[2].ravel()
+        else:
+            self.ints_array[2] = np.array([0.0])
+
+        self.dip_ints_array = [None] * 3
+        self.dip_ints_array[0] = [None] * 3 #np.zeros((3, N, K * K))
+        self.dip_ints_array[1] = [None] * 3 #np.zeros((3, N2, K4))
+        self.dip_ints_array[2] = [None] * 3 #np.zeros((3, N3, K6))
+        for x in range(3):
+            self.dip_ints_array[0][x] = np.zeros((N, K * K))
+            ints_ravel = self.mol.dip_ints[0][x].ravel()
+            for i in range(N):
+                self.dip_ints_array[0][x][i] = ints_ravel[i].ravel()
+            self.dip_ints_array[0][x] = self.dip_ints_array[0][x].ravel()
+
+            self.dip_ints_array[1][x] = np.zeros((N2, K4))
+            ints_ravel = self.mol.dip_ints[1][x].ravel()
+            for i in range(N2):
+                self.dip_ints_array[1][x][i] = ints_ravel[i].ravel()
+            self.dip_ints_array[1][x] = self.dip_ints_array[1][x].ravel()
+            
+            if ints2ravel.shape[0] != 0:
+                self.dip_ints_array[2][x] = np.zeros((N3, K6))
+                ints_ravel = self.mol.dip_ints[2][x].ravel()
+                for i in range(N3):
+                    self.dip_ints_array[2][x][i] = ints_ravel[i].ravel()
+                self.dip_ints_array[2][x] = self.dip_ints_array[2][x].ravel()
+            else:
+                self.dip_ints_array[2][x] = np.array([0.0])
+
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
         self.DipoleSurfaceList = []
 
