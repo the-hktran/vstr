@@ -3,7 +3,7 @@ from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.utils import constants
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode, VCISparseHamNModeFromOM, VCISparseHamNModeFromOMArray, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode, VCISparseT
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode, VCISparseHamNModeFromOM, VCISparseHamNModeFromOMArray, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode, AddStatesHB2ModeArray, VCISparseT
 from functools import reduce
 import itertools
 import math
@@ -120,7 +120,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         UniqueBasis = AddStatesHBStoreCoupling(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
         return UniqueBasis, len(UniqueBasis[0])
     elif mVHCI.HBMethod.upper() == '2MODE':
-        UniqueBasis = AddStatesHB2Mode(mVHCI.Basis, mVHCI.mol.ints[1], mVHCI.Sorted2Mode, C, eps, True) 
+        UniqueBasis = AddStatesHB2ModeArray(mVHCI.Basis, mVHCI.mol.ints[1], mVHCI.Sorted2Mode, C, eps, True, mVHCI.N, mVHCI.K) 
     elif mVHCI.HBMethod.upper() == 'CIPSI':
         ConnectedBasis = ConnectedStatesCIPSI(mVHCI.Basis, mVHCI.MaxQuanta, mVHCI.mol.Order)
         UniqueBasis = AddStatesCIPSI(mVHCI.Basis, ConnectedBasis, C, mVHCI.E, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0], mVHCI.mol.ints[1], mVHCI.mol.ints[2], eps)
@@ -266,7 +266,8 @@ def pyVCISparseHamNMode(Basis1, Basis2, Frequencies, V0, onemode_eig, ints, isDi
 
 def SparseDiagonalizeNMode(mVHCI):
     mVHCI.Timer.start(1)
-    
+   
+    '''
     #flatten arrays
     K = mVHCI.mol.ints[1][0, 0].shape[0]
     N = mVHCI.mol.ints[1].shape[0]
@@ -289,20 +290,21 @@ def SparseDiagonalizeNMode(mVHCI):
         ThreeModeInts = ThreeModeInts.ravel()
     else:
         ThreeModeInts = np.array([0.0])
+    '''
 
     if mVHCI.H is None:
         if mVHCI.mol.use_onemode_states:
             #mVHCI.H = VCISparseHamNModeFromOM(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
-            mVHCI.H = VCISparseHamNModeFromOMArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, TwoModeInts, ThreeModeInts, True, mVHCI.mol.Order, K)
+            mVHCI.H = VCISparseHamNModeFromOMArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], True, mVHCI.mol.Order, mVHCI.K)
         else:
             mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
     else:
         if len(mVHCI.NewBasis) != 0:
             if mVHCI.mol.use_onemode_states:
                 #HIJ = VCISparseHamNModeFromOM(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
-                HIJ = VCISparseHamNModeFromOMArray(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, TwoModeInts, ThreeModeInts, False, mVHCI.mol.Order, K)
+                HIJ = VCISparseHamNModeFromOMArray(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], False, mVHCI.mol.Order, mVHCI.K)
                 #HJJ = VCISparseHamNModeFromOM(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
-                HJJ = VCISparseHamNModeFromOMArray(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, TwoModeInts, ThreeModeInts, True, mVHCI.mol.Order, K)
+                HJJ = VCISparseHamNModeFromOMArray(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], True, mVHCI.mol.Order, mVHCI.K)
             else:
                 HIJ = VCISparseHamNMode(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
                 HJJ = VCISparseHamNMode(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
@@ -696,6 +698,7 @@ class NModeVHCI(VHCI):
                             Sorted = np.unravel_index(Sorted, (self.mol.ngridpts, self.mol.ngridpts))
                             Sorted = np.vstack((Sorted[0], Sorted[1]))
                             self.Sorted2Mode[i, j, ni, nj] = Sorted.T
+            self.Sorted2Mode = np.array(self.Sorted2Mode.tolist()).ravel()
 
         if self.SaveToFile or self.ReadFromFile:
             assert(self.CHKFile is not None)
@@ -706,6 +709,22 @@ class NModeVHCI(VHCI):
             self.Basis = init_funcs.InitTruncatedBasis(self.NModes, self.Frequencies, self.MaxQuanta, MaxTotalQuanta = self.MaxTotalQuanta)
 
         self.PrintParameters()
+
+        K = self.mol.ints[1][0, 0].shape[0]
+        N = self.Frequencies.shape[0]
+        self.K = K
+        self.N = N
+        if self.mol.Order >= 1:
+            self.mol.ints[0] = np.array(self.mol.ints[0].tolist())
+            self.mol.ints[0].resize((N * K * K))
+            if self.mol.Order >= 2:
+                self.mol.ints[1] = np.array(self.mol.ints[1].tolist())
+                self.mol.ints[1].resize((N * N * K * K * K * K))
+                if self.mol.Order >= 3:
+                    self.mol.ints[2] = np.array(self.mol.ints[2].tolist())
+                    self.mol.ints[2].resize((N * N * N * K * K * K * K * K * K))
+                else:
+                    self.mol.ints[2] = np.array([0.0])
 
         if doVCI:
             self.Timer.start(0)

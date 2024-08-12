@@ -87,6 +87,12 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("ConnectedStatesCIPSI", ConnectedStatesCIPSI, "Finds all connected configurations given an n-mode potential to a space of configurations.");
     m.def("AddStatesCIPSI", AddStatesCIPSI, "Selects configurations based on the CIPSI criterion.");
     m.def("AddStatesHB2Mode", AddStatesHB2Mode, "Selects configurations based on 2-mode potential sorting.");
+    m.def("AddStatesHB2ModeArray", [](std::vector<WaveFunction> BasisSet1, pybind11::array_t<double> buffer2, pybind11::array_t<int> buffer3, Eigen::VectorXd C, double eps, bool ExactSingles, int NModes, int MaxQ)
+            {
+                pybind11::buffer_info info2 = buffer2.request();
+                pybind11::buffer_info info3 = buffer3.request();
+                return AddStatesHB2ModeArray(BasisSet1, static_cast<double*>(info2.ptr), static_cast<int*>(info3.ptr), C, eps, ExactSingles, NModes, MaxQ);
+            });
     m.def("DoSpectralPT2NMode", DoSpectralPT2NMode, "Runs spectral PT2 corrections for nMode potential");
     m.def("VCISparseHamDiagonalNModeFromOM", VCISparseHamDiagonalNModeFromOM, "Generates H diagonal elements using n-Mode potential in one mode eigenbasis");
     m.def("VCISparseT", VCISparseT, "Generates kinetic energy in HO basis.");
