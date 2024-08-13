@@ -710,18 +710,18 @@ class NModeVHCI(VHCI):
 
         self.PrintParameters()
 
-        K = self.mol.ints[1][0, 0].shape[0]
+        K = self.mol.ngridpts
         N = self.Frequencies.shape[0]
         self.K = K
         self.N = N
         if self.mol.Order >= 1:
-            self.mol.ints[0] = np.array(self.mol.ints[0].tolist())
+            #self.mol.ints[0] = np.array(self.mol.ints[0].tolist())
             self.mol.ints[0].resize((N * K * K))
             if self.mol.Order >= 2:
-                self.mol.ints[1] = np.array(self.mol.ints[1].tolist())
+                #self.mol.ints[1] = np.array(self.mol.ints[1].tolist())
                 self.mol.ints[1].resize((N * N * K * K * K * K))
                 if self.mol.Order >= 3:
-                    self.mol.ints[2] = np.array(self.mol.ints[2].tolist())
+                    #self.mol.ints[2] = np.array(self.mol.ints[2].tolist())
                     self.mol.ints[2].resize((N * N * N * K * K * K * K * K * K))
                 else:
                     self.mol.ints[2] = np.array([0.0])

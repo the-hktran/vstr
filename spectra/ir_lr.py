@@ -497,22 +497,15 @@ class LinearResponseIRNMode(LinearResponseIR):
         N2 = N * N
 
         if self.mol.Order >= 1:
-            #self.mol.ints[0] = np.array(self.mol.ints[0].tolist())
-            #self.mol.ints[0].resize((N * K * K))
-            self.mol.dip_ints[0] = np.array(self.mol.dip_ints[0].tolist())
+            #self.mol.dip_ints[0] = np.array(self.mol.dip_ints[0].tolist())
             self.mol.dip_ints[0].resize((3, N * K * K))
             if self.mol.Order >= 2:
-                #self.mol.ints[1] = np.array(self.mol.ints[1].tolist())
-                #self.mol.ints[1].resize((N * N * K * K * K * K))
-                self.mol.dip_ints[1] = np.array(self.mol.dip_ints[1].tolist())
+                #self.mol.dip_ints[1] = np.array(self.mol.dip_ints[1].tolist())
                 self.mol.dip_ints[1].resize((3, N * N * K * K * K * K))
                 if self.mol.Order >= 3:
-                    #self.mol.ints[2] = np.array(self.mol.ints[2].tolist())
-                    #self.mol.ints[2].resize((N * N * N * K * K * K * K * K * K))
-                    self.mol.dip_ints[2] = np.array(self.mol.dip_ints[2].tolist())
+                    #self.mol.dip_ints[2] = np.asarray(self.mol.dip_ints[2].tolist())
                     self.mol.dip_ints[2].resize((3, N * N * N * K * K * K * K * K * K))
                 else:
-                    #self.mol.ints[2] = np.array([0.0])
                     self.mol.dip_ints[2] = [np.array([0.0])] * 3
 
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)

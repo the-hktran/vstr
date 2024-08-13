@@ -249,7 +249,8 @@ class Molecule():
         self.nmode = NModePotential(self.nm)
         self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
         if self.ReadInt:
-            self.ReadIntegrals()
+            #self.ReadIntegrals()
+            self.ReadIntegralsAsArrays()
         else:
             for i in range(Order):
                 self.Timer.start(i + 1)
@@ -287,7 +288,8 @@ class Molecule():
 
         self.dip_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3)]
         if self.ReadDip:
-            self.ReadDipoles()
+            #self.ReadDipoles()
+            self.ReadDipolesAsArrays()
         else:
             for i in range(Order):
                 self.Timer.start(i + 4)
@@ -550,6 +552,64 @@ class Molecule():
                                 self.dip_ints[n][x, i, j] = f["dip_ints/%d/%s/%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1)][()]
                 if n == 2:
                     self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm), dtype = object)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    self.dip_ints[n][x, i, j, k] = f["dip_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
+
+    def ReadIntegralsAsArrays(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+        MaxOrder = self.Order
+        if self.OrderPlus is not None:
+            MaxOrder = self.OrderPlus
+
+        with h5py.File(IntsFile, "r") as f:
+            for n in range(MaxOrder):
+                if n == 0:
+                    self.ints[n] = np.empty((self.Nm, self.ngridpts, self.ngridpts), dtype = float)
+                    for i in range(self.Nm):
+                        self.ints[n][i] = f["ints/%d/%d" % (n + 1, i + 1)][()]
+                if n == 1:
+                    self.ints[n] = np.empty((self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                if n == 2:
+                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+    
+            self.onemode_eig = []
+            for i in range(self.Nm):
+                self.onemode_eig.append(f["onemode_eig/%d" % (i + 1)][()])
+            self.onemode_coeff = []
+            for i in range(self.Nm):
+                self.onemode_coeff.append(f["onemode_coeff/%d" % (i + 1)][()])
+
+    def ReadDipolesAsArrays(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+        cart_coord = ['x', 'y', 'z']
+
+        with h5py.File(IntsFile, "r") as f:
+            for n in range(self.Order):
+                if n == 0:
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.ngridpts, self.ngridpts), dtype = float)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            self.dip_ints[n][x, i] = f["dip_ints/%d/%s/%d" % (n + 1, cart_coord[x], i + 1)][()]
+                if n == 1:
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                self.dip_ints[n][x, i, j] = f["dip_ints/%d/%s/%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1)][()]
+                if n == 2:
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
                     for x in range(3):
                         for i in range(self.Nm):
                             for j in range(self.Nm):
