@@ -104,11 +104,22 @@ def FormWSD(mVHCI):
                 WSD[1].append(mW)
     mVHCI.PotentialSD = WSD
 
-def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
+def ScreenBasis(mVHCI, Ws = None, ints2 = None, ints2sorted = None, C = None, eps = 0.01):
     if Ws is None:
         Ws = mVHCI.PotentialListFull
     if C is None:
         C = mVHCI.C[0]
+
+    if ints2 is None:
+        try:
+            ints2 = mVHCI.mol.ints[1]
+        except:
+            ints2 = None
+    if ints2sorted is None:
+        try:
+            ints2sorted = mVHCI.Sorted2Mode
+        except:
+            ints2sorted = None
 
     if mVHCI.HBMethod == 'orig':
         UniqueBasis = AddStatesHB(mVHCI.Basis, Ws, C, eps)
@@ -120,7 +131,7 @@ def ScreenBasis(mVHCI, Ws = None, C = None, eps = 0.01):
         UniqueBasis = AddStatesHBStoreCoupling(mVHCI.Basis, Ws, C, eps, mVHCI.Ys)
         return UniqueBasis, len(UniqueBasis[0])
     elif mVHCI.HBMethod.upper() == '2MODE':
-        UniqueBasis = AddStatesHB2ModeArray(mVHCI.Basis, mVHCI.mol.ints[1], mVHCI.Sorted2Mode, C, eps, True, mVHCI.N, mVHCI.K) 
+        UniqueBasis = AddStatesHB2ModeArray(mVHCI.Basis, ints2, ints2sorted, C, eps, True, mVHCI.N, mVHCI.K) 
     elif mVHCI.HBMethod.upper() == 'CIPSI':
         ConnectedBasis = ConnectedStatesCIPSI(mVHCI.Basis, mVHCI.MaxQuanta, mVHCI.mol.Order)
         UniqueBasis = AddStatesCIPSI(mVHCI.Basis, ConnectedBasis, C, mVHCI.E, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0], mVHCI.mol.ints[1], mVHCI.mol.ints[2], eps)
@@ -295,16 +306,16 @@ def SparseDiagonalizeNMode(mVHCI):
     if mVHCI.H is None:
         if mVHCI.mol.use_onemode_states:
             #mVHCI.H = VCISparseHamNModeFromOM(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
-            mVHCI.H = VCISparseHamNModeFromOMArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], True, mVHCI.mol.Order, mVHCI.K)
+            mVHCI.H = VCISparseHamNModeFromOMArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], mVHCI.mol.ints[3], mVHCI.mol.ints[4], True, mVHCI.mol.Order, mVHCI.K)
         else:
             mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
     else:
         if len(mVHCI.NewBasis) != 0:
             if mVHCI.mol.use_onemode_states:
                 #HIJ = VCISparseHamNModeFromOM(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
-                HIJ = VCISparseHamNModeFromOMArray(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], False, mVHCI.mol.Order, mVHCI.K)
+                HIJ = VCISparseHamNModeFromOMArray(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], mVHCI.mol.ints[3], mVHCI.mol.ints[4], False, mVHCI.mol.Order, mVHCI.K)
                 #HJJ = VCISparseHamNModeFromOM(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
-                HJJ = VCISparseHamNModeFromOMArray(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], True, mVHCI.mol.Order, mVHCI.K)
+                HJJ = VCISparseHamNModeFromOMArray(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], mVHCI.mol.ints[3], mVHCI.mol.ints[4], True, mVHCI.mol.Order, mVHCI.K)
             else:
                 HIJ = VCISparseHamNMode(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
                 HJJ = VCISparseHamNMode(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
@@ -723,8 +734,21 @@ class NModeVHCI(VHCI):
                 if self.mol.Order >= 3:
                     #self.mol.ints[2] = np.array(self.mol.ints[2].tolist())
                     self.mol.ints[2].resize((N * N * N * K * K * K * K * K * K))
+                    if self.mol.Order >= 4:
+                        #self.mol.ints[3] = np.array(self.mol.ints[3].tolist())
+                        self.mol.ints[3].resize((N * N * N * N * K * K * K * K * K * K * K * K))
+                        if self.mol.Order >= 5:
+                            #self.mol.ints[4] = np.array(self.mol.ints[4].tolist())
+                            self.mol.ints[4].resize((N * N * N * N * N * K * K * K * K * K * K * K * K * K * K))
+                        else:
+                            self.mol.ints[4] = np.array([0.0])
+                    else:
+                        self.mol.ints[3] = np.array([0.0])
+                        self.mol.ints[4] = np.array([0.0])
                 else:
                     self.mol.ints[2] = np.array([0.0])
+                    self.mol.ints[3] = np.array([0.0])
+                    self.mol.ints[4] = np.array([0.0])
 
         if doVCI:
             self.Timer.start(0)

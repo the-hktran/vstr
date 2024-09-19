@@ -36,13 +36,13 @@ def GetTransitionDipoleMatrixNMode(mIR, xi = None, IncludeZeroth = False):
         mIR.D = []
         for x in range(3):
             #Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[x], mIR.mol.dip_ints[0][x].tolist(), mIR.mol.dip_ints[1][x].tolist(), mIR.mol.dip_ints[2][x].tolist(), True)
-            Dx = VCISparseHamNModeArray(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[x], mIR.mol.dip_ints[0][x], mIR.mol.dip_ints[1][x], mIR.mol.dip_ints[2][x], True, mIR.mol.Order, mIR.K)
+            Dx = VCISparseHamNModeArray(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[x], mIR.mol.dip_ints[0][x], mIR.mol.dip_ints[1][x], mIR.mol.dip_ints[2][x], mIR.mol.dip_ints[3][x], mIR.mol.dip_ints[4][x], True, mIR.mol.Order, mIR.K)
             if not IncludeZeroth:
                 Dx.setdiag(0)
             mIR.D.append(Dx)
     else:
         #Dx = VCISparseHamNMode(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[xi], mIR.mol.dip_ints[0][xi].tolist(), mIR.mol.dip_ints[1][xi].tolist(), mIR.mol.dip_ints[2][xi].tolist(), True)
-        Dx = VCISparseHamNModeArray(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[xi], mIR.mol.dip_ints[0][xi], mIR.mol.dip_ints[1][xi], mIR.mol.dip_ints[2][xi], True, mIR.mol.Order, mIR.K)
+        Dx = VCISparseHamNModeArray(mIR.mVCI.Basis, mIR.mVCI.Basis, list(np.zeros_like(mIR.mVCI.Frequencies)), mIR.mol.mu0[xi], mIR.mol.dip_ints[0][xi], mIR.mol.dip_ints[1][xi], mIR.mol.dip_ints[2][xi], mIR.mol.dip_ints[3][xi], mIR.mol.dip_ints[4][xi], True, mIR.mol.Order, mIR.K)
         if not IncludeZeroth:
             Dx.setdiag(0)
         mIR.D[xi] = Dx
@@ -105,7 +105,7 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
         E = mIR.mVCI.E
     else:
         #H = VCISparseHamNModeFromOM(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), True)
-        H = VCISparseHamNModeFromOMArray(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mol.ints[1], mIR.mol.ints[2], True, mIR.mol.Order, mIR.K)
+        H = VCISparseHamNModeFromOMArray(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mol.ints[1], mIR.mol.ints[2], mIR.mol.ints[3], mIR.mol.ints[4], True, mIR.mol.Order, mIR.K)
         E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SA')
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
@@ -194,7 +194,7 @@ def ApproximateAInv(mIR, w, Order = 1):
         AInv += 0.5 * np.einsum('ij,i,j->ij', HDH, DInv, DInv, optimize = True)
     return AInv
 
-def SpectralScreenBasis(mIR, Ws = None, C = None, eps = 0.01, InitState = None):
+def SpectralScreenBasis(mIR, Ws = None, ints2 = None, ints2sorted = None, C = None, eps = 0.01, InitState = None):
     if InitState is None:
         InitState = mIR.InitState
     if Ws is None:
@@ -202,7 +202,18 @@ def SpectralScreenBasis(mIR, Ws = None, C = None, eps = 0.01, InitState = None):
     if C is None:
         C = abs(mIR.mVCI.C[:, InitState])
 
-    return mIR.mVCI.ScreenBasis(Ws = Ws, C = C, eps = eps)
+    if ints2 is None:
+        try:
+            ints2 = mIR.mVCI.mol.ints[1]
+        except:
+            ints2 = None
+    if ints2sorted is None:
+        try:
+            ints2sorted = mIR.mVCI.Sorted2Mode
+        except:
+            ints2sorted = None
+
+    return mIR.mVCI.ScreenBasis(Ws = Ws, ints2 = ints2, ints2sorted = ints2sorted, C = C, eps = eps)
 
 def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
     if mIR.SpectralHBMethod == 1: # means perturbing the ground state
@@ -235,6 +246,26 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         del mIR.mVCI.NewBasis
         '''
         NAdded1 = 0
+
+        # HB using H and x
+        mIR.GetTransitionDipoleMatrix(xi = xi)
+        A, b = mIR.GetAb(w, xi = xi)
+        b[xi] = b[xi].ravel()
+        mIR.Timer.start(2)
+        x = SolveAxb(A, b[xi])
+        mIR.Timer.stop(2)
+        mIR.Timer.start(3)
+        NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.imag), eps = eps, InitState = InitState)
+        mIR.Timer.stop(3)
+        mIR.mVCI.Basis += NewBasis
+
+    elif mIR.SpectralHBMethod == 3: # means perturbing x and dipole operator
+        # HB using dipole operator first
+        mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(ints2 = mIR.mol.dip_ints[1][xi], ints2sorted = mIR.Sorted2ModeDip[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
+        mIR.mVCI.Basis += mIR.mVCI.NewBasis
+        mIR.mVCI.SparseDiagonalize()
+        mIR.mVCI.NewBasis = None
+        del mIR.mVCI.NewBasis
 
         # HB using H and x
         mIR.GetTransitionDipoleMatrix(xi = xi)
@@ -366,7 +397,7 @@ class LinearResponseIR:
 
     TestPowerSeries = TestPowerSeries
 
-    def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, SpectralHBMethod = 2, **kwargs):
+    def __init__(self, mf, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, NormalModes = None, DipoleSurface = None, SpectralHBMethod = 3, **kwargs):
         self.mf = mf
         self.mVCI = mVCI
         #self.mVCI.HBMethod = 'coupling'
@@ -461,7 +492,7 @@ class LinearResponseIRNMode(LinearResponseIR):
     GetAb = GetAbNMode
     DoSpectralPT2 = DoSpectralPT2NMode
     
-    def __init__(self, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, SpectralHBMethod = 2, NormalModes = None, **kwargs):
+    def __init__(self, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, SpectralHBMethod = 3, NormalModes = None, **kwargs):
         self.mVCI = mVCI
         self.mol = mVCI.mol
         
@@ -496,6 +527,23 @@ class LinearResponseIRNMode(LinearResponseIR):
         K4 = K * K * K * K
         N2 = N * N
 
+        if self.mVCI.HBMethod.upper() == '2MODE':
+            self.Sorted2ModeDip = []
+            for x in range(3):
+                Sorted2ModeDipx = np.zeros((N, N, K, K, K * K, 2), dtype = np.int8)
+                for i in range(N):
+                    for j in range(N):
+                        for ni in range(K):
+                            for nj in range(K):
+                                Sorted = np.argsort(-abs(self.mol.dip_ints[1][x, i, j][ni, nj].reshape(-1)))
+                                Sorted = np.unravel_index(Sorted, (K, K))
+                                Sorted = np.vstack((Sorted[0], Sorted[1]))
+                                Sorted2ModeDipx[i, j, ni, nj] = Sorted.T
+                Sorted2ModeDipx = Sorted2ModeDipx.ravel()
+                self.Sorted2ModeDip.append(Sorted2ModeDipx)
+        else:
+            self.Sorted2ModeDip = [None] * 3
+
         if self.mol.Order >= 1:
             #self.mol.dip_ints[0] = np.array(self.mol.dip_ints[0].tolist())
             self.mol.dip_ints[0].resize((3, N * K * K))
@@ -505,8 +553,21 @@ class LinearResponseIRNMode(LinearResponseIR):
                 if self.mol.Order >= 3:
                     #self.mol.dip_ints[2] = np.asarray(self.mol.dip_ints[2].tolist())
                     self.mol.dip_ints[2].resize((3, N * N * N * K * K * K * K * K * K))
+                    if self.mol.Order >= 4:
+                        #self.mol.dip_ints[3] = np.asarray(self.mol.dip_ints[3].tolist())
+                        self.mol.dip_ints[3].resize((3, N * N * N * N * K4 * K4))
+                        if self.mol.Order >= 5:
+                            #self.mol.dip_ints[4] = np.asarray(self.mol.dip_ints[4].tolist())
+                            self.mol.dip_ints[4].resize((3, N * N * N * N * N * K4 * K4 * K * K))
+                        else:
+                            self.mol.dip_ints[4] = [np.array([0.0])] * 3
+                    else:
+                        self.mol.dip_ints[3] = [np.array([0.0])] * 3
+                        self.mol.dip_ints[4] = [np.array([0.0])] * 3
                 else:
                     self.mol.dip_ints[2] = [np.array([0.0])] * 3
+                    self.mol.dip_ints[3] = [np.array([0.0])] * 3
+                    self.mol.dip_ints[4] = [np.array([0.0])] * 3
 
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
         self.DipoleSurfaceList = []

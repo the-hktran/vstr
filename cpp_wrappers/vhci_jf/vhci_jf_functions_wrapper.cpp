@@ -70,19 +70,23 @@ PYBIND11_MODULE(vhci_jf_functions, m)
     m.def("SpectralFrequencyPruneFromVSCF", SpectralFrequencyPruneFromVSCF, "Prunes basis based on how close w is to Hnn-E0 using VSCF modals");
     m.def("DoSpectralPT2", DoSpectralPT2, "Runs spectral PT2 corrections");
     m.def("VCISparseHamNMode", VCISparseHamNMode, "Generates H using n-Mode potential.");
-    m.def("VCISparseHamNModeArray", [](std::vector<WaveFunction> BasisSet1, std::vector<WaveFunction> BasisSet2, std::vector<double> Frequencies, double V0, pybind11::array_t<double> buffer2, pybind11::array_t<double> buffer3, pybind11::array_t<double> buffer4, bool DiagonalBlock, int MaxNMode, int MaxQ)
+    m.def("VCISparseHamNModeArray", [](std::vector<WaveFunction> BasisSet1, std::vector<WaveFunction> BasisSet2, std::vector<double> Frequencies, double V0, pybind11::array_t<double> buffer2, pybind11::array_t<double> buffer3, pybind11::array_t<double> buffer4, pybind11::array_t<double> buffer5, pybind11::array_t<double> buffer6, bool DiagonalBlock, int MaxNMode, int MaxQ)
             {
                 pybind11::buffer_info info2 = buffer2.request();
                 pybind11::buffer_info info3 = buffer3.request();
                 pybind11::buffer_info info4 = buffer4.request();
-                return VCISparseHamNModeArray(BasisSet1, BasisSet2, Frequencies, V0, static_cast<double*>(info2.ptr), static_cast<double*>(info3.ptr), static_cast<double*>(info4.ptr), DiagonalBlock, MaxNMode, MaxQ);
+                pybind11::buffer_info info5 = buffer5.request();
+                pybind11::buffer_info info6 = buffer6.request();
+                return VCISparseHamNModeArray(BasisSet1, BasisSet2, Frequencies, V0, static_cast<double*>(info2.ptr), static_cast<double*>(info3.ptr), static_cast<double*>(info4.ptr), static_cast<double*>(info5.ptr), static_cast<double*>(info6.ptr), DiagonalBlock, MaxNMode, MaxQ);
             });
     m.def("VCISparseHamNModeFromOM", VCISparseHamNModeFromOM, "Generates H using n-Mode potential in one mode eigenbasis.");
-    m.def("VCISparseHamNModeFromOMArray", [](std::vector<WaveFunction> BasisSet1, std::vector<WaveFunction> BasisSet2, std::vector<double> Frequencies, double V0, std::vector<Eigen::VectorXd> OneMode_Eig, pybind11::array_t<double> buffer3, pybind11::array_t<double> buffer4, bool DiagonalBlock, int MaxNMode, int MaxQ)
+    m.def("VCISparseHamNModeFromOMArray", [](std::vector<WaveFunction> BasisSet1, std::vector<WaveFunction> BasisSet2, std::vector<double> Frequencies, double V0, std::vector<Eigen::VectorXd> OneMode_Eig, pybind11::array_t<double> buffer3, pybind11::array_t<double> buffer4, pybind11::array_t<double> buffer5, pybind11::array_t<double> buffer6, bool DiagonalBlock, int MaxNMode, int MaxQ)
             {
                 pybind11::buffer_info info3 = buffer3.request();
                 pybind11::buffer_info info4 = buffer4.request();
-                return VCISparseHamNModeFromOMArray(BasisSet1, BasisSet2, Frequencies, V0, OneMode_Eig, static_cast<double*>(info3.ptr), static_cast<double*>(info4.ptr), DiagonalBlock, MaxNMode, MaxQ);
+                pybind11::buffer_info info5 = buffer5.request();
+                pybind11::buffer_info info6 = buffer6.request();
+                return VCISparseHamNModeFromOMArray(BasisSet1, BasisSet2, Frequencies, V0, OneMode_Eig, static_cast<double*>(info3.ptr), static_cast<double*>(info4.ptr), static_cast<double*>(info5.ptr), static_cast<double*>(info6.ptr), DiagonalBlock, MaxNMode, MaxQ);
             });
     m.def("ConnectedStatesCIPSI", ConnectedStatesCIPSI, "Finds all connected configurations given an n-mode potential to a space of configurations.");
     m.def("AddStatesCIPSI", AddStatesCIPSI, "Selects configurations based on the CIPSI criterion.");

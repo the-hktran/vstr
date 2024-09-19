@@ -155,8 +155,30 @@ class IRSpectraNMode(IRSpectra):
         self.__dict__.update(kwargs)
         self.mVCI = mVHCI
         self.mol = mVHCI.mol
+        self.K = mVHCI.mol.ngridpts
+        K = self.K
+        N = self.mol.Frequencies.shape[0]
 
         self.DipoleSurface = [[], [], [], []]
+        if self.mol.Order >= 1:
+            self.mol.dip_ints[0].resize((3, N * K * K))
+            if self.mol.Order >= 2:
+                self.mol.dip_ints[1].resize((3, N * N * K * K * K * K))
+                if self.mol.Order >= 3:
+                    self.mol.dip_ints[2].resize((3, N * N * N * K * K * K * K * K * K))
+                    if self.mol.Order >= 4:
+                        self.mol.dip_ints[3].resize((3, N * N * N * N * K * K * K * K * K * K * K * K))
+                        if self.mol.Order >= 5:
+                            self.mol.dip_ints[4].resize((3, N * N * N * N * N * K * K * K * K * K * K * K * K * K * K))
+                        else:
+                            self.mol.dip_ints[4] = [np.array([0.0])] * 3
+                    else:
+                        self.mol.dip_ints[3] = [np.array([0.0])] * 3
+                        self.mol.dip_ints[4] = [np.array([0.0])] * 3
+                else:
+                    self.mol.dip_ints[2] = [np.array([0.0])] * 3
+                    self.mol.dip_ints[3] = [np.array([0.0])] * 3
+                    self.mol.dip_ints[4] = [np.array([0.0])] * 3
     
     def kernel(self):
         self.Timer.start(0)

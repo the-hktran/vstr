@@ -4,6 +4,7 @@ import numpy as np
 import scipy
 import numdifftools as nd
 import h5py
+from itertools import permutations
 from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
@@ -93,8 +94,8 @@ class Molecule():
 
         self.__dict__.update(kwargs)
 
-        self.Timer = TIMER(7)
-        self.TimerNames = ["Opt + NM", "1-Mode Ints", "2-Mode Ints", "3-Mode Ints", "1-Mode Dips", "2-Mode Dips", "3-Mode Dips"]
+        self.Timer = TIMER(11)
+        self.TimerNames = ["Opt + NM", "1-Mode Ints", "2-Mode Ints", "3-Mode Ints", "4-Mode Ints", "5-Mode Ints", "1-Mode Dips", "2-Mode Dips", "3-Mode Dips", "4-Mode Dips", "5-Mode Dips"]
 
     def __str__(self):
         '''
@@ -247,7 +248,7 @@ class Molecule():
         if OrderPlus is None:
             OrderPlus = self.OrderPlus
         self.nmode = NModePotential(self.nm)
-        self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]])]
+        self.ints = [np.asarray([]), np.asarray([[[[[[]]]]]]), np.asarray([[[[[[[[[]]]]]]]]]), np.asarray([[[[[[[[[[[[[]]]]]]]]]]]]]), np.asarray([[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]])]
         if self.ReadInt:
             #self.ReadIntegrals()
             self.ReadIntegralsAsArrays()
@@ -286,15 +287,15 @@ class Molecule():
                 self.onemode_coeff.append(v)
                 self.onemode_eig.append(e)
 
-        self.dip_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3)]
+        self.dip_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3), np.asarray([[[[[[[[[[[[[]]]]]]]]]]]]] * 3), np.asarray([[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]] * 3)]
         if self.ReadDip:
             #self.ReadDipoles()
             self.ReadDipolesAsArrays()
         else:
             for i in range(Order):
-                self.Timer.start(i + 4)
+                self.Timer.start(i + 6)
                 self.dip_ints[i] = self.nmode.get_dipole_ints(i + 1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff, usePyPotDip = self.usePyPotDip)
-                self.Timer.stop(i + 4)
+                self.Timer.stop(i + 6)
 
         # separate dipole and energy as necessary
         if self.usePyPotDip and not self.ReadDip:
@@ -381,6 +382,21 @@ class Molecule():
                         for j in range(self.Nm):
                             for k in range(self.Nm):
                                 g3.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.ints[2][i, j, k])
+                    if MaxOrder >= 4:
+                        g4 = g.create_group("4")
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    for l in range(self.Nm):
+                                        g4.create_dataset("%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1), data = self.ints[3][i, j, k, l])
+                        if MaxOrder >= 5:
+                            g5 = g.create_group("5")
+                            for i in range(self.Nm):
+                                for j in range(self.Nm):
+                                    for k in range(self.Nm):
+                                        for l in range(self.Nm):
+                                            for m in range(self.Nm):
+                                                g5.create_dataset("%d_%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1, m + 1), data = self.ints[4][i, j, k, l, m])
 
             if "onemode_coeff" in f:
                 del f["onemode_coeff"]
@@ -437,6 +453,25 @@ class Molecule():
                             for j in range(self.Nm):
                                 for k in range(self.Nm):
                                     g3x.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.dip_ints[2][x, i, j, k])
+                    if self.Order >= 4:
+                        g4 = g.create_group("4")
+                        for x in range(3):
+                            g4x = g4.create_group(cart_coord[x])
+                            for i in range(self.Nm):
+                                for j in range(self.Nm):
+                                    for k in range(self.Nm):
+                                        for l in range(self.Nm):
+                                            g4x.create_dataset("%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1), data = self.dip_ints[3][x, i, j, k, l])
+                        if self.Order >= 5:
+                            g5 = g.create_group("5")
+                            for x in range(3):
+                                g5x = g5.create_group(cart_coord[x])
+                                for i in range(self.Nm):
+                                    for j in range(self.Nm):
+                                        for k in range(self.Nm):
+                                            for l in range(self.Nm):
+                                                for m in range(self.Nm):
+                                                    g5x.create_dataset("%d_%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1, m + 1), data = self.dip_ints[4][x, i, j, k, l, m])
 
             if "onemode_coeff" in f:
                 del f["onemode_coeff"]
@@ -582,6 +617,30 @@ class Molecule():
                         for j in range(self.Nm):
                             for k in range(self.Nm):
                                 self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+                if n == 3:
+                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                for l in range(self.Nm):
+                                    self.ints[n][i, j, k, l] = f["ints/%d/%d_%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1, l + 1)][()]
+                if n == 4:
+                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                for l in range(self.Nm):
+                                    for m in range(self.Nm):
+                                        self.ints[n][i, j, k, l, m] = f["ints/%d/%d_%d_%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1, l + 1, m + 1)][()]
+                if n == 5:
+                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for i in range(self.Nm):
+                        for j in range(self.Nm):
+                            for k in range(self.Nm):
+                                for l in range(self.Nm):
+                                    for m in range(self.Nm):
+                                        for o in range(self.Nm):
+                                            self.ints[n][i, j, k, l, m, o] = f["ints/%d/%d_%d_%d_%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1, l + 1, m + 1, o + 1)][()]
     
             self.onemode_eig = []
             for i in range(self.Nm):
@@ -615,6 +674,33 @@ class Molecule():
                             for j in range(self.Nm):
                                 for k in range(self.Nm):
                                     self.dip_ints[n][x, i, j, k] = f["dip_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
+                if n == 3:
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    for l in range(self.Nm):
+                                        self.dip_ints[n][x, i, j, k, l] = f["dip_ints/%d/%s/%d_%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1, l + 1)][()]
+                if n == 4:
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    for l in range(self.Nm):
+                                        for m in range(self.Nm):
+                                            self.dip_ints[n][x, i, j, k, l, m] = f["dip_ints/%d/%s/%d_%d_%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1, l + 1, m + 1)][()]
+                if n == 5:
+                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                    for x in range(3):
+                        for i in range(self.Nm):
+                            for j in range(self.Nm):
+                                for k in range(self.Nm):
+                                    for l in range(self.Nm):
+                                        for m in range(self.Nm):
+                                            for o in range(self.Nm):
+                                                self.dip_ints[n][x, i, j, k, l, m, o] = f["dip_ints/%d/%s/%d_%d_%d_%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1, l + 1, m + 1, o + 1)][()]
 
     def ReadInvInertia(self, IntsFile = None):
         if IntsFile is None:
@@ -996,6 +1082,15 @@ class NormalModes():
         x = self._normal2cart(q)
         return (self.mol.potential_cart(x) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(j, k, qj, qk) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk) - self.V0)
 
+    def potential_4mode(self, i, j, k, l, qi, qj, qk, ql):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        q[k] = qk
+        q[l] = ql
+        x = self._normal2cart(q)
+        return (self.mol.potential_cart(x) - self.potential_3mode(i, j, k, qi, qj, qk) - self.potential_3mode(i, j, l, qi, qj, ql) - self.potential_3mode(i, k, l, qi, qk, ql) - self.potential_3mode(j, k, l, qj, qk, ql) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(i, l, qi, ql) - self.potential_2mode(j, k, qj, qk) - self.potential_2mode(j, l, qj, ql) - self.potential_2mode(k, l, qk, ql) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk) - self.potential_1mode(l, ql) - self.V0)
+
     def pot_test(self, i, j, k, qi, qj, qk):
         q = np.zeros(self.nmodes)
         q[i] = qi
@@ -1032,6 +1127,15 @@ class NormalModes():
         q[k] = qk
         x = self._normal2cart(q)
         return (self.mol.dipole_cart(x) - self.dipole_2mode(i, j, qi, qj) - self.dipole_2mode(i, k, qi, qk) - self.dipole_2mode(j, k, qj, qk) - self.dipole_1mode(i, qi) - self.dipole_1mode(j, qj) - self.dipole_1mode(k, qk) - self.mu0)
+
+    def dipole_4mode(self, i, j, k, l, qi, qj, qk, ql):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        q[k] = qk
+        q[l] = ql
+        x = self._normal2cart(q)
+        return (self.mol.dipole_cart(x) - self.dipole_3mode(i, j, k, qi, qj, qk) - self.dipole_3mode(i, j, l, qi, qj, ql) - self.dipole_3mode(i, k, l, qi, qk, ql) - self.dipole_3mode(j, k, l, qj, qk, ql) - self.dipole_2mode(i, j, qi, qj) - self.dipole_2mode(i, k, qi, qk) - self.dipole_2mode(i, l, qi, ql) - self.dipole_2mode(j, k, qj, qk) - self.dipole_2mode(j, l, qj, ql) - self.dipole_2mode(k, l, qk, ql) - self.dipole_1mode(i, qi) - self.dipole_1mode(j, qj) - self.dipole_1mode(k, qk) - self.dipole_1mode(l, ql) - self.mu0)
 
     def inv_moment_of_inertia_1mode(self, i, qi):
         """
@@ -1303,6 +1407,56 @@ class NModePotential():
                                 ints[k, i, j] = vijk * constants.AU_TO_INVCM
                                 ints[j, k, i] = vijk * constants.AU_TO_INVCM
                                 ints[k, j, i] = vijk * constants.AU_TO_INVCM
+            elif nmode == 4:
+                ints = np.empty((nmodes,nmodes,nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    Ci = coeff[i].T @ onemode_coeff[i]
+                    for j in range(i, nmodes):
+                        Cj = coeff[j].T @ onemode_coeff[j]
+                        for k in range(j, nmodes):
+                            Ck = coeff[k].T @ onemode_coeff[k]
+                            for l in range(k, nmodes):
+                                if self.nm.mol.doSaveIntsOTF:
+                                    intotf_name = "ints4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
+                                    if os.path.exists(intotf_name):
+                                        continue
+                                Cl = coeff[l].T @ onemode_coeff[l]
+                                vgrid = np.array([[[[self.nm.potential_4mode(i,j,k,l,qi,qj,qk,ql) for ql in gridpts[l]] for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                                vijkl = np.einsum('gp,hq,fr,es,ghfe,gt,hu,fv,ew->pqrstuvw', Ci, Cj, Ck, Cl, vgrid, Ci, Cj, Ck, Cl, optimize=True)
+                                if self.nm.mol.doSaveIntsOTF:
+                                    intotf_name = "ints4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
+                                    with h5py.File(intotf_name, "w") as f:
+                                        f.create_dataset("ints", data = vijkl * constants.AU_TO_INVCM)
+                                else:
+                                    Is = list(permutations([i, j, k, l]))
+                                    for I in Is:
+                                        ints[I] = vijkl * constants.AU_TO_INVCM
+            elif nmode == 5:
+                ints = np.empty((nmodes,nmodes,nmodes,nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    Ci = coeff[i].T @ onemode_coeff[i]
+                    for j in range(i, nmodes):
+                        Cj = coeff[j].T @ onemode_coeff[j]
+                        for k in range(j, nmodes):
+                            Ck = coeff[k].T @ onemode_coeff[k]
+                            for l in range(k, nmodes):
+                                Cl = coeff[l].T @ onemode_coeff[l]
+                                for m in range(l, nmodes):
+                                    if self.nm.mol.doSaveIntsOTF:
+                                        intotf_name = "ints5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
+                                        if os.path.exists(intotf_name):
+                                            continue
+                                    Cm = coeff[m].T @ onemode_coeff[m]
+                                    vgrid = np.array([[[[[self.nm.potential_5mode(i,j,k,l,m,qi,qj,qk,ql,qm) for qm in gridpts[m]] for ql in gridpts[l]] for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                                    vijklm = np.einsum('gp,hq,fr,es,dt,ghfed,gu,hv,fw,ex,dy->pqrstuvwxy', Ci, Cj, Ck, Cl, Cm, vgrid, Ci, Cj, Ck, Cl, Cm, optimize=True)
+                                    if self.nm.mol.doSaveIntsOTF:
+                                        intotf_name = "ints5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
+                                        with h5py.File(intotf_name, "w") as f:
+                                            f.create_dataset("ints", data = vijklm * constants.AU_TO_INVCM)
+                                    else:
+                                        Is = list(permutations([i, j, k, l, m]))
+                                        for I in Is:
+                                            ints[I] = vijklm * constants.AU_TO_INVCM
         else:
             if nmode == 3:
                 ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
@@ -1356,8 +1510,29 @@ class NModePotential():
                                 ints[k, i, j] = f["ints"][:]
                                 ints[j, k, i] = f["ints"][:]
                                 ints[k, j, i] = f["ints"][:]
-                            
-
+            elif nmode == 4:
+                ints = np.empty((nmodes,nmodes,nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(i, nmodes):
+                        for k in range(j, nmodes):
+                            for l in range(k, nmodes):
+                                intotf_name = "ints4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
+                                with h5py.File(intotf_name, "r") as f:
+                                    Is = list(permutations([i, j, k, l]))
+                                    for I in Is:
+                                        ints[I] = f["ints"][:]
+            elif nmode == 5:
+                ints = np.empty((nmodes,nmodes,nmodes,nmodes,nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(i, nmodes):
+                        for k in range(j, nmodes):
+                            for l in range(k, nmodes):
+                                for m in range(l, nmodes):
+                                    intotf_name = "ints5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
+                                    with h5py.File(intotf_name, "r") as f:
+                                        Is = list(permutations([i, j, k, l, m]))
+                                        for I in Is:
+                                            ints[I] = f["ints"][:]
         return ints
 
     def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None, usePyPotDip = False):
@@ -1479,6 +1654,70 @@ class NModePotential():
                                 ints[3, j, k, i] = vijk[3]
                                 ints[3, k, j, i] = vijk[3]
 
+        elif nmode == 4:
+            ints = np.empty((3, nmodes, nmodes, nmodes, nmodes), dtype=object)
+            if usePyPotDip:
+                ints = np.empty((4, nmodes, nmodes, nmodes, nmodes), dtype=object)
+            for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
+                for j in range(i, nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
+                    for k in range(j, nmodes):
+                        Ck = coeff[k].T @ onemode_coeff[k]
+                        for l in range(k, nmodes):
+                            if self.nm.mol.doSaveIntsOTF:
+                                intotf_name = "dips4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
+                                if os.path.exists(intotf_name):
+                                    continue
+                            Cl = coeff[l].T @ onemode_coeff[l]
+                            vgrid = np.array([[[[self.nm.dipole_4mode(i,j,k,l,qi,qj,qk,ql) for ql in gridpts[l]] for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                            vijkl = np.zeros((ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[l], ngridpts[i], ngridpts[j], ngridpts[k], ngridpts[l]))
+                            vijkl = np.einsum('gp,hq,fr,es,ghfex,gt,hu,fv,ew->xpqrstuvw', Ci, Cj, Ck, Cl, vgrid, Ci, Cj, Ck, Cl, optimize=True)
+                            if self.nm.mol.doSaveIntsOTF:
+                                intotf_name = "dips4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
+                                with h5py.File(intotf_name, "w") as f:
+                                    f.create_dataset("dips", data = vijkl)
+                            else:
+                                Is = list(permutations([i, j, k, l]))
+                                ncart = 3
+                                if usePyPotDip:
+                                    ncart = 4
+                                for x in range(ncart):
+                                    for I in Is:
+                                        ints[x][I] = vijkl[x]
+        elif nmode == 5:
+            ints = np.empty((3, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
+            if usePyPotDip:
+                ints = np.empty((4, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
+            for i in range(nmodes):
+                Ci = coeff[i].T @ onemode_coeff[i]
+                for j in range(i, nmodes):
+                    Cj = coeff[j].T @ onemode_coeff[j]
+                    for k in range(j, nmodes):
+                        Ck = coeff[k].T @ onemode_coeff[k]
+                        for l in range(k, nmodes):
+                            Cl = coeff[l].T @ onemode_coeff[l]
+                            for m in range(l, nmodes):
+                                if self.nm.mol.doSaveIntsOTF:
+                                    intotf_name = "dips5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
+                                    if os.path.exists(intotf_name):
+                                        continue
+                                Cm = coeff[m].T @ onemode_coeff[m]
+                                vgrid = np.array([[[[[self.nm.dipole_5mode(i,j,k,l,m,qi,qj,qk,ql,qm) for qm in gridpts[m]] for ql in gridpts[l]] for qk in gridpts[k]] for qj in gridpts[j]] for qi in gridpts[i]])
+                                vijklm = np.einsum('gp,hq,fr,es,dt,ghfedx,gu,hv,fw,ey,dz->xpqrstuvwyz', Ci, Cj, Ck, Cl, Cm, vgrid, Ci, Cj, Ck, Cl, Cm, optimize=True)
+                                if self.nm.mol.doSaveIntsOTF:
+                                    intotf_name = "dips5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
+                                    with h5py.File(intotf_name, "w") as f:
+                                        f.create_dataset("dips", data = vijklm)
+                                else:
+                                    Is = list(permutations([i, j, k, l, m]))
+                                    ncart = 3
+                                    if usePyPotDip:
+                                        ncart = 4
+                                    for x in range(ncart):
+                                        for I in Is:
+                                            ints[x][I] = vijklm[x]
+
         if self.nm.mol.doSaveIntsOTF:
             if nmode == 1:
                 ints = np.empty((3, nmodes), dtype=object)
@@ -1539,7 +1778,41 @@ class NModePotential():
                                     ints[3, k, i, j] = f["dips"][3]
                                     ints[3, j, k, i] = f["dips"][3]
                                     ints[3, k, j, i] = f["dips"][3]
-
+            elif nmode == 4:
+                ints = np.empty((3, nmodes, nmodes, nmodes, nmodes), dtype=object)
+                if usePyPotDip:
+                    ints = np.empty((4, nmodes, nmodes, nmodes, nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(i, nmodes):
+                        for k in range(j, nmodes):
+                            for l in range(k, nmodes):
+                                intotf_name = "dips4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
+                                with h5py.File(intotf_name, "r") as f:
+                                    Is = list(permutations([i, j, k, l]))
+                                    ncart = 3
+                                    if usePyPotDip:
+                                        ncart = 4
+                                    for x in range(ncart):
+                                        for I in Is:
+                                            ints[x][I] = f["dips"][x]
+            elif nmode == 5:
+                ints = np.empty((3, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
+                if usePyPotDip:
+                    ints = np.empty((4, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
+                for i in range(nmodes):
+                    for j in range(i, nmodes):
+                        for k in range(j, nmodes):
+                            for l in range(k, nmodes):
+                                for m in range(l, nmodes):
+                                    intotf_name = "dips5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
+                                    with h5py.File(intotf_name, "r") as f:
+                                        Is = list(permutations([i, j, k, l, m]))
+                                        ncart = 3
+                                        if usePyPotDip:
+                                            ncart = 4
+                                        for x in range(ncart):
+                                            for I in Is:
+                                                ints[x][I] = f["dips"][x]
         return ints
 
     def get_inv_inertia_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
