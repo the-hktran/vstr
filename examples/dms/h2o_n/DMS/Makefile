@@ -1,6 +1,6 @@
 #Generic makefile for fortran90
 
-LIBDIR := /burg/home/hkt2112/Code/vstr/examples/dms/h2o_n/lib
+LIBDIR := /insomnia001/home/hkt2112/Code/vstr/examples/dms/h2o_n/lib
 
 FC := gfortran
 LIBS :=  -L$(LIBDIR) -ldms2b  

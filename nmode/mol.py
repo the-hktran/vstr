@@ -12,9 +12,9 @@ from vstr.spectra.dipole import GetDipole
 from vstr.utils.perf_utils import TIMER
 from pyscf import gto, scf, cc
 
-import tntorch as tn
-import torch
-import xfacpy
+#import tntorch as tn
+#import torch
+#import xfacpy
 
 A2B = 1.88973
 AU2CM = 219474.63 
@@ -91,6 +91,8 @@ class Molecule():
         self.doGeomOpt = True
         self.doShiftPotential = True
         self.doSaveIntsOTF = False
+
+        self.NonFrzCoords = None
 
         self.__dict__.update(kwargs)
 
@@ -221,7 +223,7 @@ class Molecule():
         if self.ReadGeom:
             self.ReadGeometry()
         else:
-            self.nm.kernel(x0 = x0, doGeomOpt = self.doGeomOpt)
+            self.nm.kernel(x0 = x0, doGeomOpt = self.doGeomOpt, coords = self.NonFrzCoords)
         self.Nm = self.nm.freqs.shape[0]
         #debug!!
         #c = np.zeros((self.natoms * 3, self.nm.nmodes))
@@ -904,7 +906,7 @@ class Molecule():
 
 class NormalModes():
 
-    def __init__(self, mol):
+    def __init__(self, mol, coords = None):
         self.mol = mol
         self.V0 = 0
         self.nm_coeff = None
@@ -912,7 +914,7 @@ class NormalModes():
 
         self.nmodes = 3*self.mol.natoms - 6
 
-    def kernel(self, x0=None, doGeomOpt = True):
+    def kernel(self, x0=None, doGeomOpt = True, coords = None):
         """
         Calculate the normal modes of the potential defined in mol.
     
@@ -928,7 +930,7 @@ class NormalModes():
         pes = self.mol._potential
         if doGeomOpt:
             print("Beginning geometry optimization...", flush = True)
-            result = scipy.optimize.minimize(pes, x0, tol = 1e-12)
+            result = scipy.optimize.minimize(pes, x0.flatten(), tol = 1e-12)
             print("...geometry optimization complete.", flush = True)
             self.x0 = result.x.reshape((natoms,3))
         else:
@@ -943,12 +945,21 @@ class NormalModes():
         except:
             self.B0 = np.zeros((9))
         
-        hess0 = self.hessian(self.x0).reshape((natoms*3, natoms*3))
+        if coords is not None:
+            natoms = len(coords)
+            self.nmodes = 3*natoms - 6
+        hess0 = self.hessian(self.x0, coords = coords).reshape((natoms*3, natoms*3))
 
         e, v = scipy.linalg.eigh(hess0)
         e, v = e[6:], v[:,6:] # remove translations and rotations
         v = v.reshape((natoms,3,self.nmodes))
+        if coords is not None:
+            V = np.zeros((self.mol.natoms, 3, self.nmodes))
+            for i, yi in enumerate(coords):
+                V[yi, :, :] = v[i, :, :]
+            v = V
         self.freqs, self.nm_coeff = np.sqrt(e), v
+        print("All frequencies:", self.freqs * constants.AU_TO_INVCM)
         if self.mol.LowFrequencyCutoff is not None:
             Cutoff = self.mol.LowFrequencyCutoff / constants.AU_TO_INVCM
             Keep = self.freqs > Cutoff
@@ -963,14 +974,28 @@ class NormalModes():
         grad = nd.Gradient(pes)(x.reshape(-1))
         return grad.reshape((self.mol.natoms,3))
 
-    def hessian(self, x):
+    def hessian(self, x, coords = None):
         """
         Calculate the mass-weighted Hessian.
         """
         natoms = self.mol.natoms
         mass = self.mol.mass
-        pes = self.mol._potential
-        hess = nd.Hessian(pes)(x.reshape(-1))
+        if coords is None:
+            pes = self.mol._potential
+        else:
+            natoms_full = natoms
+            natoms = len(coords)
+            mass = np.array([mass[i] for i in coords])
+            def pes(y):
+                Y = y.reshape((natoms,3))
+                X = x
+                for i, yi in enumerate(coords):
+                    X[yi, :] = Y[i, :]
+                return self.mol._potential(X.reshape(-1))
+        if coords is None:
+            hess = nd.Hessian(pes)(x.reshape(-1))
+        else:
+            hess = nd.Hessian(pes)(x[coords].reshape(-1))
         hess = hess.reshape((natoms,3,natoms,3))
         for i in range(natoms):
             for j in range(natoms):

@@ -65,28 +65,28 @@ contains
     allocate(loc3b(n3b,3))
     allocate(loc4b(n4b,4))
 
-    open(20,file='/burg/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_diff_2b.dat',status='old')
+    open(20,file='/insomnia001/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_diff_2b.dat',status='old')
     ncoef = size(coef2)
     do i=1,ncoef
        read (20,*) coef2(i)
     end do
     close(20)
 
-    open(20,file='/burg/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_diff_3b.dat',status='old')
+    open(20,file='/insomnia001/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_diff_3b.dat',status='old')
     ncoef = size(coef3_2)
     do i=1,ncoef
        read (20,*) coef3_2(i)
     end do
     close(20)
 
-    open(20,file='/burg/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_diff_3b_lr_4th.dat',status='old')
+    open(20,file='/insomnia001/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_diff_3b_lr_4th.dat',status='old')
     ncoef = size(coef3_1)
     do i=1,ncoef
        read (20,*) coef3_1(i)
     end do
     close(20)
 
-    open(20,file='/burg/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_grp200_diff',status='old')
+    open(20,file='/insomnia001/home/hkt2112/Code/vstr/examples/potentials/coef_qAQUA-pol/coeff_grp200_diff',status='old')
     ncoef = size(coef4)
     do i=1,ncoef
        read (20,*) coef4(i)
