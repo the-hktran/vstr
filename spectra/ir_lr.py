@@ -179,7 +179,8 @@ def DoSpectralPT2NMode(mIR, w, x, eta = None, eps_pt2 = None):
     return dE_PT2
 
 def SolveAxb(A, b):
-    x = sparse.linalg.spsolve(A, b)
+    #x = sparse.linalg.spsolve(A, b)
+    x = sparse.linalg.gmres(A, b, tol = 1e-8)[0]
     return x
 
 def ApproximateAInv(mIR, w, Order = 1):
