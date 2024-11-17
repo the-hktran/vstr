@@ -2,6 +2,7 @@ import numpy as np
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, GenerateSparseHamVOD, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, VCISparseHamNMode, VCISparseHamNModeArray, VCISparseHamNModeFromOM, VCISparseHamDiagonalNModeFromOM, VCISparseHamNModeFromOMArray
 from vstr.utils.perf_utils import TIMER
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
+from vstr.utils.linalg_utils import gmres_counter
 from scipy import sparse
 import matplotlib.pyplot as plt
 import gc
@@ -180,7 +181,8 @@ def DoSpectralPT2NMode(mIR, w, x, eta = None, eps_pt2 = None):
 
 def SolveAxb(A, b):
     #x = sparse.linalg.spsolve(A, b)
-    x = sparse.linalg.gmres(A, b, tol = 1e-8)[0]
+    counter = gmres_counter()
+    x = sparse.linalg.gmres(A, b, callback = counter, tol = 1e-8)[0]
     return x
 
 def ApproximateAInv(mIR, w, Order = 1):
