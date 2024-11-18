@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from pyscf.lo import Boys
 from pyscf.soscf import ciah
 from pyscf import lib
@@ -15,7 +16,7 @@ class NMOptimizer():
         self.coords = mol.x0
         self.nm = mol.nm
         self.maxiter = maxiter
-        self.tol = 1e-4
+        self.tol = 1e-6
 
         self.nmodes = self.nm_coeff.shape[2]
         self.triu_idx = np.triu_indices(self.nmodes, k = 1)
@@ -42,9 +43,13 @@ class NMOptimizer():
                 self.update_Q(uj, j)
                 self.update_U(uj, j)
                 K = self.get_K(self.Q_loc)
-                if abs(cost_new - cost_old) < self.tol:
-                    return self.Q_loc
-                cost_old = cost_new
+                print("Iteration: %d, Mode: %d, Cost: %f" % (i, j, cost_new))
+                #if abs(cost_new - cost_old) < self.tol:
+                #    return self.Q_loc
+                #cost_old = cost_new
+            if abs(cost_new - cost_old) < self.tol:
+                return self.Q_loc
+            cost_old = cost_new
             if i == self.maxiter - 1:
                 print("Warning: Maximum number of iterations reached")
         return self.Q_loc
@@ -56,8 +61,8 @@ class NMOptimizer():
         U = np.eye(self.nmodes) 
         U[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
         U[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
-        U[self.triu_idx[0][i], self.triu_idx[1][i]] = np.sin(u)
-        U[self.triu_idx[1][i], self.triu_idx[0][i]] = -np.sin(u)
+        U[self.triu_idx[0][i], self.triu_idx[1][i]] = -np.sin(u)
+        U[self.triu_idx[1][i], self.triu_idx[0][i]] = np.sin(u)
         return np.einsum('sr,tr,ur,vr,stuv->', U, U, U, U, K, optimize = True)
 
     def get_K(self, QLoc = None):
@@ -67,24 +72,26 @@ class NMOptimizer():
         Ui = np.eye(self.nmodes)
         Ui[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
         Ui[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
-        Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = np.sin(u)
-        Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = -np.sin(u)
+        Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = -np.sin(u)
+        Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = np.sin(u)
         self.Q_loc = np.einsum('kp,nxk->nxp', Ui, self.Q_loc, optimize = True)
 
     def update_U(self, u, i):
         Ui = np.eye(self.nmodes)
         Ui[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
         Ui[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
-        Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = np.sin(u)
-        Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = -np.sin(u)
+        Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = -np.sin(u)
+        Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = np.sin(u)
         self.U = self.U @ Ui
 
     def calc_angle(self, K, p, q):
         A = K[p, q, p, q] - (K[p, p, p, p] + K[q, q, q, q] - 2 * K[p, p, q, q]) / 4
         B = K[p, p, p, q] - K[q, q, q, p]
         
-        a1 = np.arcsin(B / np.sqrt(A**2 + B**2)) / 4
-        a2 = np.arccos(-A / np.sqrt(A**2 + B**2)) / 4
+        a1 = math.asin( B / np.sqrt(A**2 + B**2)) / 4
+        a2 = math.acos(-A / np.sqrt(A**2 + B**2)) / 4
+
+        print("increase", A + np.sqrt(A**2 + B**2))
 
         assert (abs(a1) < np.pi / 4) or (abs(a2) < np.pi / 4)
         return a1, a2
@@ -150,32 +157,8 @@ if __name__ == '__main__':
     #vmol.SaveIntegrals()
     mlo = NMBoys(vmol)
 
-    '''
-    # numerical derivative
-    U = np.eye(3)
-    G = np.zeros((3, 3))
-    for i in range(3):
-        for j in range(3):
-            dU = np.zeros((3, 3))
-            dU[i, j] = 1e-2
-            G[i, j] = (mlo.cost_function(U + dU) - mlo.cost_function(U - dU)) / 2e-2
-    print(G)
-    print(mlo.get_grad(U))
-    # numerical hessian
-    H = np.zeros((3, 3, 3, 3))
-    for i in range(3):
-        for j in range(3):
-            for k in range(3):
-                for l in range(3):
-                    dU1 = np.zeros((3, 3))
-                    dU2 = np.zeros((3, 3))
-                    dU1[i, j] = 1e-2
-                    dU2[k, l] = 1e-2
-                    H[i, j, k, l] = (mlo.cost_function(U + dU1 + dU2) - mlo.cost_function(U + dU1 - dU2) - mlo.cost_function(U - dU1 + dU2) + mlo.cost_function(U - dU1 - dU2)) / 4e-4
-    print(H)
-    '''
     print("Normal Modes")
-    print(mlo.nm_coeff.reshape(9, 3))
+    print(mlo.nm_coeff)
     lo_coeff = mlo.kernel()
     print("Local Modes")
     print(lo_coeff)
