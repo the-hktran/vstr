@@ -6,136 +6,124 @@ from pyscf.lib import logger
 from pyscf import __config__
 from pyscf.lo import orth, cholesky_mos
 
-def kernel(localizer, mo_coeff=None, callback=None, verbose=None):
-    from pyscf.tools import mo_mapping
-    if mo_coeff is not None:
-        localizer.mo_coeff = np.asarray(mo_coeff, order='C')
-    if localizer.mo_coeff.shape[1] <= 1:
-        return localizer.mo_coeff
+class NMOptimizer():
+    def __init__(self, mol, maxiter = 100, **kwargs):
+        self.mol = mol
+        self.nm_coeff = mol.nm.nm_coeff
+        self.Q_loc = self.nm_coeff.copy()
+        self.U = np.eye(mol.nm.nmodes)
+        self.coords = mol.x0
+        self.nm = mol.nm
+        self.maxiter = maxiter
+        self.tol = 1e-4
 
-    if localizer.verbose >= logger.WARN:
-        localizer.check_sanity()
-    localizer.dump_flags()
+        self.nmodes = self.nm_coeff.shape[2]
+        self.triu_idx = np.triu_indices(self.nmodes, k = 1)
+        self.nidx = len(self.triu_idx[0])
 
-    cput0 = (logger.process_clock(), logger.perf_counter())
-    log = logger.new_logger(localizer, verbose=verbose)
+        self.__dict__.update(kwargs)
 
-    if localizer.conv_tol_grad is None:
-        conv_tol_grad = np.sqrt(localizer.conv_tol*.1)
-        log.info('Set conv_tol_grad to %g', conv_tol_grad)
-    else:
-        conv_tol_grad = localizer.conv_tol_grad
+    def kernel(self):
+        K = self.get_K()
+        cost_old = self.cost_function_i(0, 0, K)
+        for i in range(self.maxiter):
+            for j in range(self.nidx):
+                p = self.triu_idx[0][j]
+                q = self.triu_idx[1][j]
+                uj1, uj2 = self.calc_angle(K, p, q)
+                cost_new1 = self.cost_function_i(uj1, j, K)
+                cost_new2 = self.cost_function_i(uj2, j, K)
+                if cost_new1 > cost_new2:
+                    uj = uj1
+                    cost_new = cost_new1
+                else:
+                    uj = uj2
+                    cost_new = cost_new2
+                self.update_Q(uj, j)
+                self.update_U(uj, j)
+                K = self.get_K(self.Q_loc)
+                if abs(cost_new - cost_old) < self.tol:
+                    return self.Q_loc
+                cost_old = cost_new
+            if i == self.maxiter - 1:
+                print("Warning: Maximum number of iterations reached")
+        return self.Q_loc
 
-    if mo_coeff is None:
-        if getattr(localizer, 'mol', None) and localizer.mol.natm == 0:
-            # For customized Hamiltonian
-            u0 = localizer.get_init_guess('random')
-        else:
-            #u0 = localizer.get_init_guess(localizer.init_guess)
-            u0 = np.eye(localizer.mo_coeff.shape[0])
-    else:
-        u0 = localizer.get_init_guess(None)
+    def cost_function(self, U):
+        pass
 
-    rotaiter = ciah.rotate_orb_cc(localizer, u0, conv_tol_grad, verbose=log)
-    u, g_orb, stat = next(rotaiter)
-    cput1 = log.timer('initializing CIAH', *cput0)
+    def cost_function_i(self, u, i, K):
+        U = np.eye(self.nmodes) 
+        U[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
+        U[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
+        U[self.triu_idx[0][i], self.triu_idx[1][i]] = np.sin(u)
+        U[self.triu_idx[1][i], self.triu_idx[0][i]] = -np.sin(u)
+        return np.einsum('sr,tr,ur,vr,stuv->', U, U, U, U, K, optimize = True)
 
-    tot_kf = stat.tot_kf
-    tot_hop = stat.tot_hop
-    conv = False
-    e_last = 0
-    for imacro in range(localizer.max_cycle):
-        norm_gorb = np.linalg.norm(g_orb)
-        u0 = lib.dot(u0, u)
-        e = localizer.cost_function(u0)
-        e_last, de = e, e-e_last
+    def get_K(self, QLoc = None):
+        pass
 
-        log.info('macro= %d  f(x)= %.14g  delta_f= %g  |g|= %g  %d KF %d Hx' %(
-                 imacro+1, e, de, norm_gorb, stat.tot_kf+1, stat.tot_hop))
-        cput1 = log.timer('cycle= %d'%(imacro+1), *cput1)
+    def update_Q(self, u, i):
+        Ui = np.eye(self.nmodes)
+        Ui[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
+        Ui[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
+        Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = np.sin(u)
+        Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = -np.sin(u)
+        self.Q_loc = np.einsum('kp,nxk->nxp', Ui, self.Q_loc, optimize = True)
 
-        if (norm_gorb < conv_tol_grad and abs(de) < localizer.conv_tol
-                and stat.tot_hop < localizer.ah_max_cycle):
-            conv = True
+    def update_U(self, u, i):
+        Ui = np.eye(self.nmodes)
+        Ui[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
+        Ui[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
+        Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = np.sin(u)
+        Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = -np.sin(u)
+        self.U = self.U @ Ui
 
-        if callable(callback):
-            callback(locals())
+    def calc_angle(self, K, p, q):
+        A = K[p, q, p, q] - (K[p, p, p, p] + K[q, q, q, q] - 2 * K[p, p, q, q]) / 4
+        B = K[p, p, p, q] - K[q, q, q, p]
+        
+        a1 = np.arcsin(B / np.sqrt(A**2 + B**2)) / 4
+        a2 = np.arccos(-A / np.sqrt(A**2 + B**2)) / 4
 
-        if conv:
-            break
+        assert (abs(a1) < np.pi / 4) or (abs(a2) < np.pi / 4)
+        return a1, a2
 
-        u, g_orb, stat = rotaiter.send(u0)
-        tot_kf += stat.tot_kf
-        tot_hop += stat.tot_hop
-
-    rotaiter.close()
-    #log.info
-    print('macro X = %d  f(x)= %.14g  |g|= %g  %d intor %d KF %d Hx' %(
-             imacro+1, e, norm_gorb,
-             (imacro+1)*2, tot_kf+imacro+1, tot_hop))
-# Sort the localized orbitals, to make each localized orbitals as close as
-# possible to the corresponding input orbitals
-    sorted_idx = mo_mapping.mo_1to1map(u0)
-    localizer.mo_coeff = lib.dot(localizer.mo_coeff, u0[:,sorted_idx])
-    return localizer.mo_coeff
 
 def RCenter(mLO, U):
     QNew = np.einsum('kp,nxk->nxp', U, mLO.nm_coeff, optimize = True)
     C = (QNew * QNew).sum(axis = 1)
     return QNew, C #, np.einsum('np,nx->xp', C, mLO.coords, optimize = True)
 
-def gen_g_hop(mLO, U):
-    print(U)
-    g = mLO.get_grad(U)
-    g = mLO.pack_uniq_var(g)
+def ContractU(mLO, Us):
+    U = np.eye(mLO.nm_coeff.shape[2])
+    for i in range(mLO.nidx):
+        u = np.eye(mLO.nm_coeff.shape[2])
+        u[mLO.triu_idx[0][i], mLO.triu_idx[0][i]] = np.cos(Us[i])
+        u[mLO.triu_idx[1][i], mLO.triu_idx[1][i]] = np.cos(Us[i])
+        u[mLO.triu_idx[0][i], mLO.triu_idx[1][i]] = np.sin(Us[i])
+        u[mLO.triu_idx[1][i], mLO.triu_idx[0][i]] = -np.sin(Us[i])
+        U = U @ u
+    return U
 
-    K = mLO.nm_coeff.shape[0]
-    P = mLO.nm_coeff.shape[1]
-    h = np.zeros((K, P, K, P))
-
-    QNew, C = mLO.RCenter(U)
-    RR = mLO.coords @ mLO.coords.T
-
-    h = 4 * np.einsum('pq,nm,nxk,nxp,myp,myl->kplq', np.eye(P), RR, mLO.nm_coeff, QNew, 2 * QNew, mLO.nm_coeff, optimize = True) + 4 * np.einsum('pq,nm,nxk,mp,nxl->kplq', np.eye(P), RR, mLO.nm_coeff, C, mLO.nm_coeff, optimize = True)
-    h_diag = mLO.pack_uniq_var(np.diag(h.reshape(K * P, K * P)).reshape(K, P))
-
-    def h_op(x):
-        x = mLO.unpack_uniq_var(x)
-        return mLO.pack_uniq_var(np.einsum('kplq,lq->kp', h, x, optimize = True))
-    
-    return g, h_op, h_diag
-    
-def get_grad(mLO, U = None):
-    if U is None:
-        U = np.eye(mLO.nm_coeff.shape[2])
-    QNew, C = mLO.RCenter(U)
-    RR = mLO.coords @ mLO.coords.T
-    return 4 * np.einsum('nm,mp,nxp,nxk->kp', RR, C, QNew, mLO.nm_coeff, optimize = True)
-
-def cost_function(mLO, U = None):
+def cost_function_boys(mLO, U = None):
     if U is None:
         U = np.eye(mLO.nm_coeff.shape[2])
     QNew, C = mLO.RCenter(U)
     RC = np.einsum('np,nx->px', C, mLO.coords, optimize = True)
     return (RC * RC).sum()
 
-class NMBoys(Boys):
+def get_K_boys(mLO, QLoc = None):
+    if QLoc is None:
+        QLoc = mLO.Q_loc
+    K1 = np.einsum('kx,kys,kyt->xst', mLO.coords, QLoc, QLoc, optimize = True)
+    return np.einsum('xst,xuv->stuv', K1, K1, optimize = True)
+
+class NMBoys(NMOptimizer):
     RCenter = RCenter
-    gen_g_hop = gen_g_hop
-    get_grad = get_grad
-    cost_function = cost_function
+    cost_function = cost_function_boys
+    get_K = get_K_boys
 
-    kernel = kernel
-
-    def __init__(self, mol, **kwargs):
-        mol.stdout = None
-        mol.verbose = 0
-        mol.natm = mol.natoms
-        mol.mo_coeff = mol.nm.nm_coeff
-
-        Boys.__init__(self, mol, mol.nm.nm_coeff, **kwargs)
-        self.nm_coeff = mol.nm.nm_coeff
-        self.coords = mol.x0
 
 if __name__ == '__main__':
     from vstr.examples.potentials.h2o_n.h2o_n_pot import calc_h2o_n_pot
@@ -187,7 +175,15 @@ if __name__ == '__main__':
     print(H)
     '''
     print("Normal Modes")
-    print(mlo.nm_coeff)
+    print(mlo.nm_coeff.reshape(9, 3))
     lo_coeff = mlo.kernel()
     print("Local Modes")
     print(lo_coeff)
+    print(np.einsum('nxk,kp->nxp', mlo.nm_coeff, mlo.U))
+
+    S = np.zeros((3, 3))
+    S[0, 0] = vmol.Frequencies[0]
+    S[1, 1] = vmol.Frequencies[1]
+    S[2, 2] = vmol.Frequencies[2]
+    print(mlo.U.T @ S @ mlo.U)
+
