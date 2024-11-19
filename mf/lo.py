@@ -48,11 +48,22 @@ class NMOptimizer():
                 #    return self.Q_loc
                 #cost_old = cost_new
             if abs(cost_new - cost_old) < self.tol:
-                return self.Q_loc
+                break
             cost_old = cost_new
             if i == self.maxiter - 1:
                 print("Warning: Maximum number of iterations reached")
-        return self.Q_loc
+
+        # Reorder local modes
+        S = np.zeros((self.nmodes, self.nmodes))
+        np.fill_diagonal(S, self.mol.Frequencies)
+        SLoc = self.U.T @ S @ self.U
+        idx = np.argsort(SLoc.diagonal())
+        self.U = self.U[:, idx]
+        self.Q_loc = self.Q_loc[:, :, idx]
+        self.Frequencies = SLoc.diagonal()[idx]
+        self.mol.Frequencies = SLoc.diagonal()[idx]
+        self.mol.nm.nm_coeff = self.Q_loc
+        return self.mol
 
     def cost_function(self, U):
         pass
@@ -90,8 +101,6 @@ class NMOptimizer():
         
         a1 = math.asin( B / np.sqrt(A**2 + B**2)) / 4
         a2 = math.acos(-A / np.sqrt(A**2 + B**2)) / 4
-
-        print("increase", A + np.sqrt(A**2 + B**2))
 
         assert (abs(a1) < np.pi / 4) or (abs(a2) < np.pi / 4)
         return a1, a2
@@ -159,10 +168,10 @@ if __name__ == '__main__':
 
     print("Normal Modes")
     print(mlo.nm_coeff)
-    lo_coeff = mlo.kernel()
+    mol_lo = mlo.kernel()
     print("Local Modes")
-    print(lo_coeff)
-    print(np.einsum('nxk,kp->nxp', mlo.nm_coeff, mlo.U))
+    print(mlo.Q_loc.reshape(9, 3))
+    print(np.einsum('nxk,kp->nxp', mlo.nm_coeff, mlo.U).reshape(9,3))
 
     S = np.zeros((3, 3))
     S[0, 0] = vmol.Frequencies[0]

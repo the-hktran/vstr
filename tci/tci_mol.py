@@ -9,6 +9,7 @@ from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
 from vstr.nmode.mol import NormalModes
 from vstr.spectra.dipole import GetDipole
 from vstr.nmode.mol import Molecule, get_qmat_ho, get_tmat_ho
+from vstr.mf.lo import NMBoys
 from vstr.utils.perf_utils import TIMER
 from pyscf import gto, scf, cc
 import h5py
@@ -25,13 +26,14 @@ class TCIMolecule(Molecule):
     Atomic units are used throughout. 
     '''
 
-    def __init__(self, potential_cart, natoms, mass, **kwargs):
+    def __init__(self, potential_cart, natoms, mass, loc_method = None, **kwargs):
 
         self.potential_cart = potential_cart
         self.dipole_cart = None
         self.natoms = natoms
         self.Nm = 3 * natoms - 6
         self.LowFrequencyCutoff = None
+        self.NonFrzCoords = None
         self.mass = mass
         self.onemode_coeff = []
         self.onemode_eig = []
@@ -40,6 +42,7 @@ class TCIMolecule(Molecule):
         self.tt_method = 'tci'
         self.rank = 121
         self.tci_tol = 1e-6
+        self.loc_method = loc_method
         self.Order = 2
         self.OrderPlus = None
         self.calc_integrals = True
@@ -189,6 +192,13 @@ class TCIMolecule(Molecule):
         self.Timer.start(0)
         self.CalcNM(x0 = x0)
         self.Timer.stop(0)
+
+        if self.loc_method is not None:
+            mlo = NMBoys(self)
+            mol_lo = mlo.kernel()
+            self.nm.freqs = mol_lo.Frequencies / constants.AU_TO_INVCM
+            self.nm.nm_coeff = mlo.Q_loc
+
         if not self.ReadTensors:
             self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol)
         else:
@@ -220,7 +230,7 @@ if __name__ == "__main__":
     def potential_cart_h2o(coords):
         return calc_h2o_n_pot(coords)[0]
 
-    mol = TCIMolecule(potential_cart_h2o, natoms, mass, ngridpts = 5)
+    mol = TCIMolecule(potential_cart_h2o, natoms, mass, ngridpts = 5, loc_method = 'boys')
 
     '''
     x0 = np.array([

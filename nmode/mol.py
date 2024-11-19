@@ -14,7 +14,7 @@ from pyscf import gto, scf, cc
 
 #import tntorch as tn
 #import torch
-#import xfacpy
+import xfacpy
 
 A2B = 1.88973
 AU2CM = 219474.63 
