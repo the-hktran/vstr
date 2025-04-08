@@ -3,7 +3,7 @@ from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HO
 from vstr.utils.perf_utils import TIMER
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from vstr.utils.linalg_utils import gmres_counter
-from scipy import sparse
+from scipy import sparse, linalg
 import matplotlib.pyplot as plt
 import gc
 
@@ -181,8 +181,19 @@ def DoSpectralPT2NMode(mIR, w, x, eta = None, eps_pt2 = None):
 
 def SolveAxb(A, b):
     #x = sparse.linalg.spsolve(A, b)
-    counter = gmres_counter()
-    x = sparse.linalg.gmres(A, b, callback = counter, tol = 1e-8)[0]
+    
+    #counter = gmres_counter()
+    #x = sparse.linalg.gmres(A, b, tol = 1e-5)[0]
+
+    x = linalg.solve(A.todense(), b)
+    return x
+
+def SpSolveAxb(A, b, tol = 1e-5, log = False):
+    if log:
+        counter = gmres_counter()
+        x = sparse.linalg.gmres(A, b, tol = tol, callback = counter)[0]
+    else:
+        x = sparse.linalg.gmres(A, b, tol = tol)[0]
     return x
 
 def ApproximateAInv(mIR, w, Order = 1):
@@ -232,7 +243,10 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         A, b = mIR.GetAb(w, xi = xi)
         b[xi] = b[xi].ravel()
         mIR.Timer.start(2)
-        x = SolveAxb(A, b[xi])
+        if mIR.DoSpSolve:
+            x = SpSolveAxb(A, b[xi], tol = 1e-5, log = False)
+        else:
+            x = SolveAxb(A, b[xi])
         mIR.Timer.stop(2)
         D = np.sqrt((w - mIR.mVCI.H.diagonal() + mIR.mVCI.E[0])**2.0 + mIR.eta**2.0)
         bD = abs(b[xi] / D)
@@ -255,7 +269,10 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         A, b = mIR.GetAb(w, xi = xi)
         b[xi] = b[xi].ravel()
         mIR.Timer.start(2)
-        x = SolveAxb(A, b[xi])
+        if mIR.DoSpSolve:
+            x = SpSolveAxb(A, b[xi], tol = 1e-5, log = False)
+        else:
+            x = SolveAxb(A, b[xi])
         mIR.Timer.stop(2)
         mIR.Timer.start(3)
         NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.imag), eps = eps, InitState = InitState)
@@ -275,7 +292,10 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         A, b = mIR.GetAb(w, xi = xi)
         b[xi] = b[xi].ravel()
         mIR.Timer.start(2)
-        x = SolveAxb(A, b[xi])
+        if mIR.DoSpSolve:
+            x = SpSolveAxb(A, b[xi], tol = 1e-5, log = False)
+        else:
+            x = SolveAxb(A, b[xi])
         mIR.Timer.stop(2)
         mIR.Timer.start(3)
         NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.imag), eps = eps, InitState = InitState)
@@ -324,7 +344,10 @@ def Intensity(mIR, w, state_thr = 1e-6):
         # Solve for intensity using updated VCI object
         A, b = mIR.GetAb(w)
         mIR.Timer.start(2)
-        x = SolveAxb(A, b[xi])
+        if mIR.DoSpSolve:
+            x = SpSolveAxb(A, b[xi], tol = 1e-5, log = False)
+        else:
+            x = SolveAxb(A, b[xi])
         mIR.Timer.stop(2)
         x = np.asarray(x).ravel()
         mIR.XString[xi].append(mIR.mVCI.LCLine(0, thr = state_thr, C = np.reshape(abs(x), (x.shape[0], 1))))
@@ -425,6 +448,7 @@ class LinearResponseIR:
         self.DipoleSurface = DipoleSurface
         self.Normalize = False
         self.DoPT2 = False
+        self.DoSpSolve = True
 
         self.__dict__.update(kwargs)
 
@@ -495,7 +519,7 @@ class LinearResponseIRNMode(LinearResponseIR):
     GetAb = GetAbNMode
     DoSpectralPT2 = DoSpectralPT2NMode
     
-    def __init__(self, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, SpectralHBMethod = 3, NormalModes = None, **kwargs):
+    def __init__(self, mVCI, FreqRange = [0, 5000], NPoints = 100, eta = 10, SpectralHBMethod = 3, NormalModes = None, DoSpSolve = False, **kwargs):
         self.mVCI = mVCI
         self.mol = mVCI.mol
         
@@ -515,6 +539,7 @@ class LinearResponseIRNMode(LinearResponseIR):
         self.eta = eta
         self.Normalize = False
         self.DoPT2 = False
+        self.DoSpSolve = DoSpSolve
 
         self.__dict__.update(kwargs)
         

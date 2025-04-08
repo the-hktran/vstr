@@ -8,7 +8,7 @@ from pyscf import __config__
 from pyscf.lo import orth, cholesky_mos
 
 class NMOptimizer():
-    def __init__(self, mol, maxiter = 100, **kwargs):
+    def __init__(self, mol, maxiter = 1000, **kwargs):
         self.mol = mol
         self.nm_coeff = mol.nm.nm_coeff
         self.Q_loc = self.nm_coeff.copy()
@@ -135,10 +135,20 @@ def get_K_boys(mLO, QLoc = None):
     K1 = np.einsum('kx,kys,kyt->xst', mLO.coords, QLoc, QLoc, optimize = True)
     return np.einsum('xst,xuv->stuv', K1, K1, optimize = True)
 
+def get_dist_matrix_boys(mLO):
+    QNew, C = mLO.RCenter(mLO.U)
+    RC = np.einsum('np,nx->px', C, mLO.coords, optimize = True)
+    M = np.zeros((mLO.nmodes, mLO.nmodes))
+    for i in range(mLO.nmodes):
+        for j in range(mLO.nmodes):
+            M[i, j] = np.linalg.norm(RC[i] - RC[j])
+    return M
+
 class NMBoys(NMOptimizer):
     RCenter = RCenter
     cost_function = cost_function_boys
     get_K = get_K_boys
+    get_dist_matrix = get_dist_matrix_boys
 
 
 if __name__ == '__main__':

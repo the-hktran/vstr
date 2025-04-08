@@ -74,6 +74,7 @@ class Molecule():
         self.Nm = 3 * natoms - 6
         self.LowFrequencyCutoff = None
         self.mass = mass
+        self.atom_label = None
         self.onemode_coeff = []
         self.onemode_eig = []
         self.use_onemode_states = True
@@ -254,6 +255,7 @@ class Molecule():
         if self.ReadInt:
             #self.ReadIntegrals()
             self.ReadIntegralsAsArrays()
+            print("Finished reading integrals", flush = True)
         else:
             for i in range(Order):
                 self.Timer.start(i + 1)
@@ -596,6 +598,7 @@ class Molecule():
                                     self.dip_ints[n][x, i, j, k] = f["dip_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
 
     def ReadIntegralsAsArrays(self, IntsFile = None):
+        print("Reading integrals...", flush = True)
         if IntsFile is None:
             IntsFile = self.IntsFile
         MaxOrder = self.Order
@@ -604,6 +607,7 @@ class Molecule():
 
         with h5py.File(IntsFile, "r") as f:
             for n in range(MaxOrder):
+                print("...of order %d" % (n + 1), flush = True)
                 if n == 0:
                     self.ints[n] = np.empty((self.Nm, self.ngridpts, self.ngridpts), dtype = float)
                     for i in range(self.Nm):
@@ -724,6 +728,21 @@ class Molecule():
                             for j in range(self.Nm):
                                 for k in range(self.Nm):
                                     self.inv_inertia_ints[n][x, i, j, k] = f["inv_inertia_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
+
+    def AnimateNormalModes(self):
+        for i in range(self.Nm):
+            with open(f'NormalMode_{i + 1}.xyz', 'w') as f:
+                displacements = np.linspace(-10,10,20)
+                for displacement in np.concatenate((displacements, displacements[::-1])):
+                    f.write(f'{self.natoms}\n')
+                    f.write(f'Frequency = {self.Frequencies[i]} cm-1 (positions in Angstrom)\n')
+                    q = np.zeros(self.Nm)
+                    q[i] = displacement
+                    geom = self.nm._normal2cart(q)
+                    geom /= A2B
+                    for n in range(self.natoms):
+                        f.write(f'{self.atom_label[n]} {geom[n, 0]} {geom[n, 1]} {geom[n, 2]}\n')
+            f.close()
 
     def ZeroCoupling(self, FreqTol = 1000, NCutoff = 0):
         LowFreqModes = np.where(self.Frequencies < FreqTol)[0]
@@ -912,7 +931,8 @@ class NormalModes():
         self.nm_coeff = None
         self.freqs = None
 
-        self.nmodes = 3*self.mol.natoms - 6
+        #self.nmodes = 3*self.mol.natoms - 6
+        self.nmodes = mol.Nm
 
     def kernel(self, x0=None, doGeomOpt = True, coords = None):
         """
@@ -928,14 +948,27 @@ class NormalModes():
             x0 = np.random.random((natoms,3))
 
         pes = self.mol._potential
+
+        def callback_function(xk, *args):   
+            print(f"Iteration: {callback_function.iteration}, x = {xk}, f(x) = {pes(xk)}", flush = True)
+            callback_function.iteration += 1
+        callback_function.iteration = 0
+
         if doGeomOpt:
             print("Beginning geometry optimization...", flush = True)
-            result = scipy.optimize.minimize(pes, x0.flatten(), tol = 1e-12)
+            result = scipy.optimize.minimize(pes, x0.flatten(), method = 'Nelder-Mead', tol = 1e-8, callback = callback_function)
+            print(result)
+            while(not result.success):
+                print("Optimization failed, trying again...", flush = True)
+                result = scipy.optimize.minimize(pes, result.x, method = 'Nelder-Mead', tol = 1e-8, callback = callback_function)
+                print(result)
             print("...geometry optimization complete.", flush = True)
             self.x0 = result.x.reshape((natoms,3))
         else:
             self.x0 = x0.reshape((natoms,3))
         self.V0 = pes(self.x0.reshape(-1))
+        print("Minimum energy:", self.V0 * constants.AU_TO_INVCM, flush = True)
+        print("Minimum geometry:", self.x0 / constants.ANGSTROM_TO_AU, flush = True)
         try:
             self.mu0 = self.mol._dipole(self.x0)
         except:
@@ -951,7 +984,8 @@ class NormalModes():
         hess0 = self.hessian(self.x0, coords = coords).reshape((natoms*3, natoms*3))
 
         e, v = scipy.linalg.eigh(hess0)
-        e, v = e[6:], v[:,6:] # remove translations and rotations
+        print("All eigs:", e)
+        e, v = e[-self.nmodes:], v[:,-self.nmodes:] # remove translations and rotations
         v = v.reshape((natoms,3,self.nmodes))
         if coords is not None:
             V = np.zeros((self.mol.natoms, 3, self.nmodes))
@@ -1206,6 +1240,7 @@ class NormalModes():
         return pot_vec(*argv)
 
     def potential_nm_torch(self, *argv):
+        import torch
         argv_np = [arg.detach().numpy() for arg in argv]
         potential_nm_vec = np.vectorize(self.potential_nm_i)
         return torch.tensor(potential_nm_vec(*argv_np))
@@ -1245,6 +1280,9 @@ class NormalModes():
         return ci.get_TensorTrain().core
 
     def do_tt(self, gridpts, rank = 10):
+        import tntorch as tn
+        import torch
+
         gridpts_torch = [torch.tensor(grid) for grid in gridpts]
         gridpts_mesh = torch.meshgrid(*gridpts_torch)
         gridpts_mesh_flatten = []

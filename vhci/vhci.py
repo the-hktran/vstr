@@ -30,8 +30,8 @@ def SaveBasisToFile(mVHCI, FileName):
         CHKFile.write('\n')
     CHKFile.close()
 
-    np.save(mVHCI.CHKFile + "_E", mVHCI.E)
-    np.save(mVHCI.CHKFile + "_C", mVHCI.C)
+    np.save(FileName + "_E", mVHCI.E)
+    np.save(FileName + "_C", mVHCI.C)
 
 def MakeAnharmTensor(mVHCI, PotentialList = None):
     if PotentialList is None:
@@ -187,7 +187,7 @@ def Diagonalize(mVHCI):
     mVHCI.Timer.start(0)
     mVHCI.E, mVHCI.C = np.linalg.eigh(H)
     mVHCI.Timer.stop(0)
-    mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
+    mVHCI.E_HCI = mVHCI.E.copy()
 
 def SparseDiagonalize(mVHCI):
     mVHCI.Timer.start(1)
@@ -201,9 +201,9 @@ def SparseDiagonalize(mVHCI):
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
-    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SA')
+    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NEigs, which = 'SA')
     mVHCI.Timer.stop(0)
-    mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
+    mVHCI.E_HCI = mVHCI.E.copy()
 
 def pyCalcDiffModes(B1, B2):
     Diffs = []
@@ -323,9 +323,9 @@ def SparseDiagonalizeNMode(mVHCI):
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
-    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SA')
+    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NEigs, which = 'SA')
     mVHCI.Timer.stop(0)
-    mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
+    mVHCI.E_HCI = mVHCI.E.copy()
 
 def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
     T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
@@ -367,9 +367,9 @@ def SparseDiagonalizeTCI(mVHCI):
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
-    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NStates, which = 'SA')
+    mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NEigs, which = 'SA')
     mVHCI.Timer.stop(0)
-    mVHCI.E_HCI = mVHCI.E[:mVHCI.NStates].copy()
+    mVHCI.E_HCI = mVHCI.E.copy()
 
 def InitTruncatedBasis(mVHCI, MaxQuanta, MaxTotalQuanta = None):
     Basis = []
@@ -545,6 +545,7 @@ class VHCI:
         self.tol = 0.01
         self.MaxIter = 1000
         self.NStates = NStates
+        self.NEigs = NStates
         self.NStatesPT2 = NStates
         self.NWalkers = 200
         self.NSamples = 50
@@ -661,12 +662,13 @@ class NModeVHCI(VHCI):
         self.tol = 0.01
         self.MaxIter = 1000
         self.NStates = NStates
+        self.NEigs = NStates
         self.NStatesPT2 = NStates
         self.NWalkers = 200
         self.NSamples = 50
         self.dE_PT2 = None
         self.sE_PT2 = None
-        self.HBMethod = 'qff' #['qff', '2mode']
+        self.HBMethod = '2mode' #['qff', '2mode']
 
         self.CHKFile = None
         self.ReadFromFile = False
@@ -804,6 +806,7 @@ class TCIVHCI(VHCI):
         self.tol = 0.01
         self.MaxIter = 1000
         self.NStates = NStates
+        self.NEigs = NStates
         self.NStatesPT2 = NStates
         self.NWalkers = 200
         self.NSamples = 50
