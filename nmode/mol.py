@@ -1245,6 +1245,16 @@ class NormalModes():
         potential_nm_vec = np.vectorize(self.potential_nm_i)
         return torch.tensor(potential_nm_vec(*argv_np))
 
+    def dipole_nm(self, q):
+        x = self._normal2cart(q)
+        return self.mol.dipole_cart(x)
+
+    def dipole_nm_i(self, *argv):
+        q = np.zeros(self.nmodes)
+        for i in range(self.nmodes):
+            q[i] = argv[i]
+        return self.dipole_nm(q)
+
     '''
     def get_heg(self, ngridpts = None):
         nmode = NModePotential(self)

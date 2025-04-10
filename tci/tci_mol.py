@@ -179,10 +179,15 @@ class TCIMolecule(Molecule):
         self.gridpts, self.dvr_coeff = gridpts, coeff
         return self.gridpts, self.dvr_coeff
 
-    def do_tci(self, gridpts, maxit = 121, tol = 1e-6, rank_checkpoint = None):
-        def f(x):
-            f.neval += 1
-            return self.nm.potential_nm_i(*x)
+    def do_tci(self, gridpts, maxit = 121, tol = 1e-6, rank_checkpoint = None, dip_component = None):
+        if dip_component is None:
+            def f(x):
+                f.neval += 1
+                return self.nm.potential_nm_i(*x)
+        else:
+            def f(x):
+                f.neval += 1
+                return self.nm.dipole_nm_i(*x)[dip_component]
         f.neval = 0
         ci = xfacpy.CTensorCI1(f, gridpts)
         print("rank neval pivotError")
@@ -207,12 +212,12 @@ class TCIMolecule(Molecule):
 
         return ci.get_TensorTrain().core
 
-    def CalcTT(self, tt_method = 'tci', rank = 121, tci_tol = 1e-6):
+    def CalcTT(self, tt_method = 'tci', rank = 121, tci_tol = 1e-6, dip_component = None):
         gridpts, dvr_coeff = self.get_heg(self.ngridpts)
         self.dvr_coeff = dvr_coeff
         self.Timer.start(1)
         if tt_method.upper() == 'TCI':
-            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = 25)
+            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = 25, dip_component = dip_component)
             print("Tensor Ranks")
             for core in cores:
                 print(core.shape)
@@ -398,7 +403,7 @@ class TCIMolecule(Molecule):
                 print(self.Frequencies)
 
         if not self.ReadTensors:
-            self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol)
+            self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol, dip_component = self.dip_component)
         else:
             self.ReadCoreTensors()
         print(self)
