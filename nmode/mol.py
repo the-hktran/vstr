@@ -1255,7 +1255,7 @@ class NormalModes():
         self.gridpts, self.dvr_coeff = nmode.get_heg(ngridpts)
     '''
 
-    def do_tci(self, gridpts, maxit = 121, tol = 1e-6):
+    def do_tci(self, gridpts, maxit = 121, tol = 1e-6, rank_checkpoint = None):
         # tntorch implementation
         '''
         gridpts_torch = [torch.tensor(grid) for grid in gridpts]
@@ -1272,12 +1272,17 @@ class NormalModes():
         print("rank neval pivotError")
         err = 1
         i = 0
+        cores = []
         while(err > tol and i < maxit):
             i += 1
             ci.iterate()
             err = ci.pivotError[-1]
             print(i, f.neval, ci.pivotError[-1], flush=True)
-        return ci.get_TensorTrain().core
+            if rank_checkpoint is not None:
+                if i % rank_checkpoint == 0:
+                    cores.append(ci.get_TensorTrain().core)
+        cores.append(ci.get_TensorTrain().core)
+        return cores
 
     def do_tt(self, gridpts, rank = 10):
         import tntorch as tn

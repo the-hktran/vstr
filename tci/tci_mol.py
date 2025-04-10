@@ -16,6 +16,7 @@ import h5py
 
 #import tntorch as tn
 #import torch
+import xfacpy
 
 A2B = 1.88973
 AU2CM = 219474.63 
@@ -176,13 +177,42 @@ class TCIMolecule(Molecule):
             coeff.append(u)
 
         self.gridpts, self.dvr_coeff = gridpts, coeff
-        return self.gridpts, self.dvr_coeff 
+        return self.gridpts, self.dvr_coeff
+
+    def do_tci(self, gridpts, maxit = 121, tol = 1e-6, rank_checkpoint = None):
+        def f(x):
+            f.neval += 1
+            return self.nm.potential_nm_i(*x)
+        f.neval = 0
+        ci = xfacpy.CTensorCI1(f, gridpts)
+        print("rank neval pivotError")
+        err = 1
+        i = 0
+        while (err > tol and i < maxit):
+            i += 1
+            ci.iterate()
+            err = ci.pivotError[-1]
+            print(i, f.neval, ci.pivotError[-1], flush = True)
+            
+            if rank_checkpoint is not None:
+                if i % rank_checkpoint == 0:
+                    cores = ci.get_TensorTrain().core
+                    core_tensors = [np.einsum('irj,nr,mr->ijnm', core.detach().numpy(), dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, self.dvr_coeff)]
+                    IntsFile = "core_" + str(i) +".h5"
+                    with h5py.File(IntsFile, "a") as f:
+                        if "core_tensors" in f:
+                            del f["core_tensors"]
+                        for i, core in enumerate(self.core_tensors):
+                            f.create_dataset("core_tensors/%d" % i, data = core_tensors[i])
+
+        return ci.get_TensorTrain().core
 
     def CalcTT(self, tt_method = 'tci', rank = 121, tci_tol = 1e-6):
         gridpts, dvr_coeff = self.get_heg(self.ngridpts)
+        self.dvr_coeff = dvr_coeff
         self.Timer.start(1)
         if tt_method.upper() == 'TCI':
-            cores = self.nm.do_tci(gridpts, maxit = rank, tol = tci_tol)
+            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = 25)
             print("Tensor Ranks")
             for core in cores:
                 print(core.shape)
