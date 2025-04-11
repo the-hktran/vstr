@@ -80,6 +80,7 @@ class TCIMolecule(Molecule):
 
         self.potential_cart = potential_cart
         self.dipole_cart = None
+        self.dip_component = None
         self.natoms = natoms
         self.Nm = 3 * natoms - 6
         self.LowFrequencyCutoff = None
@@ -202,7 +203,7 @@ class TCIMolecule(Molecule):
             if rank_checkpoint is not None:
                 if i % rank_checkpoint == 0:
                     cores = ci.get_TensorTrain().core
-                    core_tensors = [np.einsum('irj,nr,mr->ijnm', core.detach().numpy(), dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, self.dvr_coeff)]
+                    core_tensors = [np.einsum('irj,nr,mr->ijnm', core, dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, self.dvr_coeff)]
                     IntsFile = "core_" + str(i) +".h5"
                     with h5py.File(IntsFile, "a") as f:
                         if "core_tensors" in f:
