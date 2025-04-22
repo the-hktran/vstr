@@ -235,6 +235,10 @@ class TCIMolecule(Molecule):
         self.Timer.stop(2)
         self.cores = cores
 
+    def CoresFromContractedCores(self, core_tensors):
+        gridpts, dvr_coeff = self.get_heg(self.ngridpts)
+        self.cores = [np.einsum('ijnm,nr,mr->irj', core_tensor, dvr_c, dvr_c, optimize=True) for core_tensor, dvr_c in zip(core_tensors, dvr_coeff)]
+
     def ContractTT(self):
         VTT = self.cores[0]
         for i in range(1, len(self.cores)):
@@ -363,7 +367,10 @@ class TCIMolecule(Molecule):
 
         with h5py.File(IntsFile, "r") as f:
             self.core_tensors = [f["core_tensors/%d" % i][()] for i in range(self.Nm)]
-            self.cores = [f["cores/%d" % i][()] for i in range(self.Nm)]
+            if "cores" in f:
+                self.cores = [f["cores/%d" % i][()] for i in range(self.Nm)]
+            else:
+                self.CoresFromContractedCores(self.core_tensors)
 
     def kernel(self, x0 = None):
         self.Timer.start(0)
