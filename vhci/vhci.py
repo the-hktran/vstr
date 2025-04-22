@@ -327,6 +327,13 @@ def SparseDiagonalizeNMode(mVHCI):
     mVHCI.Timer.stop(0)
     mVHCI.E_HCI = mVHCI.E.copy()
 
+    if mVHCI.doPlotStepSpectrum:
+        from vstr.spectra.ir_exact import IRSpectraNMode
+        mir = IRSpectraNMode(mVHCI.mol, mVHCI, DoSpSolve = True)
+        mir.kernel()
+        mir.PlotSpectrum("spectrum_step_%d.png" % (len(mVHCI.Basis)), XMin = mVHCI.XLim[0], XMax = mVHCI.XLim[1], L = 5, NPoints = 201)
+        mir.SaveSpectrum("spectrum_step_%d" % (len(mVHCI.Basis)))
+
 def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
     T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
     N1 = len(Basis1)
@@ -674,6 +681,7 @@ class NModeVHCI(VHCI):
         self.ReadFromFile = False
         self.SaveToFile = False
         self.PrintHCISteps = False
+        self.doPlotStepSpectrum = False
 
         self.__dict__.update(kwargs)
 

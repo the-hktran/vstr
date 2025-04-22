@@ -210,6 +210,10 @@ class TCIMolecule(Molecule):
                             del f["core_tensors"]
                         for i, core in enumerate(self.core_tensors):
                             f.create_dataset("core_tensors/%d" % i, data = core_tensors[i])
+                        if "cores" in f:
+                            del f["cores"]
+                        for i, core in enumerate(self.cores):
+                            f.create_dataset("cores/%d" % i, data = cores[i])
 
         return ci.get_TensorTrain().core
 
