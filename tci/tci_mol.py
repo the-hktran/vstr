@@ -205,15 +205,15 @@ class TCIMolecule(Molecule):
                     cores = ci.get_TensorTrain().core
                     core_tensors = [np.einsum('irj,nr,mr->ijnm', core, dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, self.dvr_coeff)]
                     IntsFile = "core_" + str(i) +".h5"
-                    with h5py.File(IntsFile, "a") as f:
-                        if "core_tensors" in f:
-                            del f["core_tensors"]
-                        for i, core in enumerate(self.core_tensors):
-                            f.create_dataset("core_tensors/%d" % i, data = core_tensors[i])
-                        if "cores" in f:
-                            del f["cores"]
-                        for i, core in enumerate(self.cores):
-                            f.create_dataset("cores/%d" % i, data = cores[i])
+                    with h5py.File(IntsFile, "a") as chkfile:
+                        if "core_tensors" in chkfile:
+                            del chkfile["core_tensors"]
+                        for j, core in enumerate(core_tensors):
+                            chkfile.create_dataset("core_tensors/%d" % j, data = core_tensors[j])
+                        if "cores" in chkfile:
+                            del chkfile["cores"]
+                        for j, core in enumerate(cores):
+                            chkfile.create_dataset("cores/%d" % j, data = cores[j])
 
         return ci.get_TensorTrain().core
 
