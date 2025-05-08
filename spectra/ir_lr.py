@@ -302,6 +302,13 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         mIR.Timer.stop(3)
         mIR.mVCI.Basis += NewBasis
 
+    elif mIR.SpectralHBMethod == 4: # only dipole operator
+        mIR.Timer.start(3)
+        NewBasis, NAdded1 = mIR.SpectralScreenBasis(ints2 = mIR.mol.dip_ints[1][xi], ints2sorted = mIR.Sorted2ModeDip[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
+        mIR.mVCI.Basis += NewBasis
+        NAdded2 = 0
+        mIR.Timer.stop(3)
+
     return NewBasis, NAdded1 + NAdded2
 
 def SpectralHCI(mIR, w, xi):
@@ -318,6 +325,8 @@ def SpectralHCI(mIR, w, xi):
         it += 1
         if it > mIR.mVCI.MaxIter:
             raise RuntimeError("VHCI did not converge")
+        if mIR.doOneShot:
+            break
     print("VHCI for coordinate", CartCoord[xi], "converged for w =", w, "with a total of", len(mIR.mVCI.Basis), "configurations.", flush = True)
     mIR.mVCI.NewBasis = None
     del mIR.mVCI.NewBasis
@@ -355,6 +364,8 @@ def Intensity(mIR, w, state_thr = 1e-6):
             b[xj] = np.asarray(b[xj]).ravel()
             I[xj, xi] = (1.j * np.dot(b[xj], x)).real / np.pi
 
+            # OLD PT2 Method
+            '''
             # Include PT2 corrections
             if mIR.DoPT2:
                 # Only do it for diagonal elements
@@ -362,6 +373,7 @@ def Intensity(mIR, w, state_thr = 1e-6):
                     mIR.Timer.start(5)
                     I[xj, xi] -= mIR.DoSpectralPT2(w, x.reshape(x.shape[0], 1), eta = mIR.eta, eps_pt2 = mIR.eps2).imag / np.pi #DoSpectralPT2(x.reshape(x.shape[0], 1), mIR.mVCI.E, mIR.mVCI.C, mIR.mVCI.Basis, mIR.mVCI.PotentialListFull, mIR.mVCI.PotentialList, mIR.mVCI.Potential[0], mIR.mVCI.Potential[1], mIR.mVCI.Potential[2], mIR.mVCI.Potential[3], mIR.DipoleSurfaceList[xi], mIR.mVCI.Ys, mIR.eps2, 1, w, mIR.eta).real / np.pi
                     mIR.Timer.stop(5)
+            '''
         # Reset VCI object
         mIR.ResetVCI()
     return I
@@ -449,6 +461,7 @@ class LinearResponseIR:
         self.Normalize = False
         self.DoPT2 = False
         self.DoSpSolve = True
+        self.DoOneShot = False
 
         self.__dict__.update(kwargs)
 

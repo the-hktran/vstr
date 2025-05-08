@@ -5224,28 +5224,28 @@ SpMat VCISparseHamNModeFromOMArray(std::vector<WaveFunction> &BasisSet1, std::ve
     SpMat H(BasisSet1.size(), BasisSet2.size());
     std::vector<Trip> HTrip;
 
-    auto Idx2 = [&] (int m, int n, int mi, int ni, int mj, int nj)
+    auto Idx2 = [&] (long unsigned int m, long unsigned int n, long unsigned int mi, long unsigned int ni, long unsigned int mj, long unsigned int nj)
     {
-        int M = Frequencies.size();
-        int N = MaxQ;
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
         return m * N * N * N * N * M + n * N * N * N * N + mi * N * N * N + ni * N * N + mj * N + nj;
     };
-    auto Idx3 = [&] (int m, int n, int o, int mi, int ni, int oi, int mj, int nj, int oj)
+    auto Idx3 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int mj, long unsigned int nj, long unsigned int oj)
     {
-        int M = Frequencies.size();
-        int N = MaxQ;
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
         return m * N * N * N * N * N * N * M * M + n * N * N * N * N * N * N * M + o * N * N * N * N * N * N + mi * N * N * N * N * N + ni * N * N * N * N + oi * N * N * N + mj * N * N + nj * N + oj;
     };
-    auto Idx4 = [&] (int m, int n, int o, int p, int mi, int ni, int oi, int pi, int mj, int nj, int oj, int pj)
+    auto Idx4 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj)
     {
-        int M = Frequencies.size();
-        int N = MaxQ;
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
         return m * N * N * N * N * N * N * N * N * M * M * M + n * N * N * N * N * N * N * N * N * M * M + o * N * N * N * N * N * N * N * N * M + p * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N + ni * N * N * N * N * N * N + oi * N * N * N * N * N + pi * N * N * N * N + mj * N * N * N + nj * N * N + oj * N + pj;
     };
-    auto Idx5 = [&] (int m, int n, int o, int p, int q, int mi, int ni, int oi, int pi, int qi, int mj, int nj, int oj, int pj, int qj)
+    auto Idx5 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int q, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int qi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj, long unsigned int qj)
     {
-        int M = Frequencies.size();
-        int N = MaxQ;
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
         return m * N * N * N * N * N * N * N * N * N * N * M * M * M * M + n * N * N * N * N * N * N * N * N * N * N * M * M * M + o * N * N * N * N * N * N * N * N * N * N * M * M + p * N * N * N * N * N * N * N * N * N * N * M + q * N * N * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N * N * N + ni * N * N * N * N * N * N * N * N + oi * N * N * N * N * N * N * N + pi * N * N * N * N * N * N + qi * N * N * N * N * N + mj * N * N * N * N + nj * N * N * N + oj * N * N + pj * N + qj;
     };
 
