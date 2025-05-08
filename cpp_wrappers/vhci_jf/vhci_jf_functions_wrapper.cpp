@@ -98,6 +98,15 @@ PYBIND11_MODULE(vhci_jf_functions, m)
                 return AddStatesHB2ModeArray(BasisSet1, static_cast<double*>(info2.ptr), static_cast<int*>(info3.ptr), C, eps, ExactSingles, NModes, MaxQ);
             });
     m.def("DoSpectralPT2NMode", DoSpectralPT2NMode, "Runs spectral PT2 corrections for nMode potential");
+    m.def("DownFoldPT2NModeFromOMArray", [](Eigen::MatrixXd C, std::vector<WaveFunction> BasisSet, double V0, std::vector<Eigen::VectorXd> OneModeEig, pybind11::array_t<double> buffer2, pybind11::array_t<double> buffer3, pybind11::array_t<double> buffer4, pybind11::array_t<double> buffer5, pybind11::array_t<int> buffer6, int MaxNMode, int MaxQ, double PT2_Eps, double w)
+        {
+            pybind11::buffer_info info2 = buffer2.request();
+            pybind11::buffer_info info3 = buffer3.request();
+            pybind11::buffer_info info4 = buffer4.request();
+            pybind11::buffer_info info5 = buffer5.request();
+            pybind11::buffer_info info6 = buffer6.request();
+            return DownFoldPT2NModeFromOMArray(C, BasisSet, V0, OneModeEig, static_cast<double*>(info2.ptr), static_cast<double*>(info3.ptr), static_cast<double*>(info4.ptr), static_cast<double*>(info5.ptr), static_cast<int*>(info6.ptr), MaxNMode, MaxQ, PT2_Eps, w);
+        });
     m.def("VCISparseHamDiagonalNModeFromOM", VCISparseHamDiagonalNModeFromOM, "Generates H diagonal elements using n-Mode potential in one mode eigenbasis");
     m.def("VCISparseT", VCISparseT, "Generates kinetic energy in HO basis.");
     //m.def("VCISparseHamTCI", VCISparseHamTCI, "Generates H using TCI potential.");

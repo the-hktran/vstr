@@ -5572,6 +5572,121 @@ std::vector<double> VCISparseHamDiagonalNModeFromOM(std::vector<WaveFunction> &B
 	return HamDiag;
 }
 
+std::vector<double> VCISparseHamDiagonalNModeFromOMArray(std::vector<WaveFunction> &BasisSet1, std::vector<double> &Frequencies, double V0, std::vector<Eigen::VectorXd> &OneModeEig, double TwoModePotential[], double ThreeModePotential[], double FourModePotential[], double FiveModePotential[], int MaxNMode, int MaxQ)
+{
+    std::vector<double> HamDiag(BasisSet1.size());
+    auto Idx2 = [&] (long unsigned int m, long unsigned int n, long unsigned int mi, long unsigned int ni, long unsigned int mj, long unsigned int nj)
+    {
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
+        return m * N * N * N * N * M + n * N * N * N * N + mi * N * N * N + ni * N * N + mj * N + nj;
+    };
+    auto Idx3 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int mj, long unsigned int nj, long unsigned int oj)
+    {
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
+        return m * N * N * N * N * N * N * M * M + n * N * N * N * N * N * N * M + o * N * N * N * N * N * N + mi * N * N * N * N * N + ni * N * N * N * N + oi * N * N * N + mj * N * N + nj * N + oj;
+    };
+    auto Idx4 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj)
+    {
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
+        return m * N * N * N * N * N * N * N * N * M * M * M + n * N * N * N * N * N * N * N * N * M * M + o * N * N * N * N * N * N * N * N * M + p * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N + ni * N * N * N * N * N * N + oi * N * N * N * N * N + pi * N * N * N * N + mj * N * N * N + nj * N * N + oj * N + pj;
+    };
+    auto Idx5 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int q, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int qi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj, long unsigned int qj)
+    {
+        long unsigned int M = (unsigned long int) Frequencies.size();
+        long unsigned int N = (unsigned long int) MaxQ;
+        return m * N * N * N * N * N * N * N * N * N * N * M * M * M * M + n * N * N * N * N * N * N * N * N * N * N * M * M * M + o * N * N * N * N * N * N * N * N * N * N * M * M + p * N * N * N * N * N * N * N * N * N * N * M + q * N * N * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N * N * N + ni * N * N * N * N * N * N * N * N + oi * N * N * N * N * N * N * N + pi * N * N * N * N * N * N + qi * N * N * N * N * N + mj * N * N * N * N + nj * N * N * N + oj * N * N + pj * N + qj;
+    };
+
+    #pragma omp parallel for
+    for (long unsigned int i = 0; i < BasisSet1.size(); i++)
+    {
+        std::vector<long unsigned int> ModeOccI;
+        for (long unsigned int m = 0; m < BasisSet1[i].Modes.size(); m++) ModeOccI.push_back(BasisSet1[i].Modes[m].Quanta);
+
+        double Vij = 0;
+        std::vector<long unsigned int> ModeOccJ = ModeOccI;
+
+        Vij += V0;
+        if (MaxNMode >= 1)
+        {
+            for (long unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                Vij += OneModeEig[m][ModeOccI[m]];
+            }
+        }
+        if (MaxNMode >= 2)
+        {
+            for (long unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                for (long unsigned int n = m + 1; n < Frequencies.size(); n++)
+                {
+                    long unsigned int idx = Idx2(m, n, ModeOccI[m], ModeOccI[n], ModeOccJ[m], ModeOccJ[n]);
+                    Vij += TwoModePotential[idx];
+                }
+            }
+        }
+        if (MaxNMode >= 3)
+        {
+            for (long unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                for (long unsigned int n = m + 1; n < Frequencies.size(); n++)
+                {
+                    for (long unsigned int o = n + 1; o < Frequencies.size(); o++)
+                    {
+                        long unsigned int idx = Idx3(m, n, o, ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o]);
+                        Vij += ThreeModePotential[idx];
+                    }
+                }
+            }
+        }
+        if (MaxNMode >= 4)
+        {
+            for (long unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                for (long unsigned int n = m + 1; n < Frequencies.size(); n++)
+                {
+                    for (long unsigned int o = n + 1; o < Frequencies.size(); o++)
+                    {
+                        for (long unsigned int p = o + 1; p < Frequencies.size(); p++)
+                        {
+                            long unsigned int idx = Idx4(m, n, o, p, ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccI[p], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o], ModeOccJ[p]);
+                            Vij += FourModePotential[idx];
+                        }
+                    }
+                }
+            }
+        }
+        if (MaxNMode >= 5)
+        {
+            for (long unsigned int m = 0; m < Frequencies.size(); m++)
+            {
+                for (long unsigned int n = m + 1; n < Frequencies.size(); n++)
+                {
+                    for (long unsigned int o = n + 1; o < Frequencies.size(); o++)
+                    {
+                        for (long unsigned int p = o + 1; p < Frequencies.size(); p++)
+                        {
+                            for (long unsigned int q = p + 1; q < Frequencies.size(); q++)
+                            {
+                                long unsigned int idx = Idx5(m, n, o, p, q, ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccI[p], ModeOccI[q], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o], ModeOccJ[p], ModeOccJ[q]);
+                                Vij += FiveModePotential[idx];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #pragma omp critical
+        HamDiag[i] = Vij;
+    }
+    return HamDiag;
+}
+
+
+
 double VCISparseHamNModeElement(WaveFunction &BasisSet1, WaveFunction &BasisSet2, std::vector<double> &Frequencies, double V0, std::vector<std::vector<std::vector<double>>> &OneModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>> &TwoModePotential, std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>>>>> &ThreeModePotential)
 {
     int MaxNMode = 3;
@@ -6390,6 +6505,52 @@ complex<double> DoSpectralPT2NMode(MatrixXcd& Evecs, VectorXd& Evals, MatrixXd& 
         }
     }
     return DeltaE[0];    
+}
+
+// This generates H_VP (w - HPdiag)^{-1} H_VP^T
+SpMat DownFoldPT2NModeFromOMArray(VectorXd C, std::vector<WaveFunction> &BasisSet, double V0, std::vector<Eigen::VectorXd> &OneModeEig, double TwoModePotential[], double ThreeModePotential[], double FourModePotential[], double FiveModePotential[], int SortedIndices[], int MaxNMode, int MaxQ, double PT2_Eps, double w)
+{
+    SpMat dH(BasisSet.size(), BasisSet.size());
+    std::vector<Trip> HTrip;
+
+    std::vector<WaveFunction> PTBasisSet = AddStatesHB2ModeArray(BasisSet, TwoModePotential, SortedIndices, C, PT2_Eps, true, BasisSet[0].Modes.size(), MaxQ);
+    std::cout << " Perturbative space contains " << PTBasisSet.size() << " basis states." << std::endl;
+
+    std::vector<double> Frequencies;
+    for (unsigned int i = 0; i < BasisSet[0].Modes.size(); i++) Frequencies.push_back(1.0);
+
+    std::vector<double> Ea = VCISparseHamDiagonalNModeFromOMArray(PTBasisSet, Frequencies, V0, OneModeEig, TwoModePotential, ThreeModePotential, FourModePotential, FiveModePotential, MaxNMode, MaxQ);
+   
+    double thr = 1e-4;
+    for (unsigned int i = 0; i < BasisSet.size(); i++)
+    {
+        double dHij = 0;
+        for (unsigned int j = i; j < BasisSet.size(); j++)
+        {
+            for (unsigned int a = 0; a < PTBasisSet.size(); a++)
+            {
+                double Hia = VCISparseHamNModeElementFromOMArray(BasisSet[i], PTBasisSet[a], Frequencies, V0, OneModeEig, TwoModePotential, ThreeModePotential, FourModePotential, FiveModePotential, MaxQ);
+                double Haj = VCISparseHamNModeElementFromOMArray(BasisSet[j], PTBasisSet[a], Frequencies, V0, OneModeEig, TwoModePotential, ThreeModePotential, FourModePotential, FiveModePotential, MaxQ);
+                dHij += Hia * Haj / (w - Ea[a]);
+            }
+            if (abs(dHij) > thr)
+            {
+                if (i == j) HTrip.push_back(Trip(i, j, dHij / 2));
+                else HTrip.push_back(Trip(i, j, dHij));
+            }
+        }
+    }
+    
+    dH.setFromTriplets(HTrip.begin(), HTrip.end());
+    dH.makeCompressed();
+    HTrip = std::vector<Trip>(); // Free memory
+    SpMat dHT = dH.transpose();
+    dHT.makeCompressed();
+    dH += dHT; // Complete symmetric matrix
+    dHT = SpMat(1,1); // Free memory
+    dH.makeCompressed();
+
+    return dH;
 }
 
 

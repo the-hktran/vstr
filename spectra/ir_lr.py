@@ -1,5 +1,5 @@
 import numpy as np
-from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, GenerateSparseHamVOD, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, VCISparseHamNMode, VCISparseHamNModeArray, VCISparseHamNModeFromOM, VCISparseHamDiagonalNModeFromOM, VCISparseHamNModeFromOMArray
+from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc, GenerateHamV, GenerateSparseHamV, GenerateSparseHamAnharmV, GenerateSparseHamVOD, VCISparseHamFromVSCF, HeatBath_Sort_FC, SpectralFrequencyPrune, SpectralFrequencyPruneFromVSCF, VCISparseHamNMode, VCISparseHamNModeArray, VCISparseHamNModeFromOM, VCISparseHamDiagonalNModeFromOM, VCISparseHamNModeFromOMArray, DownFoldPT2NModeFromOMArray
 from vstr.utils.perf_utils import TIMER
 from vstr.spectra.dipole import GetDipoleSurface, MakeDipoleList
 from vstr.utils.linalg_utils import gmres_counter
@@ -104,10 +104,15 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
         H = mIR.mVCI.H
         C = mIR.mVCI.C
         E = mIR.mVCI.E
+        Basis = mIR.mVCI.Basis
     else:
         #H = VCISparseHamNModeFromOM(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mVCI.mol.ints[1].tolist(), mIR.mVCI.mol.ints[2].tolist(), True)
         H = VCISparseHamNModeFromOMArray(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mol.ints[1], mIR.mol.ints[2], mIR.mol.ints[3], mIR.mol.ints[4], True, mIR.mol.Order, mIR.K)
         E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SA')
+       
+    if mIR.DoPT2:
+        dH = DownFoldPT2NModeFromOMArray(C[:, 0], Basis, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mol.ints[1], mIR.mol.ints[2], mIR.mol.ints[3], mIR.mol.ints[4], mIR.mVCI.Sorted2Mode, mIR.mol.Order, mIR.K, mIR.eps2, w)
+        H += dH
 
     #A = np.eye(H.shape[0]) * (w + mIR.mVCI.E[0]) - H + np.eye(H.shape[0]) * mIR.eta * 1.j
     HDiag = H.diagonal()
@@ -551,7 +556,9 @@ class LinearResponseIRNMode(LinearResponseIR):
         self.NPoints = NPoints
         self.eta = eta
         self.Normalize = False
+        self.doOneShot = False
         self.DoPT2 = False
+        self.pt2_eps = self.eps2/ 100
         self.DoSpSolve = DoSpSolve
 
         self.__dict__.update(kwargs)
