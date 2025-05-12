@@ -73,7 +73,7 @@ def GetTransitionDipoleMatrixFromVSCF(mIR, xi = None, IncludeZeroth = False):
         mIR.D[xi] = Dx
     mIR.Timer.stop(0)
 
-def GetAb(mIR, w, Basis = None, xi = None):
+def GetAb(mIR, w, Basis = None, xi = None, DoPT2 = False):
     mIR.Timer.start(1)
     if Basis is None:
         H = mIR.mVCI.H
@@ -98,7 +98,7 @@ def GetAb(mIR, w, Basis = None, xi = None):
     mIR.Timer.stop(1)
     return A, b
 
-def GetAbNMode(mIR, w, Basis = None, xi = None):
+def GetAbNMode(mIR, w, Basis = None, xi = None, DoPT2 = False):
     mIR.Timer.start(1)
     if Basis is None:
         H = mIR.mVCI.H
@@ -110,7 +110,7 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
         H = VCISparseHamNModeFromOMArray(Basis, Basis, mIR.mVCI.Frequencies, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mol.ints[1], mIR.mol.ints[2], mIR.mol.ints[3], mIR.mol.ints[4], True, mIR.mol.Order, mIR.K)
         E, C = sparse.linalg.eigsh(H, k = mIR.mVCI.NStates, which = 'SA')
        
-    if mIR.DoPT2:
+    if DoPT2:
         dH = DownFoldPT2NModeFromOMArray(C[:, 0], Basis, mIR.mVCI.mol.V0, mIR.mVCI.mol.onemode_eig, mIR.mol.ints[1], mIR.mol.ints[2], mIR.mol.ints[3], mIR.mol.ints[4], mIR.mVCI.Sorted2Mode, mIR.mol.Order, mIR.K, mIR.eps2, w)
         H += dH
 
@@ -131,7 +131,7 @@ def GetAbNMode(mIR, w, Basis = None, xi = None):
     return A, b
 
 
-def GetAbFromVSCF(mIR, w, Basis = None, xi = None):
+def GetAbFromVSCF(mIR, w, Basis = None, xi = None, DoPT2 = False):
     mIR.Timer.start(1)
     if Basis is None:
         H = mIR.mVCI.H
@@ -234,7 +234,7 @@ def SpectralScreenBasis(mIR, Ws = None, ints2 = None, ints2sorted = None, C = No
 
     return mIR.mVCI.ScreenBasis(Ws = Ws, ints2 = ints2, ints2sorted = ints2sorted, C = C, eps = eps)
 
-def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
+def SpectralHCIStep(mIR, w, xi, eps = 0.01, eps0 = None, InitState = 0):
     if mIR.SpectralHBMethod == 1: # means perturbing the ground state
         # HB using dipole operator first
         mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(Ws = mIR.DipoleSurfaceList[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
@@ -285,12 +285,7 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         mIR.mVCI.Basis += NewBasis
 
     elif mIR.SpectralHBMethod == 3: # means perturbing x and dipole operator
-        # HB using dipole operator first
-        mIR.mVCI.NewBasis, NAdded1 = mIR.SpectralScreenBasis(ints2 = mIR.mol.dip_ints[1][xi], ints2sorted = mIR.Sorted2ModeDip[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
-        mIR.mVCI.Basis += mIR.mVCI.NewBasis
-        mIR.mVCI.SparseDiagonalize()
-        mIR.mVCI.NewBasis = None
-        del mIR.mVCI.NewBasis
+        NAdded1 = 0
 
         # HB using H and x
         mIR.GetTransitionDipoleMatrix(xi = xi)
@@ -304,15 +299,12 @@ def SpectralHCIStep(mIR, w, xi, eps = 0.01, InitState = 0):
         mIR.Timer.stop(2)
         mIR.Timer.start(3)
         NewBasis, NAdded2 = mIR.SpectralScreenBasis(Ws = mIR.mVCI.PotentialListFull, C = abs(x.imag), eps = eps, InitState = InitState)
+        print("-- Condition 1:", NAdded2)
         mIR.Timer.stop(3)
         mIR.mVCI.Basis += NewBasis
 
     elif mIR.SpectralHBMethod == 4: # only dipole operator
-        mIR.Timer.start(3)
-        NewBasis, NAdded1 = mIR.SpectralScreenBasis(ints2 = mIR.mol.dip_ints[1][xi], ints2sorted = mIR.Sorted2ModeDip[xi], C = abs(mIR.mVCI.C[:, InitState]), eps = eps, InitState = InitState)
-        mIR.mVCI.Basis += NewBasis
         NAdded2 = 0
-        mIR.Timer.stop(3)
 
     return NewBasis, NAdded1 + NAdded2
 
@@ -322,7 +314,7 @@ def SpectralHCI(mIR, w, xi):
     NAdded = len(mIR.mVCI.Basis)
     it = 1
     while (float(NAdded) / float(len(mIR.mVCI.Basis))) > mIR.mVCI.tol:
-        mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, xi = xi, eps = mIR.eps1)
+        mIR.mVCI.NewBasis, NAdded = mIR.SpectralHCIStep(w, xi = xi, eps = mIR.eps1, eps0 = mIR.eps0)
         #print("VHCI Iteration", it, "for w =", w, "complete with", NAdded, "new configurations and a total of", len(mIR.mVCI.Basis), flush = True)
         mIR.Timer.start(4)
         mIR.mVCI.SparseDiagonalize()
@@ -353,10 +345,17 @@ def Intensity(mIR, w, state_thr = 1e-6):
     I = np.zeros((3,3))
     # Should define new basis with HCI and then solve VHCI here, be sure to update mVCI object 
     for xi in range(3):
+
+        if mIR.SpectralHBMethod == 3 or mIR.SpectralHBMethod == 4:
+            mIR.mVCI.Basis = mIR.Basis0x[xi].copy()
+            mIR.mVCI.H = mIR.H0x[xi].copy()
+            mIR.mVCI.C = mIR.C0x[xi].copy()
+            mIR.mVCI.E = mIR.E0x[xi].copy()
+
         mIR.SpectralHCI(w, xi = xi)
         mIR.GetTransitionDipoleMatrix(IncludeZeroth = False)
         # Solve for intensity using updated VCI object
-        A, b = mIR.GetAb(w)
+        A, b = mIR.GetAb(w, DoPT2 = mIR.DoPT2)
         mIR.Timer.start(2)
         if mIR.DoSpSolve:
             x = SpSolveAxb(A, b[xi], tol = 1e-5, log = False)
@@ -452,6 +451,7 @@ class LinearResponseIR:
         self.C0 = mVCI.C.copy()
         self.E0 = mVCI.E.copy()
         self.Frequencies = mVCI.Frequencies
+        self.eps0 = None 
         self.eps1 = mVCI.eps1 / 100
         self.eps2 = self.eps1 / 100
         self.NormalModes = NormalModes
@@ -548,6 +548,7 @@ class LinearResponseIRNMode(LinearResponseIR):
         self.C0 = mVCI.C.copy()
         self.E0 = mVCI.E.copy()
         self.Frequencies = mVCI.Frequencies
+        self.eps0 = None 
         self.eps1 = mVCI.eps1 / 100
         self.eps2 = self.eps1 / 100
         self.NormalModes = NormalModes
@@ -562,6 +563,9 @@ class LinearResponseIRNMode(LinearResponseIR):
         self.DoSpSolve = DoSpSolve
 
         self.__dict__.update(kwargs)
+
+        if self.eps0 is None:
+            self.eps0 = self.eps1
         
         self.Timer = TIMER(6)
         self.TimerNames = ["Dipole Hamiltonian", "A and b Generation", "Axb Solve", "Screen Basis", "Diagonalization", "PT2"]
@@ -619,6 +623,30 @@ class LinearResponseIRNMode(LinearResponseIR):
 
         self.GetTransitionDipoleMatrix(IncludeZeroth = False)
         self.DipoleSurfaceList = []
+
+        if self.SpectralHBMethod == 3 or self.SpectralHBMethod == 4:
+            coords = ['x', 'y', 'z']
+            self.Basis0x = []
+            self.H0x = []
+            self.C0x = []
+            self.E0x = []
+            for xi in range(3):
+                self.Timer.start(3)
+                self.mVCI.NewBasis, NAdded1 = self.SpectralScreenBasis(ints2 = self.mol.dip_ints[1][xi], ints2sorted = self.Sorted2ModeDip[xi], C = abs(self.mVCI.C[:, self.InitState]), eps = self.eps0, InitState = self.InitState)
+                print("-- Condition 0 for", coords[xi],":", NAdded1)
+                self.mVCI.Basis += self.mVCI.NewBasis
+                self.Timer.stop(3)
+                self.Timer.start(4)
+                self.mVCI.SparseDiagonalize()
+                self.mVCI.NewBasis = None
+                del self.mVCI.NewBasis
+                self.Timer.stop(4)
+
+                self.Basis0x.append(self.mVCI.Basis.copy())
+                self.H0x.append(self.mVCI.H.copy())
+                self.C0x.append(self.mVCI.C.copy())
+                self.E0x.append(self.mVCI.E.copy())
+                self.ResetVCI() 
 
         self.ws = np.linspace(self.FreqRange[0], self.FreqRange[1], num = self.NPoints)
         self.ITensors = []
