@@ -43,7 +43,7 @@ class NMOptimizer():
                 self.update_Q(uj, j)
                 self.update_U(uj, j)
                 K = self.get_K(self.Q_loc)
-                print("Iteration: %d, Mode: %d, Cost: %f" % (i, j, cost_new))
+                print("Iteration: %d, Mode: %d, Cost: %f" % (i, j, cost_new), flush = True)
                 #if abs(cost_new - cost_old) < self.tol:
                 #    return self.Q_loc
                 #cost_old = cost_new

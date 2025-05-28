@@ -65,6 +65,109 @@ def traveling_salesman_brute_force(distance_matrix):
 
     return shortest_path[:-1], min_distance
 
+def traveling_salesman_dynamic_programming(distance_matrix):
+    """
+    Solves the Traveling Salesman Problem (TSP) using dynamic programming.
+
+    Args:
+        distance_matrix: A 2D list representing the distances between cities.
+                       distance_matrix[i][j] is the distance from city i to city j.
+
+    Returns:
+        A tuple containing:
+            - The shortest path (a list of city indices).
+            - The total distance of the shortest path.
+            Returns None if the input is invalid (e.g., non-square matrix).
+    """
+
+    num_cities = len(distance_matrix)
+
+    # Input validation: Check if it's a square matrix
+    if any(len(row) != num_cities for row in distance_matrix):
+        return None  # Or raise an exception: raise ValueError("Distance matrix must be square.")
+
+    if num_cities <= 1: # trivial cases
+      return [0], 0 if num_cities==1 else float('inf')
+
+    # Initialize memoization table
+    memo = {}
+    for i in range(num_cities):
+        memo[(1 << i, i)] = (distance_matrix[0][i], [0, i])
+
+    def tsp(mask, pos):
+        if mask == (1 << num_cities) - 1:
+            return distance_matrix[pos][0], [pos]
+
+        if (mask, pos) in memo:
+            return memo[(mask, pos)]
+
+        min_distance = float('inf')
+        best_path = []
+
+        for city in range(num_cities):
+            if mask & (1 << city) == 0:
+                new_mask = mask | (1 << city)
+                distance, path = tsp(new_mask, city)
+                distance += distance_matrix[pos][city]
+
+                if distance < min_distance:
+                    min_distance = distance
+                    best_path = path
+
+        memo[(mask, pos)] = (min_distance, [pos] + best_path)
+        return min_distance, memo[(mask, pos)][1]
+
+    min_distance, path = tsp(1, 0)
+    return path[:-1], min_distance
+
+def traveling_salesman_nearest_neighbor(distance_matrix):
+    """
+    Solves the Traveling Salesman Problem (TSP) using the nearest neighbor heuristic.
+
+    Args:
+        distance_matrix: A 2D list representing the distances between cities.
+                       distance_matrix[i][j] is the distance from city i to city j.
+
+    Returns:
+        A tuple containing:
+            - The shortest path (a list of city indices).
+            - The total distance of the shortest path.
+            Returns None if the input is invalid (e.g., non-square matrix).
+    """
+
+    num_cities = len(distance_matrix)
+
+    # Input validation: Check if it's a square matrix
+    if any(len(row) != num_cities for row in distance_matrix):
+        return None  # Or raise an exception: raise ValueError("Distance matrix must be square.")
+
+    if num_cities <= 1: # trivial cases
+      return [0], 0 if num_cities==1 else float('inf')
+
+    visited = [False] * num_cities
+    path = [0]
+    visited[0] = True
+    total_distance = 0
+
+    for _ in range(num_cities - 1):
+        last_city = path[-1]
+        nearest_city = None
+        min_distance = float('inf')
+
+        for city in range(num_cities):
+            if not visited[city] and distance_matrix[last_city][city] < min_distance:
+                min_distance = distance_matrix[last_city][city]
+                nearest_city = city
+
+        path.append(nearest_city)
+        visited[nearest_city] = True
+        total_distance += min_distance
+
+    total_distance += distance_matrix[path[-1]][0]  # Return to starting city
+    path.append(0)
+
+    return path[:-1], total_distance
+
 def fiedler_vector(I):
     D = np.diag(np.sum(I, axis=0))
     L = D - I
@@ -254,6 +357,30 @@ class TCIMolecule(Molecule):
         #del gridpts_mesh
         #return self.nm.potential_nm_torch(*gridpts_mesh_torch).reshape([self.ngridpts]*self.nm.nmodes).detach().numpy()
 
+    def PlotPotentialParity(self, npoints = 1000):
+        true_pot = []
+        tci_pot = []
+        for it in range(npoints):
+            q = np.zeros(self.nm.nmodes)
+            n = np.zeros(self.nm.nmodes, dtype=int)
+            for i in range(self.nm.nmodes):
+                n[i] = np.random.randint(low = 0, high = self.ngridpts)
+                q[i] = self.gridpts[i][n[i]]
+            true_pot.append(self.nm.potential_nm(q))
+            G = self.cores[0][:, n[0], :]
+            for i in range(1, len(self.cores)):
+                G = G @ self.cores[i][:, n[i], :]
+            tci_pot.append(G[0, 0])
+        true_pot = np.array(true_pot)
+        tci_pot = np.array(tci_pot)
+        import matplotlib.pyplot as plt
+        plt.scatter(true_pot, tci_pot, s=1)
+        plt.xlabel('True Potential')
+        plt.ylabel('TCI Potential')
+        plt.title('TCI vs True Potential')
+        plt.plot([np.min(true_pot), np.max(true_pot)], [np.min(true_pot), np.max(true_pot)], color='red', linestyle='--')
+        plt.savefig('potential_parity.png')
+
     def PlotPotential1D(self, i):
         import matplotlib.pyplot as plt
         gridpts, dvr_coeff = self.get_heg(self.ngridpts)
@@ -330,6 +457,27 @@ class TCIMolecule(Molecule):
 
         print("squared error: ", np.sum(dV**2))
 
+    def SaveGeometry(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+
+        with h5py.File(IntsFile, "a") as f:
+            if "x0" in f:
+                del f["x0"]
+            f.create_dataset("x0", data = self.nm.x0)
+            if "V0" in f:
+                del f["V0"]
+            f.create_dataset("V0", data = self.nm.V0)
+            if "mu0" in f:
+                del f["mu0"]
+            f.create_dataset("mu0", data = self.nm.mu0)
+            if "nm_coeff" in f:
+                del f["nm_coeff"]
+            f.create_dataset("nm_coeff", data = self.nm.nm_coeff)
+            if "freq" in f:
+                del f["freq"]
+            f.create_dataset("freq", data = self.Frequencies)
+
     def SaveCoreTensors(self, IntsFile = None):
         if IntsFile is None:
             IntsFile = self.IntsFile
@@ -377,42 +525,46 @@ class TCIMolecule(Molecule):
         self.CalcNM(x0 = x0)
         self.Timer.stop(0)
 
-        if self.loc_method is not None:
-            mlo = NMBoys(self)
-            mol_lo = mlo.kernel()
-            self.nm.freqs = mol_lo.Frequencies / constants.AU_TO_INVCM
-            self.nm.Frequencies = mol_lo.Frequencies
-            self.Frequencies = mol_lo.Frequencies
-            self.nm.nm_coeff = mlo.Q_loc
+        if not self.ReadGeom:
+            if self.loc_method is not None:
+                mlo = NMBoys(self)
+                mol_lo = mlo.kernel()
+                self.nm.freqs = mol_lo.Frequencies / constants.AU_TO_INVCM
+                self.nm.Frequencies = mol_lo.Frequencies
+                self.Frequencies = mol_lo.Frequencies
+                self.nm.nm_coeff = mlo.Q_loc
 
-        if self.order_method is not None:
-            if self.order_method.upper() == 'DIST':
-                self.distance_matrix = mlo.get_dist_matrix()
-                path, path_length = traveling_salesman_brute_force(self.distance_matrix)
-                self.nm.freqs = self.nm.freqs[path]
-                self.nm.nm_coeff = self.nm.nm_coeff[:, :, path]
-                self.nm.Frequencies = self.nm.Frequencies[path]
-                self.Frequencies = self.Frequencies[path]
-                print(path)
-                print(self.Frequencies)
+            if self.order_method is not None:
+                if self.order_method.upper() == 'DIST':
+                    self.distance_matrix = mlo.get_dist_matrix()
+                    path, path_length = traveling_salesman_brute_force(self.distance_matrix)
+                    #path, path_length = traveling_salesman_nearest_neighbor(self.distance_matrix)
+                    self.nm.freqs = self.nm.freqs[path]
+                    self.nm.nm_coeff = self.nm.nm_coeff[:, :, path]
+                    self.nm.Frequencies = self.nm.Frequencies[path]
+                    self.Frequencies = self.Frequencies[path]
+                    print(path)
+                    print(self.Frequencies)
 
-            elif self.order_method.upper() == 'COORD_ENTROPY':
-                self.distance_matrix = np.zeros((self.nm.freqs.shape[0], self.nm.freqs.shape[0]))
-                gridpts, coeff = self.get_heg(self.ngridpts)
-                for i in range(self.nm.freqs.shape[0]):
-                    for j in range(i+1, self.nm.freqs.shape[0]):
-                        vgrid = np.array([[self.nm.potential_2mode(i, j, qi, qj) for qj in gridpts[j]] for qi in gridpts[i]])
-                        u, s, vh = np.linalg.svd(vgrid)
-                        self.distance_matrix[i, j] = -np.sum(s * np.log(s))
-                        self.distance_matrix[j, i] = self.distance_matrix[i, j]
-                x = fiedler_vector(self.distance_matrix)
-                path = np.argsort(x)
-                self.nm.freqs = self.nm.freqs[path]
-                self.nm.nm_coeff = self.nm.nm_coeff[:, :, path]
-                self.nm.Frequencies = self.nm.Frequencies[path]
-                self.Frequencies = self.Frequencies[path]
-                print(path)
-                print(self.Frequencies)
+                elif self.order_method.upper() == 'COORD_ENTROPY':
+                    self.distance_matrix = np.zeros((self.nm.freqs.shape[0], self.nm.freqs.shape[0]))
+                    gridpts, coeff = self.get_heg(self.ngridpts)
+                    for i in range(self.nm.freqs.shape[0]):
+                        for j in range(i+1, self.nm.freqs.shape[0]):
+                            vgrid = np.array([[self.nm.potential_2mode(i, j, qi, qj) for qj in gridpts[j]] for qi in gridpts[i]])
+                            u, s, vh = np.linalg.svd(vgrid)
+                            self.distance_matrix[i, j] = -np.sum(s * np.log(s))
+                            self.distance_matrix[j, i] = self.distance_matrix[i, j]
+                    x = fiedler_vector(self.distance_matrix)
+                    path = np.argsort(x)
+                    self.nm.freqs = self.nm.freqs[path]
+                    self.nm.nm_coeff = self.nm.nm_coeff[:, :, path]
+                    self.nm.Frequencies = self.nm.Frequencies[path]
+                    self.Frequencies = self.Frequencies[path]
+                    print(path)
+                    print(self.Frequencies)
+
+            self.SaveGeometry()
 
         if not self.ReadTensors:
             self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol, dip_component = self.dip_component)
