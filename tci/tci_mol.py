@@ -357,29 +357,36 @@ class TCIMolecule(Molecule):
         #del gridpts_mesh
         #return self.nm.potential_nm_torch(*gridpts_mesh_torch).reshape([self.ngridpts]*self.nm.nmodes).detach().numpy()
 
-    def PlotPotentialParity(self, npoints = 1000):
+    def PlotPotentialParity(self, npoints = 1000, lim = None):
         true_pot = []
         tci_pot = []
+        gridpts, dvr_coeff = self.get_heg(self.ngridpts)
         for it in range(npoints):
             q = np.zeros(self.nm.nmodes)
             n = np.zeros(self.nm.nmodes, dtype=int)
             for i in range(self.nm.nmodes):
                 n[i] = np.random.randint(low = 0, high = self.ngridpts)
-                q[i] = self.gridpts[i][n[i]]
+                q[i] = gridpts[i][n[i]]
             true_pot.append(self.nm.potential_nm(q))
             G = self.cores[0][:, n[0], :]
             for i in range(1, len(self.cores)):
                 G = G @ self.cores[i][:, n[i], :]
             tci_pot.append(G[0, 0])
-        true_pot = np.array(true_pot)
-        tci_pot = np.array(tci_pot)
+        true_pot = np.array(true_pot) * constants.AU_TO_INVCM
+        tci_pot = np.array(tci_pot) * constants.AU_TO_INVCM
         import matplotlib.pyplot as plt
         plt.scatter(true_pot, tci_pot, s=1)
-        plt.xlabel('True Potential')
-        plt.ylabel('TCI Potential')
+        plt.xlabel('True Potential (cm-1)')
+        plt.ylabel('TCI Potential (cm-1)')
         plt.title('TCI vs True Potential')
         plt.plot([np.min(true_pot), np.max(true_pot)], [np.min(true_pot), np.max(true_pot)], color='red', linestyle='--')
+        if lim is not None:
+            v0 = np.min(true_pot)
+            plt.xlim(v0+lim[0], v0+lim[1])
+            plt.ylim(v0+lim[0], v0+lim[1])
         plt.savefig('potential_parity.png')
+        np.save("tci_pot", tci_pot)
+        np.save("true_pot", true_pot)
 
     def PlotPotential1D(self, i):
         import matplotlib.pyplot as plt
