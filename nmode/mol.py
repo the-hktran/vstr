@@ -92,6 +92,7 @@ class Molecule():
         self.doGeomOpt = True
         self.doShiftPotential = True
         self.doSaveIntsOTF = False
+        self.doTCIResidual = False
 
         self.NonFrzCoords = None
 
@@ -275,6 +276,18 @@ class Molecule():
                     if i == 2:
                         self.Divergent3Modes = self.FindDivergent3Modes()
                     self.ints[i] = self.nmode.get_ints(OrderPlus, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff, modes = self.Divergent3Modes)
+            if self.doTCIResidual:
+                from vstr.tci.tci_mol import TCIMolecule
+                def residual_pot(x):
+                    return self.potential_cart(x) - self._nmode_potential(x)
+                self.tci_mol = TCIMolecule(residual_pot, self.natoms, self.mass, ngridpts = self.ngridpts, tci_tol = 1e-6)
+                self.tci_mol.rank = 500
+                self.tci_mol.nm = self.nm
+                self.tci_mol.Frequencies = self.Frequencies
+                self.tci_mol.x0 = self.x0
+                self.tci_mol.CalcTT(rank = self.tci_mol.rank, tci_tol = self.tci_mol.tci_tol)
+                
+                
     
     def CalcNModeDipole(self, Order = None):
         if Order is None:
@@ -427,6 +440,16 @@ class Molecule():
             if "freq" in f:
                 del f["freq"]
             f.create_dataset("freq", data = self.Frequencies)
+            
+            if self.doTCIResidual:
+                if "core_tensors" in f:
+                    del f["core_tensors"]
+                for i, core in enumerate(self.tci_mol.core_tensors):
+                    f.create_dataset("core_tensors/%d" % i, data = core)
+                if "cores" in f:
+                    del f["cores"]
+                for i, core in enumerate(self.tci_mol.cores):
+                    f.create_dataset("cores/%d" % i, data = core)
 
     def SaveDipoles(self, IntsFile = None):
         if IntsFile is None:

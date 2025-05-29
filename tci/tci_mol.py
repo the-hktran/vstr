@@ -6,7 +6,6 @@ import h5py
 from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
-from vstr.nmode.mol import NormalModes
 from vstr.spectra.dipole import GetDipole
 from vstr.nmode.mol import Molecule, get_qmat_ho, get_tmat_ho
 from vstr.mf.lo import NMBoys
@@ -485,6 +484,18 @@ class TCIMolecule(Molecule):
                 del f["freq"]
             f.create_dataset("freq", data = self.Frequencies)
 
+    def ReadGeometry(self, IntsFile = None):
+        if IntsFile is None:
+            IntsFile = self.IntsFile
+
+        with h5py.File(IntsFile, "r") as f:
+            self.nm.x0 = f["x0"][()]
+            self.nm.V0 = f["V0"][()]
+            self.nm.mu0 = f["mu0"][()]
+            self.nm.nm_coeff = f["nm_coeff"][()]
+            self.Frequencies = f["freq"][()]
+            self.nm.freqs = self.Frequencies / constants.AU_TO_INVCM
+
     def SaveCoreTensors(self, IntsFile = None):
         if IntsFile is None:
             IntsFile = self.IntsFile
@@ -572,6 +583,8 @@ class TCIMolecule(Molecule):
                     print(self.Frequencies)
 
             self.SaveGeometry()
+        else:
+            self.ReadGeometry()
 
         if not self.ReadTensors:
             self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol, dip_component = self.dip_component)
