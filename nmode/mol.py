@@ -890,6 +890,36 @@ class Molecule():
             plt.legend()
             plt.savefig(SavePES)
 
+    def PlotPotentialParityGridPoints(self, npoints = 1000, lim = None):
+        import matplotlib.pyplot as plt
+        true_pot = []
+        nmode_pot = []
+        gridpts, dvr_coeff = self.get_heg(self.ngridpts)
+        for it in range(npoints):
+            q = np.zeros(self.nm.nmodes)
+            n = np.zeros(self.nm.nmodes, dtype=int)
+            for i in range(self.nm.nmodes):
+                n[i] = np.random.randint(low = 0, high = self.ngridpts)
+                q[i] = gridpts[i][n[i]]
+            x = self.nm._normal2cart(q)
+            true_pot.append(self.potential_cart(x))
+            nmode_pot.append(self._nmode_potential(x))
+        true_pot = np.array(true_pot) * constants.AU_TO_INVCM
+        nmode_pot = np.array(nmode_pot) * constants.AU_TO_INVCM
+        plt.plot([np.min(true_pot), np.max(true_pot)], [np.min(true_pot), np.max(true_pot)], color='red', linestyle='--')
+        plt.scatter(true_pot, nmode_pot, s=1)
+        plt.xlabel('True Potential (cm-1)')
+        plt.ylabel('nMode Potential (cm-1)')
+        plt.title('nMode vs True Potential')
+        if lim is not None:
+            v0 = np.min(true_pot)
+            plt.xlim(v0+lim[0], v0+lim[1])
+            plt.ylim(v0+lim[0], v0+lim[1])
+        plt.savefig('potential_parity.png')
+        np.save("nmode_pot", nmode_pot)
+        np.save("true_pot", true_pot)
+
+
     def FindDivergent3Modes(self):
         DivergentTriplets = []
         V0 = self._nmode_potential(self.nm.x0)
