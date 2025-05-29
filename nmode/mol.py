@@ -894,7 +894,7 @@ class Molecule():
         import matplotlib.pyplot as plt
         true_pot = []
         nmode_pot = []
-        gridpts, dvr_coeff = self.get_heg(self.ngridpts)
+        gridpts, dvr_coeff = self.nmode.get_heg([self.ngridpts] * self.nm.nmodes)
         for it in range(npoints):
             q = np.zeros(self.nm.nmodes)
             n = np.zeros(self.nm.nmodes, dtype=int)
@@ -904,6 +904,7 @@ class Molecule():
             x = self.nm._normal2cart(q)
             true_pot.append(self.potential_cart(x))
             nmode_pot.append(self._nmode_potential(x))
+            print(true_pot[-1], nmode_pot[-1], flush=True)
         true_pot = np.array(true_pot) * constants.AU_TO_INVCM
         nmode_pot = np.array(nmode_pot) * constants.AU_TO_INVCM
         plt.plot([np.min(true_pot), np.max(true_pot)], [np.min(true_pot), np.max(true_pot)], color='red', linestyle='--')
