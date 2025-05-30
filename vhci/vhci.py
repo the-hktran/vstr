@@ -309,6 +309,11 @@ def SparseDiagonalizeNMode(mVHCI):
             mVHCI.H = VCISparseHamNModeFromOMArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], mVHCI.mol.ints[3], mVHCI.mol.ints[4], True, mVHCI.mol.Order, mVHCI.K)
         else:
             mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+        
+        if mVHCI.mol.doTCIResidual:
+            dH = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False)
+            print(dH)
+            mVHCI.H += dH
     else:
         if len(mVHCI.NewBasis) != 0:
             if mVHCI.mol.use_onemode_states:
@@ -319,8 +324,16 @@ def SparseDiagonalizeNMode(mVHCI):
             else:
                 HIJ = VCISparseHamNMode(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), False)
                 HJJ = VCISparseHamNMode(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
+
+            if mVHCI.mol.doTCIResidual:
+                dHIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, True)
+                dHJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False)
+                HIJ += dHIJ
+                HJJ += dHJJ
+
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
+
     mVHCI.Timer.stop(1)
     mVHCI.Timer.start(0)
     mVHCI.E, mVHCI.C = sparse.linalg.eigsh(mVHCI.H, k = mVHCI.NEigs, which = 'SA')

@@ -202,7 +202,7 @@ class Molecule():
                     for k in range(j + 1, self.nm.nmodes):
                         V += self.nm.potential_3mode(i, j, k, q[i], q[j], q[k])
         return V
-    
+
     def inverse_moment_of_inertia_cart(self, x):
         I = np.zeros((3, 3))
         for i in range(self.natoms):
@@ -276,18 +276,22 @@ class Molecule():
                     if i == 2:
                         self.Divergent3Modes = self.FindDivergent3Modes()
                     self.ints[i] = self.nmode.get_ints(OrderPlus, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff, modes = self.Divergent3Modes)
-            if self.doTCIResidual:
-                from vstr.tci.tci_mol import TCIMolecule
-                def residual_pot(x):
-                    return self.potential_cart(x) - self._nmode_potential(x)
-                self.tci_mol = TCIMolecule(residual_pot, self.natoms, self.mass, ngridpts = self.ngridpts, tci_tol = 1e-6)
-                self.tci_mol.rank = 500
-                self.tci_mol.nm = self.nm
-                self.tci_mol.Frequencies = self.Frequencies
-                self.tci_mol.x0 = self.x0
-                self.tci_mol.CalcTT(rank = self.tci_mol.rank, tci_tol = self.tci_mol.tci_tol)
-                
-                
+            
+        if self.doTCIResidual:
+            from vstr.tci.tci_mol import TCIMolecule
+            def residual_pot(x):
+                return self.potential_cart(x) - self._nmode_potential(x)
+            self.tci_mol = TCIMolecule(residual_pot, self.natoms, self.mass, ngridpts = self.ngridpts, tci_tol = 1e-6)
+            self.tci_mol.IntsFile = self.IntsFile
+            self.tci_mol.rank = 500
+            self.tci_mol.nm = self.nm
+            self.tci_mol.Frequencies = self.Frequencies
+            self.tci_mol.x0 = self.x0
+            if self.ReadInt:
+                self.tci_mol.ReadCoreTensors()
+            else:
+                self.tci_mol.CalcTTFromOM(rank = self.tci_mol.rank, tci_tol = self.tci_mol.tci_tol, onemode_coeff = self.onemode_coeff)
+                self.tci_mol.SaveCoreTensors()
     
     def CalcNModeDipole(self, Order = None):
         if Order is None:

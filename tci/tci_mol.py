@@ -337,6 +337,25 @@ class TCIMolecule(Molecule):
         self.Timer.stop(2)
         self.cores = cores
 
+    def CalcTTFromOM(self, tt_method = 'tci', rank = 121, tci_tol = 1e-6, dip_component = None, onemode_coeff = None):
+        gridpts, dvr_coeff = self.get_heg(self.ngridpts)
+        for i in range(len(dvr_coeff)):
+            dvr_coeff[i] = dvr_coeff[i].T @ onemode_coeff[i]
+        self.dvr_coeff = dvr_coeff
+        self.Timer.start(1)
+        if tt_method.upper() == 'TCI':
+            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = 25, dip_component = dip_component)
+            print("Tensor Ranks")
+            for core in cores:
+                print(core.shape)
+        else:
+            cores = self.nm.do_tt(gridpts)
+        self.Timer.stop(1)
+        self.Timer.start(2)
+        self.core_tensors = [np.einsum('irj,rn,rm->ijnm', core, dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, dvr_coeff)]
+        self.Timer.stop(2)
+        self.cores = cores
+
     def CoresFromContractedCores(self, core_tensors):
         gridpts, dvr_coeff = self.get_heg(self.ngridpts)
         self.cores = [np.einsum('ijnm,nr,mr->irj', core_tensor, dvr_c, dvr_c, optimize=True) for core_tensor, dvr_c in zip(core_tensors, dvr_coeff)]
