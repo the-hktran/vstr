@@ -328,8 +328,12 @@ class TCIMolecule(Molecule):
             print("Tensor Ranks")
             for core in cores:
                 print(core.shape)
-        else:
+        elif tt_method.upper() == 'TT':
             cores = self.nm.do_tt(gridpts)
+        else:
+            self.core_tensors = [np.zeros((self.nm.nmodes, self.nm.nmodes, self.ngridpts, self.ngridpts)) for _ in range(self.Nm)]
+            self.cores = [np.zeros((self.nm.nmodes, 1, self.ngridpts)) for _ in range(self.Nm)]
+            return
         self.Timer.stop(1)
         #self.core_tensors = [np.einsum('irj,nr,mr->ijnm', core.detach().numpy(), dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, dvr_coeff)]
         self.Timer.start(2)

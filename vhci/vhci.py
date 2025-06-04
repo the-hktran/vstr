@@ -309,10 +309,9 @@ def SparseDiagonalizeNMode(mVHCI):
             mVHCI.H = VCISparseHamNModeFromOMArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.onemode_eig, mVHCI.mol.ints[1], mVHCI.mol.ints[2], mVHCI.mol.ints[3], mVHCI.mol.ints[4], True, mVHCI.mol.Order, mVHCI.K)
         else:
             mVHCI.H = VCISparseHamNMode(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
-        
+
         if mVHCI.mol.doTCIResidual:
-            dH = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False)
-            print(dH)
+            dH = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False, withT = False)
             mVHCI.H += dH
     else:
         if len(mVHCI.NewBasis) != 0:
@@ -326,8 +325,8 @@ def SparseDiagonalizeNMode(mVHCI):
                 HJJ = VCISparseHamNMode(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0].tolist(), mVHCI.mol.ints[1].tolist(), mVHCI.mol.ints[2].tolist(), True)
 
             if mVHCI.mol.doTCIResidual:
-                dHIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, True)
-                dHJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False)
+                dHIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, True, withT = False)
+                dHJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False, withT = False)
                 HIJ += dHIJ
                 HJJ += dHJJ
 
@@ -347,8 +346,9 @@ def SparseDiagonalizeNMode(mVHCI):
         mir.PlotSpectrum("spectrum_step_%d.png" % (len(mVHCI.Basis)), XMin = mVHCI.XLim[0], XMax = mVHCI.XLim[1], L = 5, NPoints = 201)
         mir.SaveSpectrum("spectrum_step_%d" % (len(mVHCI.Basis)))
 
-def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
-    T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
+def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal, withT = True):
+    if withT:
+        T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
     N1 = len(Basis1)
     N2 = len(Basis2)
     V = sparse.lil_matrix((N1, N2))
@@ -373,7 +373,10 @@ def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal):
                     V[i, j] = Vij
                     V[j, i] = Vij
     V = V * constants.AU_TO_INVCM
-    return T + V
+    if withT:
+        return T + V
+    else:
+        return V
 
 def SparseDiagonalizeTCI(mVHCI):
     mVHCI.Timer.start(1)

@@ -188,7 +188,6 @@ class Molecule():
         V = 0.0
         V += self.nm.V0
         q = self.nm._cart2normal(x)
-
         if self.Order >= 1:
             for i in range(self.nm.nmodes):
                 V += self.nm.potential_1mode(i, q[i])
@@ -284,15 +283,17 @@ class Molecule():
             self.tci_mol = TCIMolecule(residual_pot, self.natoms, self.mass, ngridpts = self.ngridpts, tci_tol = 1e-6)
             self.tci_mol.IntsFile = self.IntsFile
             self.tci_mol.rank = 500
-            self.tci_mol.nm = self.nm
-            self.tci_mol.Frequencies = self.Frequencies
-            self.tci_mol.x0 = self.x0
+            self.tci_mol.ReadGeom = True
+            self.tci_mol.doGeomOpt = False
+            self.tci_mol.IntsFile = self.IntsFile
+            self.tci_mol.tt_method = 'skip'
+            self.tci_mol.kernel(x0 = self.x0)
             if self.ReadInt:
                 self.tci_mol.ReadCoreTensors()
             else:
                 self.tci_mol.CalcTTFromOM(rank = self.tci_mol.rank, tci_tol = self.tci_mol.tci_tol, onemode_coeff = self.onemode_coeff)
                 self.tci_mol.SaveCoreTensors()
-    
+
     def CalcNModeDipole(self, Order = None):
         if Order is None:
             Order = self.Order
