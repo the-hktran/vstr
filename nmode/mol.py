@@ -20,6 +20,12 @@ A2B = 1.88973
 AU2CM = 219474.63 
 AMU2AU = 1822.888486209
 
+def triangle_numbers(n):
+    return n * (n + 1) // 2
+
+def fourth_coeff(n):
+    return n * (n**2 + 3*n - 1) // 3
+
 def ho_3d(x):
     w = [0.00751569, 0.01746802, 0.01797638]
     D = 0.1
@@ -184,7 +190,7 @@ class Molecule():
     def _dipole(self, x):
         return self.dipole_cart(x.reshape((self.natoms, 3)))
 
-    def _nmode_potential(self, x):
+    def _nmode_potential_old2(self, x):
         V = 0.0
         V += self.nm.V0
         q = self.nm._cart2normal(x)
@@ -200,6 +206,45 @@ class Molecule():
                 for j in range(i + 1, self.nm.nmodes):
                     for k in range(j + 1, self.nm.nmodes):
                         V += self.nm.potential_3mode(i, j, k, q[i], q[j], q[k])
+        return V
+
+    def _nmode_potential_old(self, x):
+        V = 0.0
+        V += self.nm.V0
+        q = self.nm._cart2normal(x)
+        if self.Order >= 1:
+            for i in range(self.nm.nmodes):
+                V += self.nm.potential_1mode(i, q[i])
+                if self.Order >= 2:
+                    for j in range(i + 1, self.nm.nmodes):
+                        V += self.nm.potential_2mode(i, j, q[i], q[j])
+                        if self.Order >= 3:
+                            for k in range(j + 1, self.nm.nmodes):
+                                V += self.nm.potential_3mode(i, j, k, q[i], q[j], q[k])
+        return V
+
+    def _nmode_potential(self, x):
+        q = self.nm._cart2normal(x)
+        V = 0.0
+        n = self.nm.nmodes - self.Order
+        if self.Order == 1:
+            V -= n * self.nm.V0
+            for i in range(self.nm.nmodes):
+                V += self.nm.potential_1slice(i, q[i])
+        if self.Order == 2:
+            V += triangle_numbers(n) * self.nm.V0
+            for i in range(self.nm.nmodes):
+                V -= n * self.nm.potential_1slice(i, q[i])
+                for j in range(i + 1, self.nm.nmodes):
+                    V += self.nm.potential_2slice(i, j, q[i], q[j])
+        if self.Order == 3:
+            V -= fourth_coeff(n) * self.nm.V0
+            for i in range(self.nm.nmodes):
+                V += triangle_numbers(n) * self.nm.potential_1slice(i, q[i])
+                for j in range(i + 1, self.nm.nmodes):
+                    V -= n * self.nm.potential_2slice(i, j, q[i], q[j])
+                    for k in range(j + 1, self.nm.nmodes):
+                        V += self.nm.potential_3slice(i, j, k, q[i], q[j], q[k])
         return V
 
     def inverse_moment_of_inertia_cart(self, x):
@@ -288,6 +333,12 @@ class Molecule():
             self.tci_mol.IntsFile = self.IntsFile
             self.tci_mol.tt_method = 'skip'
             self.tci_mol.kernel(x0 = self.x0)
+
+            self.tci_mol.nm.x0 = self.nm.x0
+            self.tci_mol.nm.V0 = self.nm.V0
+            self.tci_mol.nm.mu0 = self.nm.mu0
+            self.tci_mol.nm.nm_coeff = self.nm.nm_coeff
+            self.tci_mol.nm.freqs = self.nm.freqs
             if self.ReadInt:
                 self.tci_mol.ReadCoreTensors()
             else:
@@ -1212,7 +1263,20 @@ class NormalModes():
         x = self._normal2cart(q)
         return (self.mol.potential_cart(x) - self.potential_3mode(i, j, k, qi, qj, qk) - self.potential_3mode(i, j, l, qi, qj, ql) - self.potential_3mode(i, k, l, qi, qk, ql) - self.potential_3mode(j, k, l, qj, qk, ql) - self.potential_2mode(i, j, qi, qj) - self.potential_2mode(i, k, qi, qk) - self.potential_2mode(i, l, qi, ql) - self.potential_2mode(j, k, qj, qk) - self.potential_2mode(j, l, qj, ql) - self.potential_2mode(k, l, qk, ql) - self.potential_1mode(i, qi) - self.potential_1mode(j, qj) - self.potential_1mode(k, qk) - self.potential_1mode(l, ql) - self.V0)
 
-    def pot_test(self, i, j, k, qi, qj, qk):
+    def potential_1slice(self, i, qi):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        x = self._normal2cart(q)
+        return self.mol.potential_cart(x)
+
+    def potential_2slice(self, i, j, qi, qj):
+        q = np.zeros(self.nmodes)
+        q[i] = qi
+        q[j] = qj
+        x = self._normal2cart(q)
+        return self.mol.potential_cart(x)
+
+    def potential_3slice(self, i, j, k, qi, qj, qk):
         q = np.zeros(self.nmodes)
         q[i] = qi
         q[j] = qj
