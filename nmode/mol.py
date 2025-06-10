@@ -420,16 +420,17 @@ class Molecule():
                                             for m in range(self.Nm):
                                                 g5.create_dataset("%d_%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1, m + 1), data = self.ints[4][i, j, k, l, m])
 
-            if "onemode_coeff" in f:
-                del f["onemode_coeff"]
-            f1c = f.create_group("onemode_coeff")
-            for i in range(self.Nm):
-                f1c.create_dataset("%d" % (i + 1), data = self.onemode_coeff[i])
-            if "onemode_eig" in f:
-                del f["onemode_eig"]
-            f1e = f.create_group("onemode_eig")
-            for i in range(self.Nm):
-                f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
+            if self.use_onemode_states:
+                if "onemode_coeff" in f:
+                    del f["onemode_coeff"]
+                f1c = f.create_group("onemode_coeff")
+                for i in range(self.Nm):
+                    f1c.create_dataset("%d" % (i + 1), data = self.onemode_coeff[i])
+                if "onemode_eig" in f:
+                    del f["onemode_eig"]
+                f1e = f.create_group("onemode_eig")
+                for i in range(self.Nm):
+                    f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
             if "x0" in f:
                 del f["x0"]
             f.create_dataset("x0", data = self.nm.x0)
@@ -505,16 +506,17 @@ class Molecule():
                                                 for m in range(self.Nm):
                                                     g5x.create_dataset("%d_%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1, m + 1), data = self.dip_ints[4][x, i, j, k, l, m])
 
-            if "onemode_coeff" in f:
-                del f["onemode_coeff"]
-            f1c = f.create_group("onemode_coeff")
-            for i in range(self.Nm):
-                f1c.create_dataset("%d" % (i + 1), data = self.onemode_coeff[i])
-            if "onemode_eig" in f:
-                del f["onemode_eig"]
-            f1e = f.create_group("onemode_eig")
-            for i in range(self.Nm):
-                f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
+            if self.use_onemode_states:
+                if "onemode_coeff" in f:
+                    del f["onemode_coeff"]
+                f1c = f.create_group("onemode_coeff")
+                for i in range(self.Nm):
+                    f1c.create_dataset("%d" % (i + 1), data = self.onemode_coeff[i])
+                if "onemode_eig" in f:
+                    del f["onemode_eig"]
+                f1e = f.create_group("onemode_eig")
+                for i in range(self.Nm):
+                    f1e.create_dataset("%d" % (i + 1), data = self.onemode_eig[i])
             if "x0" in f:
                 del f["x0"]
             f.create_dataset("x0", data = self.nm.x0)
@@ -676,12 +678,13 @@ class Molecule():
                                         for o in range(self.Nm):
                                             self.ints[n][i, j, k, l, m, o] = f["ints/%d/%d_%d_%d_%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1, l + 1, m + 1, o + 1)][()]
     
-            self.onemode_eig = []
-            for i in range(self.Nm):
-                self.onemode_eig.append(f["onemode_eig/%d" % (i + 1)][()])
-            self.onemode_coeff = []
-            for i in range(self.Nm):
-                self.onemode_coeff.append(f["onemode_coeff/%d" % (i + 1)][()])
+            if self.use_onemode_states:
+                self.onemode_eig = []
+                for i in range(self.Nm):
+                    self.onemode_eig.append(f["onemode_eig/%d" % (i + 1)][()])
+                self.onemode_coeff = []
+                for i in range(self.Nm):
+                    self.onemode_coeff.append(f["onemode_coeff/%d" % (i + 1)][()])
 
     def ReadDipolesAsArrays(self, IntsFile = None):
         if IntsFile is None:
