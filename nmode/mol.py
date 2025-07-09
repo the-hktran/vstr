@@ -1606,11 +1606,12 @@ class NModePotential():
                                     f.create_dataset("ints", data = vijk * constants.AU_TO_INVCM)
                             else:   
                                 ints[i, j, k] = vijk * constants.AU_TO_INVCM
-                                ints[j, i, k] = vijk * constants.AU_TO_INVCM
-                                ints[i, k, j] = vijk * constants.AU_TO_INVCM
-                                ints[k, i, j] = vijk * constants.AU_TO_INVCM
-                                ints[j, k, i] = vijk * constants.AU_TO_INVCM
-                                ints[k, j, i] = vijk * constants.AU_TO_INVCM
+                                ints[j, i, k] = vijk.transpose(1, 0, 2, 4, 3, 5) * constants.AU_TO_INVCM
+                                ints[i, k, j] = vijk.transpose(0, 2, 1, 3, 5, 4) * constants.AU_TO_INVCM
+                                ints[j, k, i] = vijk.transpose(1, 2, 0, 4, 5, 3) * constants.AU_TO_INVCM
+                                ints[k, i, j] = vijk.transpose(2, 0, 1, 5, 3, 4) * constants.AU_TO_INVCM
+                                ints[k, j, i] = vijk.transpose(2, 1, 0, 5, 4, 3) * constants.AU_TO_INVCM
+
             elif nmode == 4:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1633,8 +1634,9 @@ class NModePotential():
                                         f.create_dataset("ints", data = vijkl * constants.AU_TO_INVCM)
                                 else:
                                     Is = list(permutations([i, j, k, l]))
-                                    for I in Is:
-                                        ints[I] = vijkl * constants.AU_TO_INVCM
+                                    Js = list(permutations([0, 1, 2, 3]))
+                                    for I in len(Is):
+                                        ints[Is[I]] = vijkl.transpose(Js[I] + list(np.array(Js[I]) + 4)) * constants.AU_TO_INVCM
             elif nmode == 5:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1659,8 +1661,9 @@ class NModePotential():
                                             f.create_dataset("ints", data = vijklm * constants.AU_TO_INVCM)
                                     else:
                                         Is = list(permutations([i, j, k, l, m]))
-                                        for I in Is:
-                                            ints[I] = vijklm * constants.AU_TO_INVCM
+                                        Js = list(permutations([0, 1, 2, 3, 4]))
+                                        for I in len(Is):
+                                            ints[Is[I]] = vijklm.transpose(Js[I] + list(np.array(Js[I]) + 5)) * constants.AU_TO_INVCM
         else:
             if nmode == 3:
                 ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
@@ -1709,11 +1712,11 @@ class NModePotential():
                             intotf_name = "ints3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
                             with h5py.File(intotf_name, "r") as f:
                                 ints[i, j, k] = f["ints"][:]
-                                ints[j, i, k] = f["ints"][:]
-                                ints[i, k, j] = f["ints"][:]
-                                ints[k, i, j] = f["ints"][:]
-                                ints[j, k, i] = f["ints"][:]
-                                ints[k, j, i] = f["ints"][:]
+                                ints[j, i, k] = f["ints"][:].transpose(1, 0, 2, 4, 3, 5)
+                                ints[i, k, j] = f["ints"][:].transpose(0, 2, 1, 3, 5, 4)
+                                ints[k, i, j] = f["ints"][:].transpose(2, 0, 1, 5, 3, 4)
+                                ints[j, k, i] = f["ints"][:].transpose(1, 2, 0, 4, 5, 3)
+                                ints[k, j, i] = f["ints"][:].transpose(2, 1, 0, 5, 4, 3)
             elif nmode == 4:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1723,8 +1726,9 @@ class NModePotential():
                                 intotf_name = "ints4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
                                 with h5py.File(intotf_name, "r") as f:
                                     Is = list(permutations([i, j, k, l]))
-                                    for I in Is:
-                                        ints[I] = f["ints"][:]
+                                    Js = list(permutations([0, 1, 2, 3]))
+                                    for I in len(Is):
+                                        ints[Is[I]] = f["ints"][:].transpose(Js[I] + list(np.array(Js[I]) + 4))
             elif nmode == 5:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1735,8 +1739,9 @@ class NModePotential():
                                     intotf_name = "ints5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
                                     with h5py.File(intotf_name, "r") as f:
                                         Is = list(permutations([i, j, k, l, m]))
+                                        Js = list(permutations([0, 1, 2, 3, 4]))
                                         for I in Is:
-                                            ints[I] = f["ints"][:]
+                                            ints[Is[I]] = f["ints"][:].transpose(Js[I] + list(np.array(Js[I]) + 5))
         return ints
 
     def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None, usePyPotDip = False):
@@ -1835,28 +1840,28 @@ class NModePotential():
                             ints[0, i, j, k] = vijk[0]
                             ints[1, i, j, k] = vijk[1]
                             ints[2, i, j, k] = vijk[2]
-                            ints[0, j, i, k] = vijk[0]
-                            ints[1, j, i, k] = vijk[1]
-                            ints[2, j, i, k] = vijk[2]
-                            ints[0, i, k, j] = vijk[0]
-                            ints[1, i, k, j] = vijk[1]
-                            ints[2, i, k, j] = vijk[2]
-                            ints[0, k, i, j] = vijk[0]
-                            ints[1, k, i, j] = vijk[1]
-                            ints[2, k, i, j] = vijk[2]
-                            ints[0, j, k, i] = vijk[0]
-                            ints[1, j, k, i] = vijk[1]
-                            ints[2, j, k, i] = vijk[2]
-                            ints[0, k, j, i] = vijk[0]
-                            ints[1, k, j, i] = vijk[1]
-                            ints[2, k, j, i] = vijk[2]
+                            ints[0, j, i, k] = vijk[0].transpose(1, 0, 2, 4, 3, 5)
+                            ints[1, j, i, k] = vijk[1].transpose(1, 0, 2, 4, 3, 5)
+                            ints[2, j, i, k] = vijk[2].transpose(1, 0, 2, 4, 3, 5)
+                            ints[0, i, k, j] = vijk[0].transpose(0, 2, 1, 3, 5, 4)
+                            ints[1, i, k, j] = vijk[1].transpose(0, 2, 1, 3, 5, 4)
+                            ints[2, i, k, j] = vijk[2].transpose(0, 2, 1, 3, 5, 4)
+                            ints[0, k, i, j] = vijk[0].transpose(2, 0, 1, 5, 3, 4)
+                            ints[1, k, i, j] = vijk[1].transpose(2, 0, 1, 5, 3, 4)
+                            ints[2, k, i, j] = vijk[2].transpose(2, 0, 1, 5, 3, 4)
+                            ints[0, j, k, i] = vijk[0].transpose(1, 2, 0, 4, 5, 3)
+                            ints[1, j, k, i] = vijk[1].transpose(1, 2, 0, 4, 5, 3)
+                            ints[2, j, k, i] = vijk[2].transpose(1, 2, 0, 4, 5, 3)
+                            ints[0, k, j, i] = vijk[0].transpose(2, 1, 0, 5, 4, 3)
+                            ints[1, k, j, i] = vijk[1].transpose(2, 1, 0, 5, 4, 3)
+                            ints[2, k, j, i] = vijk[2].transpose(2, 1, 0, 5, 4, 3)
                             if usePyPotDip:
                                 ints[3, i, j, k] = vijk[3]
-                                ints[3, j, i, k] = vijk[3]
-                                ints[3, i, k, j] = vijk[3]
-                                ints[3, k, i, j] = vijk[3]
-                                ints[3, j, k, i] = vijk[3]
-                                ints[3, k, j, i] = vijk[3]
+                                ints[3, j, i, k] = vijk[3].transpose(1, 0, 2, 4, 3, 5)
+                                ints[3, i, k, j] = vijk[3].transpose(0, 2, 1, 3, 5, 4)
+                                ints[3, k, i, j] = vijk[3].transpose(2, 0, 1, 5, 3, 4)
+                                ints[3, j, k, i] = vijk[3].transpose(1, 2, 0, 4, 5, 3)
+                                ints[3, k, j, i] = vijk[3].transpose(2, 1, 0, 5, 4, 3)
 
         elif nmode == 4:
             ints = np.empty((3, nmodes, nmodes, nmodes, nmodes), dtype=object)
@@ -1883,12 +1888,13 @@ class NModePotential():
                                     f.create_dataset("dips", data = vijkl)
                             else:
                                 Is = list(permutations([i, j, k, l]))
+                                Js = list(permutations([0, 1, 2, 3]))
                                 ncart = 3
                                 if usePyPotDip:
                                     ncart = 4
                                 for x in range(ncart):
-                                    for I in Is:
-                                        ints[x][I] = vijkl[x]
+                                    for I in len(Is):
+                                        ints[x][Is[I]] = vijkl.transpose(Js[I] + list(np.array(Js[I]) + 4))
         elif nmode == 5:
             ints = np.empty((3, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
             if usePyPotDip:
@@ -1915,12 +1921,13 @@ class NModePotential():
                                         f.create_dataset("dips", data = vijklm)
                                 else:
                                     Is = list(permutations([i, j, k, l, m]))
+                                    Js = list(permutations([0, 1, 2, 3, 4]))
                                     ncart = 3
                                     if usePyPotDip:
                                         ncart = 4
                                     for x in range(ncart):
-                                        for I in Is:
-                                            ints[x][I] = vijklm[x]
+                                        for I in len(Is):
+                                            ints[x][Is[I]] = vijklm.transpose(Js[I] + list(np.array(Js[I]) + 5))
 
         if self.nm.mol.doSaveIntsOTF:
             if nmode == 1:
@@ -1960,28 +1967,28 @@ class NModePotential():
                                 ints[0, i, j, k] = f["dips"][0]
                                 ints[1, i, j, k] = f["dips"][1]
                                 ints[2, i, j, k] = f["dips"][2]
-                                ints[0, j, i, k] = f["dips"][0]
-                                ints[1, j, i, k] = f["dips"][1]
-                                ints[2, j, i, k] = f["dips"][2]
-                                ints[0, i, k, j] = f["dips"][0]
-                                ints[1, i, k, j] = f["dips"][1]
-                                ints[2, i, k, j] = f["dips"][2]
-                                ints[0, k, i, j] = f["dips"][0]
-                                ints[1, k, i, j] = f["dips"][1]
-                                ints[2, k, i, j] = f["dips"][2]
-                                ints[0, j, k, i] = f["dips"][0]
-                                ints[1, j, k, i] = f["dips"][1]
-                                ints[2, j, k, i] = f["dips"][2]
-                                ints[0, k, j, i] = f["dips"][0]
-                                ints[1, k, j, i] = f["dips"][1]
-                                ints[2, k, j, i] = f["dips"][2]
+                                ints[0, j, i, k] = f["dips"][0].transpose(1, 0, 2, 4, 3, 5)
+                                ints[1, j, i, k] = f["dips"][1].transpose(1, 0, 2, 4, 3, 5)
+                                ints[2, j, i, k] = f["dips"][2].transpose(1, 0, 2, 4, 3, 5)
+                                ints[0, i, k, j] = f["dips"][0].transpose(0, 2, 1, 3, 5, 4)
+                                ints[1, i, k, j] = f["dips"][1].transpose(0, 2, 1, 3, 5, 4)
+                                ints[2, i, k, j] = f["dips"][2].transpose(0, 2, 1, 3, 5, 4)
+                                ints[0, k, i, j] = f["dips"][0].transpose(2, 0, 1, 5, 3, 4)
+                                ints[1, k, i, j] = f["dips"][1].transpose(2, 0, 1, 5, 3, 4)
+                                ints[2, k, i, j] = f["dips"][2].transpose(2, 0, 1, 5, 3, 4)
+                                ints[0, j, k, i] = f["dips"][0].transpose(1, 2, 0, 4, 5, 3)
+                                ints[1, j, k, i] = f["dips"][1].transpose(1, 2, 0, 4, 5, 3)
+                                ints[2, j, k, i] = f["dips"][2].transpose(1, 2, 0, 4, 5, 3)
+                                ints[0, k, j, i] = f["dips"][0].transpose(2, 1, 0, 5, 4, 3)
+                                ints[1, k, j, i] = f["dips"][1].transpose(2, 1, 0, 5, 4, 3)
+                                ints[2, k, j, i] = f["dips"][2].transpose(2, 1, 0, 5, 4, 3)
                                 if usePyPotDip:
                                     ints[3, i, j, k] = f["dips"][3]
-                                    ints[3, j, i, k] = f["dips"][3]
-                                    ints[3, i, k, j] = f["dips"][3]
-                                    ints[3, k, i, j] = f["dips"][3]
-                                    ints[3, j, k, i] = f["dips"][3]
-                                    ints[3, k, j, i] = f["dips"][3]
+                                    ints[3, j, i, k] = f["dips"][3].transpose(1, 0, 2, 4, 3, 5)
+                                    ints[3, i, k, j] = f["dips"][3].transpose(0, 2, 1, 3, 5, 4)
+                                    ints[3, k, i, j] = f["dips"][3].transpose(2, 0, 1, 5, 3, 4)
+                                    ints[3, j, k, i] = f["dips"][3].transpose(1, 2, 0, 4, 5, 3)
+                                    ints[3, k, j, i] = f["dips"][3].transpose(2, 1, 0, 5, 4, 3)
             elif nmode == 4:
                 ints = np.empty((3, nmodes, nmodes, nmodes, nmodes), dtype=object)
                 if usePyPotDip:
@@ -1993,12 +2000,13 @@ class NModePotential():
                                 intotf_name = "dips4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
                                 with h5py.File(intotf_name, "r") as f:
                                     Is = list(permutations([i, j, k, l]))
+                                    Js = list(permutations([0, 1, 2, 3]))
                                     ncart = 3
                                     if usePyPotDip:
                                         ncart = 4
                                     for x in range(ncart):
-                                        for I in Is:
-                                            ints[x][I] = f["dips"][x]
+                                        for I in len(Is):
+                                            ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + list(np.array(Js[I]) + 4))
             elif nmode == 5:
                 ints = np.empty((3, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
                 if usePyPotDip:
@@ -2011,12 +2019,13 @@ class NModePotential():
                                     intotf_name = "dips5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
                                     with h5py.File(intotf_name, "r") as f:
                                         Is = list(permutations([i, j, k, l, m]))
+                                        Js = list(permutations([0, 1, 2, 3, 4]))
                                         ncart = 3
                                         if usePyPotDip:
                                             ncart = 4
                                         for x in range(ncart):
-                                            for I in Is:
-                                                ints[x][I] = f["dips"][x]
+                                            for I in len(Is):
+                                                ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + list(np.array(Js[I]) + 5))
         return ints
 
     def get_inv_inertia_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
