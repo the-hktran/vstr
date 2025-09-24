@@ -9,6 +9,7 @@ import itertools
 import math
 from scipy import sparse
 import numdifftools as nd
+import numba
 
 def ReadBasisFromFile(mVHCI, FileName):
     mVHCI.Basis = []
@@ -312,7 +313,7 @@ def SparseDiagonalizeNMode(mVHCI):
             mVHCI.H = VCISparseHamNModeArray(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0], mVHCI.mol.ints[1], mVHCI.mol.ints[2], mVHCI.mol.ints[3], mVHCI.mol.ints[4], True, mVHCI.mol.Order, mVHCI.K)
 
         if mVHCI.mol.doTCIResidual:
-            dH = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False, withT = False)
+            dH = numba_VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False, withT = False)
             mVHCI.H += dH
     else:
         if len(mVHCI.NewBasis) != 0:
@@ -328,8 +329,8 @@ def SparseDiagonalizeNMode(mVHCI):
                 HJJ = VCISparseHamNModeArray(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.ints[0], mVHCI.mol.ints[1], mVHCI.mol.ints[2], mVHCI.mol.ints[3], mVHCI.mol.ints[4], True, mVHCI.mol.Order, mVHCI.K)
 
             if mVHCI.mol.doTCIResidual:
-                dHIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, True, withT = False)
-                dHJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False, withT = False)
+                dHIJ = numba_VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, True, withT = False)
+                dHJJ = numba_VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.tci_mol.core_tensors, False, withT = False)
                 HIJ += dHIJ
                 HJJ += dHJJ
 
@@ -381,14 +382,82 @@ def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal, w
     else:
         return V
 
+# This "kernel" will be compiled to highly efficient machine code by Numba
+@numba.jit(nopython=True, fastmath=True)
+def _compute_V_elements(q1, q2, CoreTensors_tuple, thr, OffDiagonal):
+    N1, num_modes = q1.shape
+    N2 = q2.shape[0]
+    
+    # We build lists of values and their coordinates, a standard pattern for Numba
+    vals, rows, cols = [], [], []
+
+    if OffDiagonal:
+        for i in range(N1):
+            for j in range(N2):
+                # Use .copy() so Numba can properly infer the type of G
+                G = CoreTensors_tuple[0][:, :, q1[i, 0], q2[j, 0]].copy()
+                for m in range(1, num_modes):
+                    C_m = CoreTensors_tuple[m][:, :, q1[i, m], q2[j, m]]
+                    G = G @ C_m
+                
+                Vij = G[0, 0]
+                if abs(Vij) > thr:
+                    vals.append(Vij)
+                    rows.append(i)
+                    cols.append(j)
+    else: # Symmetric case
+        for i in range(N1):
+            for j in range(i, N2): # Efficiently compute only the upper triangle
+                G = CoreTensors_tuple[0][:, :, q1[i, 0], q2[j, 0]].copy()
+                for m in range(1, num_modes):
+                    C_m = CoreTensors_tuple[m][:, :, q1[i, m], q2[j, m]]
+                    G = G @ C_m
+                
+                Vij = G[0, 0]
+                if abs(Vij) > thr:
+                    vals.append(Vij)
+                    rows.append(i)
+                    cols.append(j)
+                    if i != j: # Add the symmetric element
+                        vals.append(Vij)
+                        rows.append(j)
+                        cols.append(i)
+                        
+    return np.array(vals), np.array(rows), np.array(cols)
+
+
+def numba_VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal, withT=True):
+    if withT:
+        T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
+        
+    N1, N2 = len(Basis1), len(Basis2)
+    thr = 1e-12
+
+    # 1. Prepare data in NumPy arrays for Numba
+    q1 = np.array([[mode.Quanta for mode in b.Modes] for b in Basis1], dtype=np.int64)
+    q2 = np.array([[mode.Quanta for mode in b.Modes] for b in Basis2], dtype=np.int64)
+    
+    # Numba works best with a tuple of arrays
+    CoreTensors_tuple = tuple(CoreTensors)
+
+    # 2. Call the fast, JIT-compiled function
+    vals, rows, cols = _compute_V_elements(q1, q2, CoreTensors_tuple, thr, OffDiagonal)
+
+    # 3. Construct the sparse matrix from the results
+    # The COO format is perfect for this construction method
+    V = sparse.coo_matrix((vals, (rows, cols)), shape=(N1, N2))
+    V = V * constants.AU_TO_INVCM
+
+    return (T + V) if withT else V
+
 def SparseDiagonalizeTCI(mVHCI):
     mVHCI.Timer.start(1)
     if mVHCI.H is None:
-        mVHCI.H = VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
+        mVHCI.H = numba_VCISparseHamTCI(mVHCI.Basis, mVHCI.Basis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
     else:
         if len(mVHCI.NewBasis) != 0:
-            HIJ = VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, True)
-            HJJ = VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
+            HIJ = numba_VCISparseHamTCI(mVHCI.Basis[:-len(mVHCI.NewBasis)], mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, True)
+            HJJ = numba_VCISparseHamTCI(mVHCI.NewBasis, mVHCI.NewBasis, mVHCI.Frequencies, mVHCI.mol.V0, mVHCI.mol.core_tensors, False)
             mVHCI.H = sparse.hstack([mVHCI.H, HIJ])
             mVHCI.H = sparse.vstack([mVHCI.H, sparse.hstack([HIJ.transpose(), HJJ])])
     mVHCI.Timer.stop(1)

@@ -322,6 +322,7 @@ class TCIMolecule(Molecule):
     def CalcTT(self, tt_method = 'tci', rank = 121, tci_tol = 1e-6, dip_component = None):
         gridpts, dvr_coeff = self.get_heg(self.ngridpts)
         self.dvr_coeff = dvr_coeff
+        self.gridpts = gridpts
         self.Timer.start(1)
         if tt_method.upper() == 'TCI':
             cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = 25, dip_component = dip_component)
@@ -338,6 +339,7 @@ class TCIMolecule(Molecule):
         #self.core_tensors = [np.einsum('irj,nr,mr->ijnm', core.detach().numpy(), dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, dvr_coeff)]
         self.Timer.start(2)
         self.core_tensors = [np.einsum('irj,nr,mr->ijnm', core, dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, dvr_coeff)]
+
         self.Timer.stop(2)
         self.cores = cores
 

@@ -14,6 +14,7 @@
 * Numdifftools
 * PySCF and its dependencies
 * h5py
+* Numba
 <!--* maxvolpy
 * TnTorch-->
 * xfacpy
