@@ -1635,8 +1635,8 @@ class NModePotential():
                                 else:
                                     Is = list(permutations([i, j, k, l]))
                                     Js = list(permutations([0, 1, 2, 3]))
-                                    for I in len(Is):
-                                        ints[Is[I]] = vijkl.transpose(Js[I] + list(np.array(Js[I]) + 4)) * constants.AU_TO_INVCM
+                                    for I in range(len(Is)):
+                                        ints[Is[I]] = vijkl.transpose(Js[I] + tuple(np.array(Js[I]) + 4)) * constants.AU_TO_INVCM
             elif nmode == 5:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1662,8 +1662,8 @@ class NModePotential():
                                     else:
                                         Is = list(permutations([i, j, k, l, m]))
                                         Js = list(permutations([0, 1, 2, 3, 4]))
-                                        for I in len(Is):
-                                            ints[Is[I]] = vijklm.transpose(Js[I] + list(np.array(Js[I]) + 5)) * constants.AU_TO_INVCM
+                                        for I in range(len(Is)):
+                                            ints[Is[I]] = vijklm.transpose(Js[I] + tuple(np.array(Js[I]) + 5)) * constants.AU_TO_INVCM
         else:
             if nmode == 3:
                 ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
@@ -1727,8 +1727,8 @@ class NModePotential():
                                 with h5py.File(intotf_name, "r") as f:
                                     Is = list(permutations([i, j, k, l]))
                                     Js = list(permutations([0, 1, 2, 3]))
-                                    for I in len(Is):
-                                        ints[Is[I]] = f["ints"][:].transpose(Js[I] + list(np.array(Js[I]) + 4))
+                                    for I in range(len(Is)):
+                                        ints[Is[I]] = f["ints"][:].transpose(Js[I] + tuple(np.array(Js[I]) + 4))
             elif nmode == 5:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1741,7 +1741,7 @@ class NModePotential():
                                         Is = list(permutations([i, j, k, l, m]))
                                         Js = list(permutations([0, 1, 2, 3, 4]))
                                         for I in Is:
-                                            ints[Is[I]] = f["ints"][:].transpose(Js[I] + list(np.array(Js[I]) + 5))
+                                            ints[Is[I]] = f["ints"][:].transpose(Js[I] + tuple(np.array(Js[I]) + 5))
         return ints
 
     def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None, usePyPotDip = False):
@@ -1893,8 +1893,8 @@ class NModePotential():
                                 if usePyPotDip:
                                     ncart = 4
                                 for x in range(ncart):
-                                    for I in len(Is):
-                                        ints[x][Is[I]] = vijkl.transpose(Js[I] + list(np.array(Js[I]) + 4))
+                                    for I in range(len(Is)):
+                                        ints[x][Is[I]] = vijkl.transpose(Js[I] + tuple(np.array(Js[I]) + 4))
         elif nmode == 5:
             ints = np.empty((3, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
             if usePyPotDip:
@@ -1926,8 +1926,8 @@ class NModePotential():
                                     if usePyPotDip:
                                         ncart = 4
                                     for x in range(ncart):
-                                        for I in len(Is):
-                                            ints[x][Is[I]] = vijklm.transpose(Js[I] + list(np.array(Js[I]) + 5))
+                                        for I in range(len(Is)):
+                                            ints[x][Is[I]] = vijklm.transpose(Js[I] + tuple(np.array(Js[I]) + 5))
 
         if self.nm.mol.doSaveIntsOTF:
             if nmode == 1:
@@ -2005,8 +2005,8 @@ class NModePotential():
                                     if usePyPotDip:
                                         ncart = 4
                                     for x in range(ncart):
-                                        for I in len(Is):
-                                            ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + list(np.array(Js[I]) + 4))
+                                        for I in range(len(Is)):
+                                            ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + tuple(np.array(Js[I]) + 4))
             elif nmode == 5:
                 ints = np.empty((3, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
                 if usePyPotDip:
@@ -2024,8 +2024,8 @@ class NModePotential():
                                         if usePyPotDip:
                                             ncart = 4
                                         for x in range(ncart):
-                                            for I in len(Is):
-                                                ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + list(np.array(Js[I]) + 5))
+                                            for I in range(len(Is)):
+                                                ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + tuple(np.array(Js[I]) + 5))
         return ints
 
     def get_inv_inertia_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):
