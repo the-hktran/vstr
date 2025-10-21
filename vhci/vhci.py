@@ -450,6 +450,81 @@ def numba_VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiago
 
     return (T + V) if withT else V
 
+def hybrid_vectorized_VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal, withT=True):
+    if withT:
+        T = VCISparseT(Basis1, Basis2, Frequencies, OffDiagonal)
+        
+    N1, N2 = len(Basis1), len(Basis2)
+    num_modes = Frequencies.shape[0]
+    thr = 1e-12
+
+    # 1. Prepare data in NumPy arrays
+    q1 = np.array([[mode.Quanta for mode in b.Modes] for b in Basis1], dtype=np.int32)
+    q2 = np.array([[mode.Quanta for mode in b.Modes] for b in Basis2], dtype=np.int32)
+
+    # Lists to build the COO sparse matrix
+    vals, rows, cols = [], [], []
+
+    # Handle the symmetric case
+    if not OffDiagonal:
+        # For the symmetric case, we must compute the full matrix if Basis1 != Basis2.
+        # If Basis1 is Basis2, we can optimize, but this code handles the general case.
+        # The logic here assumes the result should be symmetric.
+        V = sparse.lil_matrix((N1, N2)) # Use LIL for easier symmetric assignment
+    
+    # 2. Outer loop over rows (i). This is the only Python loop.
+    # The starting point for the inner loop depends on the symmetry
+    row_start_indices = range(N1) if OffDiagonal else range(N1)
+
+    for i in row_start_indices:
+        # --- Start of Vectorized Row Calculation ---
+
+        # Get the quantum path for the single state 'i'
+        path1 = q1[i, :]
+
+        # Get the initial stack of G matrices for all 'j' states.
+        # This selects C[..., path1[0], q2[j, 0]] for all j at once.
+        # Shape goes from (d, d, nq1, nq2) -> (d, d, N2)
+        G_batch = CoreTensors[0][:, :, path1[0], q2[:, 0]]
+        
+        # Transpose to (N2, d, d) for batch matrix multiplication
+        G_batch = np.transpose(G_batch, (2, 0, 1))
+
+        # Perform the chain multiplication for the entire row
+        for m in range(1, num_modes):
+            C_batch = CoreTensors[m][:, :, path1[m], q2[:, m]]
+            C_batch = np.transpose(C_batch, (2, 0, 1))
+            # G_batch @ C_batch performs N2 matrix multiplications at once
+            G_batch = G_batch @ C_batch
+        
+        # Extract the final values for the entire row V[i, :]
+        V_row = G_batch[:, 0, 0]
+        
+        # --- End of Vectorized Row Calculation ---
+
+        # 3. Find non-zero elements and store them
+        if OffDiagonal:
+            non_zero_cols = np.where(np.abs(V_row) > thr)[0]
+            if non_zero_cols.size > 0:
+                vals.extend(V_row[non_zero_cols])
+                rows.extend(np.full(non_zero_cols.size, i))
+                cols.extend(non_zero_cols)
+        else:
+            # For the symmetric case, only operate on the upper triangle
+            for j in range(i, N2):
+                if abs(V_row[j]) > thr:
+                    V[i, j] = V_row[j]
+                    V[j, i] = V_row[j] # Assign symmetric element
+
+    # 4. Finalize the matrix
+    if OffDiagonal:
+        V = sparse.coo_matrix((vals, (rows, cols)), shape=(N1, N2)).tocsr()
+    
+    V *= constants.AU_TO_INVCM
+
+    return (T + V) if withT else V
+
+
 def SparseDiagonalizeTCI(mVHCI):
     mVHCI.Timer.start(1)
     if mVHCI.H is None:
