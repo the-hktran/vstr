@@ -207,6 +207,7 @@ class TCIMolecule(Molecule):
         self.doShiftPotential = True
         self.ReadTensors = False
         self.isLinear = False
+        self.doCalcNM = True
 
         self.__dict__.update(kwargs)
 
@@ -565,7 +566,12 @@ class TCIMolecule(Molecule):
 
     def kernel(self, x0 = None):
         self.Timer.start(0)
-        self.CalcNM(x0 = x0)
+        if self.doCalcNM:
+            self.CalcNM(x0 = x0)
+        else:
+            self.ReadGeom = True
+            self.CalcNM(x0 = x0)
+            self.ReadGeom = False
         self.Timer.stop(0)
 
         if not self.ReadGeom:
@@ -610,6 +616,8 @@ class TCIMolecule(Molecule):
             self.SaveGeometry()
         else:
             self.ReadGeometry()
+
+        self.AnimateNormalModes()
 
         if not self.ReadTensors:
             self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol, dip_component = self.dip_component)
