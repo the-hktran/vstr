@@ -26,32 +26,46 @@ class NMOptimizer():
 
     def kernel(self):
         K = self.get_K()
-        cost_old = self.cost_function_i(0, 0, K)
+        cost_old = np.einsum('rrrr->', K)
+
         for i in range(self.maxiter):
             for j in range(self.nidx):
                 p = self.triu_idx[0][j]
                 q = self.triu_idx[1][j]
+
+                '''
                 uj1, uj2 = self.calc_angle(K, p, q)
                 cost_new1 = self.cost_function_i(uj1, j, K)
                 cost_new2 = self.cost_function_i(uj2, j, K)
+
                 if cost_new1 > cost_new2:
                     uj = uj1
                     cost_new = cost_new1
                 else:
                     uj = uj2
                     cost_new = cost_new2
+                
+                uj = uj1 if cost_new1 > cost_new2 else uj2
+                '''
+                uj = self.calc_angle(K, p, q)[0]
+
                 self.update_Q(uj, j)
                 self.update_U(uj, j)
                 K = self.get_K(self.Q_loc)
-                print("Iteration: %d, Mode: %d, Cost: %f" % (i, j, cost_new), flush = True)
+
+                cost_new = np.einsum('rrrr->', K)
+
+                print("Iteration: %d, Mode Pair: (%d, %d), Cost: %f" % (i, p, q, cost_new), flush = True)
                 #if abs(cost_new - cost_old) < self.tol:
                 #    return self.Q_loc
                 #cost_old = cost_new
+            cost_new = np.einsum('rrrr->', K)
             if abs(cost_new - cost_old) < self.tol:
+                print("Convergence reached at iteration %d" % i, flush = True)
                 break
             cost_old = cost_new
             if i == self.maxiter - 1:
-                print("Warning: Maximum number of iterations reached")
+                print("Warning: Maximum number of iterations reached", flush = True)
 
         # Reorder local modes
         S = np.zeros((self.nmodes, self.nmodes))
@@ -69,42 +83,81 @@ class NMOptimizer():
         pass
 
     def cost_function_i(self, u, i, K):
+        '''
         U = np.eye(self.nmodes) 
         U[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
         U[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
         U[self.triu_idx[0][i], self.triu_idx[1][i]] = -np.sin(u)
         U[self.triu_idx[1][i], self.triu_idx[0][i]] = np.sin(u)
         return np.einsum('sr,tr,ur,vr,stuv->', U, U, U, U, K, optimize = True)
+        '''
+        p = self.triu_idx[0][i]
+        q = self.triu_idx[1][i]
+        c = np.cos(u)
+        s = np.sin(u)
+
+        # Transformation for the diagonal elements of K (which sum to cost)
+        # K_new_pppp = c^4 K_pppp + s^4 K_qqqq + 6 c^2 s^2 K_ppqq + 4 c^3 s K_pppq + 4 c s^3 K_qqqp
+        k_pp = (c**4 * K[p,p,p,p] + s**4 * K[q,q,q,q] + 
+            6*c**2*s**2 * K[p,p,q,q] + 4*c**3*s * K[p,p,p,q] + 4*c*s**3 * K[q,q,q,p])
+        k_qq = (s**4 * K[p,p,p,p] + c**4 * K[q,q,q,q] + 
+            6*c**2*s**2 * K[p,p,q,q] - 4*s**3*c * K[p,p,p,q] - 4*s*c**3 * K[q,q,q,p])
+
+        # The total cost is the sum of all K_rrrr, only p and q change so we only need to track their change
+        return k_pp + k_qq + sum(K[r,r,r,r] for r in range(self.nmodes) if r != p and r != q)
+        
 
     def get_K(self, QLoc = None):
         pass
 
     def update_Q(self, u, i):
+        '''
         Ui = np.eye(self.nmodes)
         Ui[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
         Ui[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
         Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = -np.sin(u)
         Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = np.sin(u)
-        self.Q_loc = np.einsum('kp,nxk->nxp', Ui, self.Q_loc, optimize = True)
+        self.Q_loc = np.einsum('nxk,kp->nxp', self.Q_loc, Ui, optimize = True)
+        '''
+        p = self.triu_idx[0][i]
+        q = self.triu_idx[1][i]
+        c = np.cos(u)
+        s = np.sin(u)
+        Qp = self.Q_loc[:, :, p].copy()
+        Qq = self.Q_loc[:, :, q].copy()
+        self.Q_loc[:, :, p] = c * Qp + s * Qq
+        self.Q_loc[:, :, q] = -s * Qp + c * Qq
 
     def update_U(self, u, i):
+        '''
         Ui = np.eye(self.nmodes)
         Ui[self.triu_idx[0][i], self.triu_idx[0][i]] = np.cos(u)
         Ui[self.triu_idx[1][i], self.triu_idx[1][i]] = np.cos(u)
         Ui[self.triu_idx[0][i], self.triu_idx[1][i]] = -np.sin(u)
         Ui[self.triu_idx[1][i], self.triu_idx[0][i]] = np.sin(u)
         self.U = self.U @ Ui
+        '''
+        p, q = self.triu_idx[0][i], self.triu_idx[1][i]
+        c = np.cos(u)
+        s = np.sin(u)
+        Up = self.U[:, p].copy()
+        Uq = self.U[:, q].copy()
+        self.U[:, p] = c * Up + s * Uq
+        self.U[:, q] = -s * Up + c * Uq
 
     def calc_angle(self, K, p, q):
         A = K[p, q, p, q] - (K[p, p, p, p] + K[q, q, q, q] - 2 * K[p, p, q, q]) / 4
         B = K[p, p, p, q] - K[q, q, q, p]
         
+        '''
         a1 = math.asin( B / np.sqrt(A**2 + B**2)) / 4
         a2 = math.acos(-A / np.sqrt(A**2 + B**2)) / 4
 
         assert (abs(a1) < np.pi / 4) or (abs(a2) < np.pi / 4)
         return a1, a2
-
+        '''
+        a = 0.25 * math.atan2(B, -A)
+        return a, a + np.pi / 2
 
 def RCenter(mLO, U):
     QNew = np.einsum('kp,nxk->nxp', U, mLO.nm_coeff, optimize = True)

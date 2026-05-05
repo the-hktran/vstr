@@ -566,14 +566,17 @@ class TCIMolecule(Molecule):
 
     def kernel(self, x0 = None):
         self.Timer.start(0)
+        print("Beginning calculation...", flush = True)
         if self.doCalcNM:
             self.CalcNM(x0 = x0)
         else:
             self.ReadGeom = True
             self.CalcNM(x0 = x0)
             self.ReadGeom = False
+        print("... normal modes calculated.", flush = True)
         self.Timer.stop(0)
 
+        print("Beginning localization of normal modes...", flush = True)
         if not self.ReadGeom:
             if self.loc_method is not None:
                 mlo = NMBoys(self)
@@ -586,8 +589,8 @@ class TCIMolecule(Molecule):
             if self.order_method is not None:
                 if self.order_method.upper() == 'DIST':
                     self.distance_matrix = mlo.get_dist_matrix()
-                    path, path_length = traveling_salesman_brute_force(self.distance_matrix)
-                    #path, path_length = traveling_salesman_nearest_neighbor(self.distance_matrix)
+                    #path, path_length = traveling_salesman_brute_force(self.distance_matrix)
+                    path, path_length = traveling_salesman_nearest_neighbor(self.distance_matrix)
                     self.nm.freqs = self.nm.freqs[path]
                     self.nm.nm_coeff = self.nm.nm_coeff[:, :, path]
                     self.nm.Frequencies = self.nm.Frequencies[path]
@@ -616,13 +619,15 @@ class TCIMolecule(Molecule):
             self.SaveGeometry()
         else:
             self.ReadGeometry()
+        print("... normal modes localized and ordered.", flush = True)
 
         self.AnimateNormalModes()
-
+        print("Beginning calculation of tensor train representation of potential...", flush = True)
         if not self.ReadTensors:
             self.CalcTT(tt_method = self.tt_method, rank = self.rank, tci_tol = self.tci_tol, dip_component = self.dip_component)
         else:
             self.ReadCoreTensors()
+        print("... tensor train calculated.", flush = True)
         print(self)
 
         self.Timer.report(self.TimerNames)

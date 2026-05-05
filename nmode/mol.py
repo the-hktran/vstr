@@ -266,10 +266,12 @@ class Molecule():
 
     def CalcNM(self, x0 = None):
         self.nm = NormalModes(self)
+        print(" -- Optimizing geometry and calculating normal modes -- ", flush = True)
         if self.ReadGeom:
             self.ReadGeometry()
         else:
             self.nm.kernel(x0 = x0, doGeomOpt = self.doGeomOpt, coords = self.NonFrzCoords)
+        print(" -- Finished optimizing geometry and calculating normal modes -- ", flush = True)
         self.Nm = self.nm.freqs.shape[0]
         #debug!!
         #c = np.zeros((self.natoms * 3, self.nm.nmodes))
@@ -814,7 +816,7 @@ class Molecule():
     def AnimateNormalModes(self):
         for i in range(self.Nm):
             with open(f'NormalMode_{i + 1}.xyz', 'w') as f:
-                displacements = np.linspace(-10,10,20)
+                displacements = np.linspace(-100,100,20)
                 for displacement in np.concatenate((displacements, displacements[::-1])):
                     f.write(f'{self.natoms}\n')
                     f.write(f'Frequency = {self.Frequencies[i]} cm-1 (positions in Angstrom)\n')
@@ -1095,9 +1097,10 @@ class NormalModes():
             natoms = len(coords)
             self.nmodes = 3*natoms - 6
         hess0 = self.hessian(self.x0, coords = coords).reshape((natoms*3, natoms*3))
+        print(hess0, flush = True)
 
         e, v = scipy.linalg.eigh(hess0)
-        print("All eigs:", e)
+        print("All eigs:", e, flush = True)
         e, v = e[-self.nmodes:], v[:,-self.nmodes:] # remove translations and rotations
         v = v.reshape((natoms,3,self.nmodes))
         if coords is not None:
