@@ -5,7 +5,7 @@ import numpy as np
 import scipy
 import numdifftools as nd
 import h5py
-from itertools import permutations, combinations_with_replacement
+from itertools import permutations, combinations_with_replacement, product
 from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
@@ -532,45 +532,22 @@ class Molecule():
             if "dip_ints" in f:
                 del f["dip_ints"]
             g = f.create_group("dip_ints")
+            g.attrs["storage"] = "canonical_hermitian_packed"
             g1 = g.create_group("1")
             for x in range(3):
                 g1x = g1.create_group(cart_coord[x])
                 for i in range(self.Nm):
                     g1x.create_dataset("%d" % (i + 1), data = self.dip_ints[0][x, i])
             if self.Order >= 2:
-                g2 = g.create_group("2")
-                for x in range(3):
-                    g2x = g2.create_group(cart_coord[x])
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            g2x.create_dataset("%d_%d" % (i + 1, j + 1), data = self.dip_ints[1][x, i, j])
-                if self.Order >= 3:
-                    g3 = g.create_group("3")
+                for order in range(2, self.Order + 1):
+                    group = g.create_group("%d" % order)
                     for x in range(3):
-                        g3x = g3.create_group(cart_coord[x])
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                for k in range(self.Nm):
-                                    g3x.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.dip_ints[2][x, i, j, k])
-                    if self.Order >= 4:
-                        g4 = g.create_group("4")
-                        for x in range(3):
-                            g4x = g4.create_group(cart_coord[x])
-                            for i in range(self.Nm):
-                                for j in range(self.Nm):
-                                    for k in range(self.Nm):
-                                        for l in range(self.Nm):
-                                            g4x.create_dataset("%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1), data = self.dip_ints[3][x, i, j, k, l])
-                        if self.Order >= 5:
-                            g5 = g.create_group("5")
-                            for x in range(3):
-                                g5x = g5.create_group(cart_coord[x])
-                                for i in range(self.Nm):
-                                    for j in range(self.Nm):
-                                        for k in range(self.Nm):
-                                            for l in range(self.Nm):
-                                                for m in range(self.Nm):
-                                                    g5x.create_dataset("%d_%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1, m + 1), data = self.dip_ints[4][x, i, j, k, l, m])
+                        gx = group.create_group(cart_coord[x])
+                        for indices in combinations_with_replacement(range(self.Nm), order):
+                            dataset = self.dip_ints[order - 1][x][indices]
+                            _, canonical_tensor = _canonicalize_nmode_tensor(indices, dataset)
+                            name = "_".join(str(i + 1) for i in indices)
+                            gx.create_dataset(name, data = _pack_nmode_integral(canonical_tensor))
 
             if self.use_onemode_states:
                 if "onemode_coeff" in f:
@@ -686,25 +663,38 @@ class Molecule():
         cart_coord = ['x', 'y', 'z']
 
         with h5py.File(IntsFile, "r") as f:
+            storage = f["dip_ints"].attrs.get("storage", "")
+
+            def read_dipole_integral(order, x, indices):
+                perm = tuple(np.argsort(indices, kind='stable'))
+                canonical_indices = tuple(indices[i] for i in perm)
+                dataset = f["dip_ints/%d/%s/%s" % (order, cart_coord[x], "_".join(str(i + 1) for i in canonical_indices))][()]
+                if np.asarray(dataset).ndim == 1:
+                    tensor = _unpack_nmode_integral(np.asarray(dataset), order, self.ngridpts)
+                else:
+                    tensor = np.asarray(dataset)
+                if canonical_indices == tuple(indices):
+                    return tensor
+                inverse_perm = tuple(np.argsort(perm))
+                axes = inverse_perm + tuple(i + order for i in inverse_perm)
+                return np.transpose(tensor, axes)
+
             for n in range(self.Order):
                 if n == 0:
                     self.dip_ints[n] = np.empty((3, self.Nm), dtype = object)
                     for x in range(3):
                         for i in range(self.Nm):
                             self.dip_ints[n][x, i] = f["dip_ints/%d/%s/%d" % (n + 1, cart_coord[x], i + 1)][()]
-                if n == 1:
-                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm), dtype = object)
+                else:
+                    order = n + 1
+                    self.dip_ints[n] = np.empty((3,) + (self.Nm,) * order, dtype = object)
                     for x in range(3):
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                self.dip_ints[n][x, i, j] = f["dip_ints/%d/%s/%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1)][()]
-                if n == 2:
-                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm), dtype = object)
-                    for x in range(3):
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                for k in range(self.Nm):
-                                    self.dip_ints[n][x, i, j, k] = f["dip_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
+                        for indices in product(range(self.Nm), repeat = order):
+                            if storage == "canonical_hermitian_packed":
+                                self.dip_ints[n][(x,) + indices] = read_dipole_integral(order, x, indices)
+                            else:
+                                name = "_".join(str(i + 1) for i in indices)
+                                self.dip_ints[n][(x,) + indices] = f["dip_ints/%d/%s/%s" % (order, cart_coord[x], name)][()]
 
     def ReadIntegralsAsArrays(self, IntsFile = None):
         print("Reading integrals...", flush = True)
@@ -747,52 +737,38 @@ class Molecule():
         cart_coord = ['x', 'y', 'z']
 
         with h5py.File(IntsFile, "r") as f:
+            storage = f["dip_ints"].attrs.get("storage", "")
+
+            def read_dipole_integral(order, x, indices):
+                perm = tuple(np.argsort(indices, kind='stable'))
+                canonical_indices = tuple(indices[i] for i in perm)
+                dataset = f["dip_ints/%d/%s/%s" % (order, cart_coord[x], "_".join(str(i + 1) for i in canonical_indices))][()]
+                if np.asarray(dataset).ndim == 1:
+                    tensor = _unpack_nmode_integral(np.asarray(dataset), order, self.ngridpts)
+                else:
+                    tensor = np.asarray(dataset)
+                if canonical_indices == tuple(indices):
+                    return tensor
+                inverse_perm = tuple(np.argsort(perm))
+                axes = inverse_perm + tuple(i + order for i in inverse_perm)
+                return np.transpose(tensor, axes)
+
             for n in range(self.Order):
                 if n == 0:
                     self.dip_ints[n] = np.empty((3, self.Nm, self.ngridpts, self.ngridpts), dtype = float)
                     for x in range(3):
                         for i in range(self.Nm):
                             self.dip_ints[n][x, i] = f["dip_ints/%d/%s/%d" % (n + 1, cart_coord[x], i + 1)][()]
-                if n == 1:
-                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
+                else:
+                    order = n + 1
+                    self.dip_ints[n] = np.empty((3,) + (self.Nm,) * order + (self.ngridpts,) * (2 * order), dtype = float)
                     for x in range(3):
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                self.dip_ints[n][x, i, j] = f["dip_ints/%d/%s/%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1)][()]
-                if n == 2:
-                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for x in range(3):
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                for k in range(self.Nm):
-                                    self.dip_ints[n][x, i, j, k] = f["dip_ints/%d/%s/%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1)][()]
-                if n == 3:
-                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for x in range(3):
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                for k in range(self.Nm):
-                                    for l in range(self.Nm):
-                                        self.dip_ints[n][x, i, j, k, l] = f["dip_ints/%d/%s/%d_%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1, l + 1)][()]
-                if n == 4:
-                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for x in range(3):
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                for k in range(self.Nm):
-                                    for l in range(self.Nm):
-                                        for m in range(self.Nm):
-                                            self.dip_ints[n][x, i, j, k, l, m] = f["dip_ints/%d/%s/%d_%d_%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1, l + 1, m + 1)][()]
-                if n == 5:
-                    self.dip_ints[n] = np.empty((3, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for x in range(3):
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                for k in range(self.Nm):
-                                    for l in range(self.Nm):
-                                        for m in range(self.Nm):
-                                            for o in range(self.Nm):
-                                                self.dip_ints[n][x, i, j, k, l, m, o] = f["dip_ints/%d/%s/%d_%d_%d_%d_%d_%d" % (n + 1, cart_coord[x], i + 1, j + 1, k + 1, l + 1, m + 1, o + 1)][()]
+                        for indices in product(range(self.Nm), repeat = order):
+                            if storage == "canonical_hermitian_packed":
+                                self.dip_ints[n][(x,) + indices] = read_dipole_integral(order, x, indices)
+                            else:
+                                name = "_".join(str(i + 1) for i in indices)
+                                self.dip_ints[n][(x,) + indices] = f["dip_ints/%d/%s/%s" % (order, cart_coord[x], name)][()]
 
     def ReadInvInertia(self, IntsFile = None):
         if IntsFile is None:
@@ -1792,7 +1768,7 @@ class NModePotential():
                 ints = np.empty((4, nmodes, nmodes), dtype=object)
             for i in range(nmodes):
                 Ci = coeff[i].T @ onemode_coeff[i]
-                for j in range(nmodes):
+                for j in range(i, nmodes):
                     if self.nm.mol.doSaveIntsOTF:
                         intotf_name = "dips2_" + str(i) + "_" + str(j) + ".h5"
                         if os.path.exists(intotf_name):
@@ -1808,8 +1784,14 @@ class NModePotential():
                         ints[0, i, j] = vij[0]
                         ints[1, i, j] = vij[1]
                         ints[2, i, j] = vij[2]
+                        if i != j:
+                            ints[0, j, i] = vij[0].transpose(1, 0, 3, 2)
+                            ints[1, j, i] = vij[1].transpose(1, 0, 3, 2)
+                            ints[2, j, i] = vij[2].transpose(1, 0, 3, 2)
                         if usePyPotDip:
                             ints[3, i, j] = vij[3]
+                            if i != j:
+                                ints[3, j, i] = vij[3].transpose(1, 0, 3, 2)
 
         elif nmode == 3:
             ints = np.empty((3, nmodes, nmodes, nmodes), dtype=object)
@@ -1943,7 +1925,7 @@ class NModePotential():
                 if usePyPotDip:
                     ints = np.empty((4, nmodes, nmodes), dtype=object)
                 for i in range(nmodes):
-                    for j in range(nmodes):
+                    for j in range(i, nmodes):
                         intotf_name = "dips2_" + str(i) + "_" + str(j) + ".h5"
                         with h5py.File(intotf_name, "r") as f:
                             ints[0, i, j] = f["dips"][0]
@@ -1963,28 +1945,8 @@ class NModePotential():
                                 ints[0, i, j, k] = f["dips"][0]
                                 ints[1, i, j, k] = f["dips"][1]
                                 ints[2, i, j, k] = f["dips"][2]
-                                ints[0, j, i, k] = f["dips"][0].transpose(1, 0, 2, 4, 3, 5)
-                                ints[1, j, i, k] = f["dips"][1].transpose(1, 0, 2, 4, 3, 5)
-                                ints[2, j, i, k] = f["dips"][2].transpose(1, 0, 2, 4, 3, 5)
-                                ints[0, i, k, j] = f["dips"][0].transpose(0, 2, 1, 3, 5, 4)
-                                ints[1, i, k, j] = f["dips"][1].transpose(0, 2, 1, 3, 5, 4)
-                                ints[2, i, k, j] = f["dips"][2].transpose(0, 2, 1, 3, 5, 4)
-                                ints[0, k, i, j] = f["dips"][0].transpose(2, 0, 1, 5, 3, 4)
-                                ints[1, k, i, j] = f["dips"][1].transpose(2, 0, 1, 5, 3, 4)
-                                ints[2, k, i, j] = f["dips"][2].transpose(2, 0, 1, 5, 3, 4)
-                                ints[0, j, k, i] = f["dips"][0].transpose(1, 2, 0, 4, 5, 3)
-                                ints[1, j, k, i] = f["dips"][1].transpose(1, 2, 0, 4, 5, 3)
-                                ints[2, j, k, i] = f["dips"][2].transpose(1, 2, 0, 4, 5, 3)
-                                ints[0, k, j, i] = f["dips"][0].transpose(2, 1, 0, 5, 4, 3)
-                                ints[1, k, j, i] = f["dips"][1].transpose(2, 1, 0, 5, 4, 3)
-                                ints[2, k, j, i] = f["dips"][2].transpose(2, 1, 0, 5, 4, 3)
                                 if usePyPotDip:
                                     ints[3, i, j, k] = f["dips"][3]
-                                    ints[3, j, i, k] = f["dips"][3].transpose(1, 0, 2, 4, 3, 5)
-                                    ints[3, i, k, j] = f["dips"][3].transpose(0, 2, 1, 3, 5, 4)
-                                    ints[3, k, i, j] = f["dips"][3].transpose(2, 0, 1, 5, 3, 4)
-                                    ints[3, j, k, i] = f["dips"][3].transpose(1, 2, 0, 4, 5, 3)
-                                    ints[3, k, j, i] = f["dips"][3].transpose(2, 1, 0, 5, 4, 3)
             elif nmode == 4:
                 ints = np.empty((3, nmodes, nmodes, nmodes, nmodes), dtype=object)
                 if usePyPotDip:
@@ -1995,14 +1957,11 @@ class NModePotential():
                             for l in range(k, nmodes):
                                 intotf_name = "dips4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
                                 with h5py.File(intotf_name, "r") as f:
-                                    Is = list(permutations([i, j, k, l]))
-                                    Js = list(permutations([0, 1, 2, 3]))
-                                    ncart = 3
+                                    ints[0, i, j, k, l] = f["dips"][0]
+                                    ints[1, i, j, k, l] = f["dips"][1]
+                                    ints[2, i, j, k, l] = f["dips"][2]
                                     if usePyPotDip:
-                                        ncart = 4
-                                    for x in range(ncart):
-                                        for I in range(len(Is)):
-                                            ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + tuple(np.array(Js[I]) + 4))
+                                        ints[3, i, j, k, l] = f["dips"][3]
             elif nmode == 5:
                 ints = np.empty((3, nmodes, nmodes, nmodes, nmodes, nmodes), dtype=object)
                 if usePyPotDip:
@@ -2014,14 +1973,11 @@ class NModePotential():
                                 for m in range(l, nmodes):
                                     intotf_name = "dips5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
                                     with h5py.File(intotf_name, "r") as f:
-                                        Is = list(permutations([i, j, k, l, m]))
-                                        Js = list(permutations([0, 1, 2, 3, 4]))
-                                        ncart = 3
+                                        ints[0, i, j, k, l, m] = f["dips"][0]
+                                        ints[1, i, j, k, l, m] = f["dips"][1]
+                                        ints[2, i, j, k, l, m] = f["dips"][2]
                                         if usePyPotDip:
-                                            ncart = 4
-                                        for x in range(ncart):
-                                            for I in range(len(Is)):
-                                                ints[x][Is[I]] = f["dips"][x].transpose(Js[I] + tuple(np.array(Js[I]) + 5))
+                                            ints[3, i, j, k, l, m] = f["dips"][3]
         return ints
 
     def get_inv_inertia_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None):

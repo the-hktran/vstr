@@ -141,6 +141,20 @@ class TestCompactNModeIntegralStorage(unittest.TestCase):
             for j in range(i, mol.Nm):
                 for k in range(j, mol.Nm):
                     mol.ints[2][i, j, k] = hermitian_tensor(3, mol.ngridpts, 1000 + 100 * i + 10 * j + k)
+        mol.dip_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3), np.asarray([[[[[[[[[[[[[]]]]]]]]]]]]] * 3), np.asarray([[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]] * 3)]
+        mol.dip_ints[0] = np.empty((3, mol.Nm), dtype=object)
+        mol.dip_ints[1] = np.empty((3, mol.Nm, mol.Nm), dtype=object)
+        mol.dip_ints[2] = np.empty((3, mol.Nm, mol.Nm, mol.Nm), dtype=object)
+        for x in range(3):
+            for i in range(mol.Nm):
+                mol.dip_ints[0][x, i] = hermitian_tensor(1, mol.ngridpts, 2000 + 100 * x + i)
+            for i in range(mol.Nm):
+                for j in range(i, mol.Nm):
+                    mol.dip_ints[1][x, i, j] = hermitian_tensor(2, mol.ngridpts, 3000 + 100 * x + 10 * i + j)
+            for i in range(mol.Nm):
+                for j in range(i, mol.Nm):
+                    for k in range(j, mol.Nm):
+                        mol.dip_ints[2][x, i, j, k] = hermitian_tensor(3, mol.ngridpts, 4000 + 100 * x + 100 * i + 10 * j + k)
         return mol
 
     def test_save_and_read_use_compact_canonical_storage(self):
@@ -204,6 +218,30 @@ class TestCompactNModeIntegralStorage(unittest.TestCase):
         self.assertEqual(call_count["value"], 6)
         np.testing.assert_allclose(ints[1, 0], ints[0, 1].transpose(1, 0, 3, 2))
         np.testing.assert_allclose(ints[2, 1], ints[1, 2].transpose(1, 0, 3, 2))
+
+    def test_save_dipoles_uses_compact_canonical_storage(self):
+        mol = self.make_molecule()
+        mol.SaveDipoles()
+
+        with h5py.File(self.ints_file, "r") as handle:
+            self.assertEqual(handle["dip_ints"].attrs["storage"], "canonical_hermitian_packed")
+            self.assertEqual(sorted(handle["dip_ints/2/x"].keys()), ["1_1", "1_2", "1_3", "2_2", "2_3", "3_3"])
+            self.assertEqual(sorted(handle["dip_ints/3/z"].keys()), ["1_1_1", "1_1_2", "1_1_3", "1_2_2", "1_2_3", "1_3_3", "2_2_2", "2_2_3", "2_3_3", "3_3_3"])
+            self.assertEqual(handle["dip_ints/2/y/1_3"].ndim, 1)
+            self.assertEqual(handle["dip_ints/2/y/1_3"].shape[0], self.mod._nmode_packed_size(2, mol.ngridpts))
+
+    def test_read_dipoles_restores_permuted_dense_tensors(self):
+        mol = self.make_molecule()
+        mol.SaveDipoles()
+
+        read_mol = self.make_molecule()
+        read_mol.dip_ints = [np.asarray([]) for _ in range(5)]
+        read_mol.ReadDipoles()
+
+        expected_two_mode = np.transpose(mol.dip_ints[1][1, 0, 2], (1, 0, 3, 2))
+        expected_three_mode = np.transpose(mol.dip_ints[2][2, 0, 1, 2], (2, 0, 1, 5, 3, 4))
+        np.testing.assert_allclose(read_mol.dip_ints[1][1, 2, 0], expected_two_mode)
+        np.testing.assert_allclose(read_mol.dip_ints[2][2, 2, 0, 1], expected_three_mode)
 
 
 if __name__ == "__main__":
