@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 
 
-REPO_ROOT = pathlib.Path("/tmp/workspace/the-hktran/vstr")
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 MOL_PATH = REPO_ROOT / "nmode" / "mol.py"
 
 
@@ -60,6 +60,9 @@ def load_mol_module():
     perf_utils = types.ModuleType("vstr.utils.perf_utils")
 
     class DummyTimer:
+        def __init__(self, *args, **kwargs):
+            return None
+
         def start(self, *args, **kwargs):
             return None
 

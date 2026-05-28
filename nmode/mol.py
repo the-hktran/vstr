@@ -43,14 +43,14 @@ def _pack_nmode_integral(tensor):
 
 def _unpack_nmode_integral(packed_tensor, order, ngridpts):
     nstates = ngridpts ** order
-    matrix = np.zeros((nstates, nstates), dtype = packed_tensor.dtype)
+    matrix = np.zeros((nstates, nstates), dtype=packed_tensor.dtype)
     upper = np.triu_indices(nstates)
     matrix[upper] = packed_tensor
     matrix[(upper[1], upper[0])] = packed_tensor
     return np.reshape(matrix, (ngridpts,) * (2 * order))
 
 def _canonicalize_nmode_tensor(indices, tensor):
-    perm = tuple(np.argsort(indices, kind = 'stable'))
+    perm = tuple(np.argsort(indices, kind='stable'))
     canonical_indices = tuple(indices[i] for i in perm)
     if perm == tuple(range(len(indices))):
         return canonical_indices, np.asarray(tensor)
@@ -644,7 +644,7 @@ class Molecule():
 
         with h5py.File(IntsFile, "r") as f:
             def read_integral(order, indices):
-                perm = tuple(np.argsort(indices, kind = 'stable'))
+                perm = tuple(np.argsort(indices, kind='stable'))
                 canonical_indices = tuple(indices[i] for i in perm)
                 dataset = f["ints/%d/%s" % (order, "_".join(str(i + 1) for i in canonical_indices))][()]
                 if np.asarray(dataset).ndim == 1:
