@@ -2,6 +2,7 @@ import numpy as np
 from vstr.utils import init_funcs
 from vstr.utils.perf_utils import TIMER
 from vstr.utils import constants
+from vstr.nmode.mol import _nmode_mode_index, _unpack_nmode_integral
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import WaveFunction, FConst, HOFunc # classes from JF's code
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import GenerateHamV, GenerateSparseHamV, GenerateSparseHamVOD, GenerateHamAnharmV, AddStatesHB, AddStatesHBWithMax, AddStatesHBFromVSCF, HeatBath_Sort_FC, DoPT2, DoSPT2, AddStatesHBStoreCoupling, VCISparseHamNMode, VCISparseHamNModeArray, VCISparseHamNModeFromOM, VCISparseHamNModeFromOMArray, ConnectedStatesCIPSI, AddStatesCIPSI, AddStatesHB2Mode, AddStatesHB2ModeArray, VCISparseT
 from functools import reduce
@@ -349,6 +350,14 @@ def SparseDiagonalizeNMode(mVHCI):
         mir.kernel()
         mir.PlotSpectrum("spectrum_step_%d.png" % (len(mVHCI.Basis)), XMin = mVHCI.XLim[0], XMax = mVHCI.XLim[1], L = 5, NPoints = 201)
         mir.SaveSpectrum("spectrum_step_%d" % (len(mVHCI.Basis)))
+
+
+def _get_two_mode_tensor(mol, i, j):
+    two_mode = mol.ints[1]
+    if getattr(two_mode, "dtype", None) == object:
+        return two_mode[i, j]
+    mode_index = _nmode_mode_index((i, j))
+    return _unpack_nmode_integral(two_mode[mode_index], 2, mol.ngridpts)
 
 def VCISparseHamTCI(Basis1, Basis2, Frequencies, V0, CoreTensors, OffDiagonal, withT = True):
     if withT:
@@ -876,9 +885,10 @@ class NModeVHCI(VHCI):
             self.Sorted2Mode = np.empty((self.mol.Nm, self.mol.Nm, self.mol.ngridpts, self.mol.ngridpts, self.mol.ngridpts**2, 2), dtype = np.int8)
             for i in range(self.mol.Nm):
                 for j in range(self.mol.Nm):
+                    two_mode_tensor = _get_two_mode_tensor(self.mol, i, j)
                     for ni in range(self.mol.ngridpts):
                         for nj in range(self.mol.ngridpts):
-                            Sorted = np.argsort(-abs(self.mol.ints[1][i, j][ni, nj].reshape(-1)))
+                            Sorted = np.argsort(-abs(two_mode_tensor[ni, nj].reshape(-1)))
                             Sorted = np.unravel_index(Sorted, (self.mol.ngridpts, self.mol.ngridpts))
                             Sorted = np.vstack((Sorted[0], Sorted[1]))
                             self.Sorted2Mode[i, j, ni, nj] = Sorted.T

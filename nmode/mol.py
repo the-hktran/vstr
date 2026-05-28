@@ -1576,7 +1576,7 @@ class NModePotential():
                 ints = np.empty((nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
                     Ci = coeff[i].T @ onemode_coeff[i]
-                    for j in range(nmodes):
+                    for j in range(i, nmodes):
                         if self.nm.mol.doSaveIntsOTF:
                             intotf_name = "ints2_" + str(i) + "_" + str(j) + ".h5"
                             if os.path.exists(intotf_name):
@@ -1590,6 +1590,8 @@ class NModePotential():
                                 f.create_dataset("ints", data = vij * constants.AU_TO_INVCM)    
                         else:
                             ints[i, j] = vij * constants.AU_TO_INVCM
+                            if i != j:
+                                ints[j, i] = vij.transpose(1, 0, 3, 2) * constants.AU_TO_INVCM
 
             elif nmode == 3:
                 ints = np.empty((nmodes,nmodes,nmodes), dtype=object)
@@ -1705,7 +1707,7 @@ class NModePotential():
             elif nmode == 2:
                 ints = np.empty((nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
-                    for j in range(nmodes):
+                    for j in range(i, nmodes):
                         intotf_name = "ints2_" + str(i) + "_" + str(j) + ".h5"
                         with h5py.File(intotf_name, "r") as f:
                             ints[i, j] = f["ints"][:]
@@ -1717,11 +1719,6 @@ class NModePotential():
                             intotf_name = "ints3_" + str(i) + "_" + str(j) + "_" + str(k) + ".h5"
                             with h5py.File(intotf_name, "r") as f:
                                 ints[i, j, k] = f["ints"][:]
-                                ints[j, i, k] = f["ints"][:].transpose(1, 0, 2, 4, 3, 5)
-                                ints[i, k, j] = f["ints"][:].transpose(0, 2, 1, 3, 5, 4)
-                                ints[k, i, j] = f["ints"][:].transpose(2, 0, 1, 5, 3, 4)
-                                ints[j, k, i] = f["ints"][:].transpose(1, 2, 0, 4, 5, 3)
-                                ints[k, j, i] = f["ints"][:].transpose(2, 1, 0, 5, 4, 3)
             elif nmode == 4:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1730,10 +1727,7 @@ class NModePotential():
                             for l in range(k, nmodes):
                                 intotf_name = "ints4_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + ".h5"
                                 with h5py.File(intotf_name, "r") as f:
-                                    Is = list(permutations([i, j, k, l]))
-                                    Js = list(permutations([0, 1, 2, 3]))
-                                    for I in range(len(Is)):
-                                        ints[Is[I]] = f["ints"][:].transpose(Js[I] + tuple(np.array(Js[I]) + 4))
+                                    ints[i, j, k, l] = f["ints"][:]
             elif nmode == 5:
                 ints = np.empty((nmodes,nmodes,nmodes,nmodes,nmodes), dtype=object)
                 for i in range(nmodes):
@@ -1743,10 +1737,7 @@ class NModePotential():
                                 for m in range(l, nmodes):
                                     intotf_name = "ints5_" + str(i) + "_" + str(j) + "_" + str(k) + "_" + str(l) + "_" + str(m) + ".h5"
                                     with h5py.File(intotf_name, "r") as f:
-                                        Is = list(permutations([i, j, k, l, m]))
-                                        Js = list(permutations([0, 1, 2, 3, 4]))
-                                        for I in Is:
-                                            ints[Is[I]] = f["ints"][:].transpose(Js[I] + tuple(np.array(Js[I]) + 5))
+                                        ints[i, j, k, l, m] = f["ints"][:]
         return ints
 
     def get_dipole_ints(self, nmode, ngridpts=None, optimized=False, ngridpts0=None, onemode_coeff = None, usePyPotDip = False):

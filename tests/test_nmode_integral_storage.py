@@ -182,6 +182,29 @@ class TestCompactNModeIntegralStorage(unittest.TestCase):
         np.testing.assert_allclose(read_mol.ints[1][2, 0], expected_two_mode)
         np.testing.assert_allclose(read_mol.ints[2][2, 0, 1], expected_three_mode)
 
+    def test_get_ints_uses_canonical_pairs_for_two_mode_storage(self):
+        nm = types.SimpleNamespace(
+            nmodes=3,
+            freqs=np.ones(3),
+            mol=types.SimpleNamespace(doSaveIntsOTF=False),
+        )
+        nmode = self.mod.NModePotential(nm)
+
+        call_count = {"value": 0}
+
+        def potential_2mode(i, j, qi, qj):
+            call_count["value"] += 1
+            return np.full((1, 1), i + j + qi + qj)
+
+        nmode.nm.potential_2mode = potential_2mode
+        nmode.get_heg = lambda ngridpts, optimized=False, ngridpts0=None: ([np.array([0.0])] * 3, [np.array([[1.0]])] * 3)
+
+        ints = nmode.get_ints(2, ngridpts=1, onemode_coeff=[np.array([[1.0]]) for _ in range(3)])
+
+        self.assertEqual(call_count["value"], 6)
+        np.testing.assert_allclose(ints[1, 0], ints[0, 1].transpose(1, 0, 3, 2))
+        np.testing.assert_allclose(ints[2, 1], ints[1, 2].transpose(1, 0, 3, 2))
+
 
 if __name__ == "__main__":
     unittest.main()
