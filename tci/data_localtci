@@ -1,0 +1,523 @@
+Beginning geometry optimization...
+...geometry optimization complete.
+All frequencies: [ 117.65346338  136.68722407  144.27852202  175.13123207  348.06494199
+  611.39481024 1643.51642929 1663.8426392  3740.36732204 3821.55380772
+ 3903.7334134  3920.18547228]
+Iteration: 0, Mode: 0, Cost: 16.687484
+Iteration: 0, Mode: 1, Cost: 16.935091
+Iteration: 0, Mode: 2, Cost: 17.126453
+Iteration: 0, Mode: 3, Cost: 18.565576
+Iteration: 0, Mode: 4, Cost: 19.296254
+Iteration: 0, Mode: 5, Cost: 19.363323
+Iteration: 0, Mode: 6, Cost: 19.479349
+Iteration: 0, Mode: 7, Cost: 19.479505
+Iteration: 0, Mode: 8, Cost: 19.479723
+Iteration: 0, Mode: 9, Cost: 19.479740
+Iteration: 0, Mode: 10, Cost: 19.480560
+Iteration: 0, Mode: 11, Cost: 19.766009
+Iteration: 0, Mode: 12, Cost: 19.769907
+Iteration: 0, Mode: 13, Cost: 19.773238
+Iteration: 0, Mode: 14, Cost: 19.774392
+Iteration: 0, Mode: 15, Cost: 19.808146
+Iteration: 0, Mode: 16, Cost: 19.821359
+Iteration: 0, Mode: 17, Cost: 19.821395
+Iteration: 0, Mode: 18, Cost: 19.821618
+Iteration: 0, Mode: 19, Cost: 19.821621
+Iteration: 0, Mode: 20, Cost: 19.821629
+Iteration: 0, Mode: 21, Cost: 20.220219
+Iteration: 0, Mode: 22, Cost: 22.520443
+Iteration: 0, Mode: 23, Cost: 23.248177
+Iteration: 0, Mode: 24, Cost: 23.397280
+Iteration: 0, Mode: 25, Cost: 23.504909
+Iteration: 0, Mode: 26, Cost: 23.504913
+Iteration: 0, Mode: 27, Cost: 23.505041
+Iteration: 0, Mode: 28, Cost: 23.505082
+Iteration: 0, Mode: 29, Cost: 23.505629
+Iteration: 0, Mode: 30, Cost: 23.527325
+Iteration: 0, Mode: 31, Cost: 23.527554
+Iteration: 0, Mode: 32, Cost: 23.545618
+Iteration: 0, Mode: 33, Cost: 23.546878
+Iteration: 0, Mode: 34, Cost: 23.587600
+Iteration: 0, Mode: 35, Cost: 23.587743
+Iteration: 0, Mode: 36, Cost: 23.600710
+Iteration: 0, Mode: 37, Cost: 23.600713
+Iteration: 0, Mode: 38, Cost: 23.600717
+Iteration: 0, Mode: 39, Cost: 23.622318
+Iteration: 0, Mode: 40, Cost: 24.703167
+Iteration: 0, Mode: 41, Cost: 24.703413
+Iteration: 0, Mode: 42, Cost: 24.703852
+Iteration: 0, Mode: 43, Cost: 24.704287
+Iteration: 0, Mode: 44, Cost: 24.704299
+Iteration: 0, Mode: 45, Cost: 24.704362
+Iteration: 0, Mode: 46, Cost: 24.705297
+Iteration: 0, Mode: 47, Cost: 24.705297
+Iteration: 0, Mode: 48, Cost: 24.705307
+Iteration: 0, Mode: 49, Cost: 24.705468
+Iteration: 0, Mode: 50, Cost: 24.705560
+Iteration: 0, Mode: 51, Cost: 25.013304
+Iteration: 0, Mode: 52, Cost: 25.013622
+Iteration: 0, Mode: 53, Cost: 25.014863
+Iteration: 0, Mode: 54, Cost: 25.037413
+Iteration: 0, Mode: 55, Cost: 25.141744
+Iteration: 0, Mode: 56, Cost: 25.141778
+Iteration: 0, Mode: 57, Cost: 25.141854
+Iteration: 0, Mode: 58, Cost: 25.143048
+Iteration: 0, Mode: 59, Cost: 25.143177
+Iteration: 0, Mode: 60, Cost: 25.295940
+Iteration: 0, Mode: 61, Cost: 25.634782
+Iteration: 0, Mode: 62, Cost: 25.640407
+Iteration: 0, Mode: 63, Cost: 25.650456
+Iteration: 0, Mode: 64, Cost: 26.038893
+Iteration: 0, Mode: 65, Cost: 26.039309
+Iteration: 1, Mode: 0, Cost: 26.399677
+Iteration: 1, Mode: 1, Cost: 26.400752
+Iteration: 1, Mode: 2, Cost: 26.414885
+Iteration: 1, Mode: 3, Cost: 26.421237
+Iteration: 1, Mode: 4, Cost: 26.421337
+Iteration: 1, Mode: 5, Cost: 26.423374
+Iteration: 1, Mode: 6, Cost: 26.469905
+Iteration: 1, Mode: 7, Cost: 26.470133
+Iteration: 1, Mode: 8, Cost: 26.470448
+Iteration: 1, Mode: 9, Cost: 26.470608
+Iteration: 1, Mode: 10, Cost: 26.476848
+Iteration: 1, Mode: 11, Cost: 26.625131
+Iteration: 1, Mode: 12, Cost: 26.625643
+Iteration: 1, Mode: 13, Cost: 26.630268
+Iteration: 1, Mode: 14, Cost: 26.634500
+Iteration: 1, Mode: 15, Cost: 26.637549
+Iteration: 1, Mode: 16, Cost: 26.641581
+Iteration: 1, Mode: 17, Cost: 26.641608
+Iteration: 1, Mode: 18, Cost: 26.641761
+Iteration: 1, Mode: 19, Cost: 26.641901
+Iteration: 1, Mode: 20, Cost: 26.646702
+Iteration: 1, Mode: 21, Cost: 26.646702
+Iteration: 1, Mode: 22, Cost: 26.647416
+Iteration: 1, Mode: 23, Cost: 26.647416
+Iteration: 1, Mode: 24, Cost: 26.648069
+Iteration: 1, Mode: 25, Cost: 26.648391
+Iteration: 1, Mode: 26, Cost: 26.648434
+Iteration: 1, Mode: 27, Cost: 26.650800
+Iteration: 1, Mode: 28, Cost: 26.650806
+Iteration: 1, Mode: 29, Cost: 26.651172
+Iteration: 1, Mode: 30, Cost: 26.651441
+Iteration: 1, Mode: 31, Cost: 26.651550
+Iteration: 1, Mode: 32, Cost: 26.652063
+Iteration: 1, Mode: 33, Cost: 26.652125
+Iteration: 1, Mode: 34, Cost: 26.652829
+Iteration: 1, Mode: 35, Cost: 26.653351
+Iteration: 1, Mode: 36, Cost: 26.653432
+Iteration: 1, Mode: 37, Cost: 26.653508
+Iteration: 1, Mode: 38, Cost: 26.653569
+Iteration: 1, Mode: 39, Cost: 26.761668
+Iteration: 1, Mode: 40, Cost: 26.766839
+Iteration: 1, Mode: 41, Cost: 26.778475
+Iteration: 1, Mode: 42, Cost: 26.782790
+Iteration: 1, Mode: 43, Cost: 26.783293
+Iteration: 1, Mode: 44, Cost: 26.890725
+Iteration: 1, Mode: 45, Cost: 26.904030
+Iteration: 1, Mode: 46, Cost: 26.904228
+Iteration: 1, Mode: 47, Cost: 26.904231
+Iteration: 1, Mode: 48, Cost: 26.906248
+Iteration: 1, Mode: 49, Cost: 26.906249
+Iteration: 1, Mode: 50, Cost: 26.920150
+Iteration: 1, Mode: 51, Cost: 26.920203
+Iteration: 1, Mode: 52, Cost: 26.927423
+Iteration: 1, Mode: 53, Cost: 27.184091
+Iteration: 1, Mode: 54, Cost: 27.184894
+Iteration: 1, Mode: 55, Cost: 27.440128
+Iteration: 1, Mode: 56, Cost: 27.440231
+Iteration: 1, Mode: 57, Cost: 27.440296
+Iteration: 1, Mode: 58, Cost: 27.440302
+Iteration: 1, Mode: 59, Cost: 27.440721
+Iteration: 1, Mode: 60, Cost: 27.441067
+Iteration: 1, Mode: 61, Cost: 27.441067
+Iteration: 1, Mode: 62, Cost: 27.441480
+Iteration: 1, Mode: 63, Cost: 27.441514
+Iteration: 1, Mode: 64, Cost: 27.449695
+Iteration: 1, Mode: 65, Cost: 27.463783
+Iteration: 2, Mode: 0, Cost: 27.463975
+Iteration: 2, Mode: 1, Cost: 27.463980
+Iteration: 2, Mode: 2, Cost: 27.463986
+Iteration: 2, Mode: 3, Cost: 27.465194
+Iteration: 2, Mode: 4, Cost: 27.465592
+Iteration: 2, Mode: 5, Cost: 27.465618
+Iteration: 2, Mode: 6, Cost: 27.465637
+Iteration: 2, Mode: 7, Cost: 27.465637
+Iteration: 2, Mode: 8, Cost: 27.466091
+Iteration: 2, Mode: 9, Cost: 27.466527
+Iteration: 2, Mode: 10, Cost: 27.466532
+Iteration: 2, Mode: 11, Cost: 27.466538
+Iteration: 2, Mode: 12, Cost: 27.466541
+Iteration: 2, Mode: 13, Cost: 27.466827
+Iteration: 2, Mode: 14, Cost: 27.466845
+Iteration: 2, Mode: 15, Cost: 27.467258
+Iteration: 2, Mode: 16, Cost: 27.467276
+Iteration: 2, Mode: 17, Cost: 27.467277
+Iteration: 2, Mode: 18, Cost: 27.467698
+Iteration: 2, Mode: 19, Cost: 27.467768
+Iteration: 2, Mode: 20, Cost: 27.472650
+Iteration: 2, Mode: 21, Cost: 27.472651
+Iteration: 2, Mode: 22, Cost: 27.472653
+Iteration: 2, Mode: 23, Cost: 27.472654
+Iteration: 2, Mode: 24, Cost: 27.473351
+Iteration: 2, Mode: 25, Cost: 27.473441
+Iteration: 2, Mode: 26, Cost: 27.473706
+Iteration: 2, Mode: 27, Cost: 27.475383
+Iteration: 2, Mode: 28, Cost: 27.480531
+Iteration: 2, Mode: 29, Cost: 27.480955
+Iteration: 2, Mode: 30, Cost: 27.481029
+Iteration: 2, Mode: 31, Cost: 27.481032
+Iteration: 2, Mode: 32, Cost: 27.481041
+Iteration: 2, Mode: 33, Cost: 27.481042
+Iteration: 2, Mode: 34, Cost: 27.481048
+Iteration: 2, Mode: 35, Cost: 27.481077
+Iteration: 2, Mode: 36, Cost: 27.481088
+Iteration: 2, Mode: 37, Cost: 27.481112
+Iteration: 2, Mode: 38, Cost: 27.481469
+Iteration: 2, Mode: 39, Cost: 27.481497
+Iteration: 2, Mode: 40, Cost: 27.481509
+Iteration: 2, Mode: 41, Cost: 27.481513
+Iteration: 2, Mode: 42, Cost: 27.481515
+Iteration: 2, Mode: 43, Cost: 27.481671
+Iteration: 2, Mode: 44, Cost: 27.481705
+Iteration: 2, Mode: 45, Cost: 27.481762
+Iteration: 2, Mode: 46, Cost: 27.481769
+Iteration: 2, Mode: 47, Cost: 27.481771
+Iteration: 2, Mode: 48, Cost: 27.481852
+Iteration: 2, Mode: 49, Cost: 27.481897
+Iteration: 2, Mode: 50, Cost: 27.482415
+Iteration: 2, Mode: 51, Cost: 27.482575
+Iteration: 2, Mode: 52, Cost: 27.483170
+Iteration: 2, Mode: 53, Cost: 27.486095
+Iteration: 2, Mode: 54, Cost: 27.493667
+Iteration: 2, Mode: 55, Cost: 27.493789
+Iteration: 2, Mode: 56, Cost: 27.493789
+Iteration: 2, Mode: 57, Cost: 27.493789
+Iteration: 2, Mode: 58, Cost: 27.493792
+Iteration: 2, Mode: 59, Cost: 27.493792
+Iteration: 2, Mode: 60, Cost: 27.493792
+Iteration: 2, Mode: 61, Cost: 27.493794
+Iteration: 2, Mode: 62, Cost: 27.493794
+Iteration: 2, Mode: 63, Cost: 27.493794
+Iteration: 2, Mode: 64, Cost: 27.493796
+Iteration: 2, Mode: 65, Cost: 27.493796
+Iteration: 3, Mode: 0, Cost: 27.494078
+Iteration: 3, Mode: 1, Cost: 27.495234
+Iteration: 3, Mode: 2, Cost: 27.495253
+Iteration: 3, Mode: 3, Cost: 27.495254
+Iteration: 3, Mode: 4, Cost: 27.495311
+Iteration: 3, Mode: 5, Cost: 27.497312
+Iteration: 3, Mode: 6, Cost: 27.497312
+Iteration: 3, Mode: 7, Cost: 27.497313
+Iteration: 3, Mode: 8, Cost: 27.497411
+Iteration: 3, Mode: 9, Cost: 27.497411
+Iteration: 3, Mode: 10, Cost: 27.497424
+Iteration: 3, Mode: 11, Cost: 27.497440
+Iteration: 3, Mode: 12, Cost: 27.497440
+Iteration: 3, Mode: 13, Cost: 27.497440
+Iteration: 3, Mode: 14, Cost: 27.497440
+Iteration: 3, Mode: 15, Cost: 27.497444
+Iteration: 3, Mode: 16, Cost: 27.497444
+Iteration: 3, Mode: 17, Cost: 27.497444
+Iteration: 3, Mode: 18, Cost: 27.497444
+Iteration: 3, Mode: 19, Cost: 27.497444
+Iteration: 3, Mode: 20, Cost: 27.497446
+Iteration: 3, Mode: 21, Cost: 27.497452
+Iteration: 3, Mode: 22, Cost: 27.497471
+Iteration: 3, Mode: 23, Cost: 27.497499
+Iteration: 3, Mode: 24, Cost: 27.497507
+Iteration: 3, Mode: 25, Cost: 27.497507
+Iteration: 3, Mode: 26, Cost: 27.497507
+Iteration: 3, Mode: 27, Cost: 27.497507
+Iteration: 3, Mode: 28, Cost: 27.497509
+Iteration: 3, Mode: 29, Cost: 27.497509
+Iteration: 3, Mode: 30, Cost: 27.497509
+Iteration: 3, Mode: 31, Cost: 27.497509
+Iteration: 3, Mode: 32, Cost: 27.497509
+Iteration: 3, Mode: 33, Cost: 27.497509
+Iteration: 3, Mode: 34, Cost: 27.497509
+Iteration: 3, Mode: 35, Cost: 27.497512
+Iteration: 3, Mode: 36, Cost: 27.497512
+Iteration: 3, Mode: 37, Cost: 27.497512
+Iteration: 3, Mode: 38, Cost: 27.497514
+Iteration: 3, Mode: 39, Cost: 27.497974
+Iteration: 3, Mode: 40, Cost: 27.497974
+Iteration: 3, Mode: 41, Cost: 27.497974
+Iteration: 3, Mode: 42, Cost: 27.497974
+Iteration: 3, Mode: 43, Cost: 27.497974
+Iteration: 3, Mode: 44, Cost: 27.497974
+Iteration: 3, Mode: 45, Cost: 27.497974
+Iteration: 3, Mode: 46, Cost: 27.497974
+Iteration: 3, Mode: 47, Cost: 27.497974
+Iteration: 3, Mode: 48, Cost: 27.497974
+Iteration: 3, Mode: 49, Cost: 27.497974
+Iteration: 3, Mode: 50, Cost: 27.497974
+Iteration: 3, Mode: 51, Cost: 27.497974
+Iteration: 3, Mode: 52, Cost: 27.497974
+Iteration: 3, Mode: 53, Cost: 27.497974
+Iteration: 3, Mode: 54, Cost: 27.497974
+Iteration: 3, Mode: 55, Cost: 27.497974
+Iteration: 3, Mode: 56, Cost: 27.497974
+Iteration: 3, Mode: 57, Cost: 27.497974
+Iteration: 3, Mode: 58, Cost: 27.497974
+Iteration: 3, Mode: 59, Cost: 27.497974
+Iteration: 3, Mode: 60, Cost: 27.497974
+Iteration: 3, Mode: 61, Cost: 27.497974
+Iteration: 3, Mode: 62, Cost: 27.497974
+Iteration: 3, Mode: 63, Cost: 27.497974
+Iteration: 3, Mode: 64, Cost: 27.497975
+Iteration: 3, Mode: 65, Cost: 27.497975
+Iteration: 4, Mode: 0, Cost: 27.497975
+Iteration: 4, Mode: 1, Cost: 27.497975
+Iteration: 4, Mode: 2, Cost: 27.497978
+Iteration: 4, Mode: 3, Cost: 27.497978
+Iteration: 4, Mode: 4, Cost: 27.497978
+Iteration: 4, Mode: 5, Cost: 27.497978
+Iteration: 4, Mode: 6, Cost: 27.497978
+Iteration: 4, Mode: 7, Cost: 27.497978
+Iteration: 4, Mode: 8, Cost: 27.497978
+Iteration: 4, Mode: 9, Cost: 27.497978
+Iteration: 4, Mode: 10, Cost: 27.497978
+Iteration: 4, Mode: 11, Cost: 27.497978
+Iteration: 4, Mode: 12, Cost: 27.497978
+Iteration: 4, Mode: 13, Cost: 27.497978
+Iteration: 4, Mode: 14, Cost: 27.497978
+Iteration: 4, Mode: 15, Cost: 27.497978
+Iteration: 4, Mode: 16, Cost: 27.497978
+Iteration: 4, Mode: 17, Cost: 27.497978
+Iteration: 4, Mode: 18, Cost: 27.497978
+Iteration: 4, Mode: 19, Cost: 27.497978
+Iteration: 4, Mode: 20, Cost: 27.497978
+Iteration: 4, Mode: 21, Cost: 27.497978
+Iteration: 4, Mode: 22, Cost: 27.497979
+Iteration: 4, Mode: 23, Cost: 27.497979
+Iteration: 4, Mode: 24, Cost: 27.497979
+Iteration: 4, Mode: 25, Cost: 27.497979
+Iteration: 4, Mode: 26, Cost: 27.497979
+Iteration: 4, Mode: 27, Cost: 27.497979
+Iteration: 4, Mode: 28, Cost: 27.497979
+Iteration: 4, Mode: 29, Cost: 27.497979
+Iteration: 4, Mode: 30, Cost: 27.497979
+Iteration: 4, Mode: 31, Cost: 27.497979
+Iteration: 4, Mode: 32, Cost: 27.497979
+Iteration: 4, Mode: 33, Cost: 27.497979
+Iteration: 4, Mode: 34, Cost: 27.497979
+Iteration: 4, Mode: 35, Cost: 27.497979
+Iteration: 4, Mode: 36, Cost: 27.497979
+Iteration: 4, Mode: 37, Cost: 27.497979
+Iteration: 4, Mode: 38, Cost: 27.497979
+Iteration: 4, Mode: 39, Cost: 27.497979
+Iteration: 4, Mode: 40, Cost: 27.497979
+Iteration: 4, Mode: 41, Cost: 27.497979
+Iteration: 4, Mode: 42, Cost: 27.497979
+Iteration: 4, Mode: 43, Cost: 27.497979
+Iteration: 4, Mode: 44, Cost: 27.497979
+Iteration: 4, Mode: 45, Cost: 27.497979
+Iteration: 4, Mode: 46, Cost: 27.497979
+Iteration: 4, Mode: 47, Cost: 27.497979
+Iteration: 4, Mode: 48, Cost: 27.497980
+Iteration: 4, Mode: 49, Cost: 27.497980
+Iteration: 4, Mode: 50, Cost: 27.497980
+Iteration: 4, Mode: 51, Cost: 27.497980
+Iteration: 4, Mode: 52, Cost: 27.497980
+Iteration: 4, Mode: 53, Cost: 27.497980
+Iteration: 4, Mode: 54, Cost: 27.497980
+Iteration: 4, Mode: 55, Cost: 27.497980
+Iteration: 4, Mode: 56, Cost: 27.497980
+Iteration: 4, Mode: 57, Cost: 27.497980
+Iteration: 4, Mode: 58, Cost: 27.497980
+Iteration: 4, Mode: 59, Cost: 27.497980
+Iteration: 4, Mode: 60, Cost: 27.497980
+Iteration: 4, Mode: 61, Cost: 27.497980
+Iteration: 4, Mode: 62, Cost: 27.497980
+Iteration: 4, Mode: 63, Cost: 27.497980
+Iteration: 4, Mode: 64, Cost: 27.497980
+Iteration: 4, Mode: 65, Cost: 27.497980
+Iteration: 5, Mode: 0, Cost: 27.497980
+Iteration: 5, Mode: 1, Cost: 27.497980
+Iteration: 5, Mode: 2, Cost: 27.497980
+Iteration: 5, Mode: 3, Cost: 27.497980
+Iteration: 5, Mode: 4, Cost: 27.497980
+Iteration: 5, Mode: 5, Cost: 27.497980
+Iteration: 5, Mode: 6, Cost: 27.497980
+Iteration: 5, Mode: 7, Cost: 27.497980
+Iteration: 5, Mode: 8, Cost: 27.497980
+Iteration: 5, Mode: 9, Cost: 27.497980
+Iteration: 5, Mode: 10, Cost: 27.497980
+Iteration: 5, Mode: 11, Cost: 27.497980
+Iteration: 5, Mode: 12, Cost: 27.497980
+Iteration: 5, Mode: 13, Cost: 27.497980
+Iteration: 5, Mode: 14, Cost: 27.497980
+Iteration: 5, Mode: 15, Cost: 27.497980
+Iteration: 5, Mode: 16, Cost: 27.497980
+Iteration: 5, Mode: 17, Cost: 27.497980
+Iteration: 5, Mode: 18, Cost: 27.497980
+Iteration: 5, Mode: 19, Cost: 27.497980
+Iteration: 5, Mode: 20, Cost: 27.497980
+Iteration: 5, Mode: 21, Cost: 27.497980
+Iteration: 5, Mode: 22, Cost: 27.497980
+Iteration: 5, Mode: 23, Cost: 27.497980
+Iteration: 5, Mode: 24, Cost: 27.497980
+Iteration: 5, Mode: 25, Cost: 27.497980
+Iteration: 5, Mode: 26, Cost: 27.497980
+Iteration: 5, Mode: 27, Cost: 27.497980
+Iteration: 5, Mode: 28, Cost: 27.497980
+Iteration: 5, Mode: 29, Cost: 27.497980
+Iteration: 5, Mode: 30, Cost: 27.497980
+Iteration: 5, Mode: 31, Cost: 27.497980
+Iteration: 5, Mode: 32, Cost: 27.497980
+Iteration: 5, Mode: 33, Cost: 27.497980
+Iteration: 5, Mode: 34, Cost: 27.497980
+Iteration: 5, Mode: 35, Cost: 27.497980
+Iteration: 5, Mode: 36, Cost: 27.497980
+Iteration: 5, Mode: 37, Cost: 27.497980
+Iteration: 5, Mode: 38, Cost: 27.497980
+Iteration: 5, Mode: 39, Cost: 27.497980
+Iteration: 5, Mode: 40, Cost: 27.497980
+Iteration: 5, Mode: 41, Cost: 27.497980
+Iteration: 5, Mode: 42, Cost: 27.497980
+Iteration: 5, Mode: 43, Cost: 27.497980
+Iteration: 5, Mode: 44, Cost: 27.497980
+Iteration: 5, Mode: 45, Cost: 27.497980
+Iteration: 5, Mode: 46, Cost: 27.497980
+Iteration: 5, Mode: 47, Cost: 27.497980
+Iteration: 5, Mode: 48, Cost: 27.497980
+Iteration: 5, Mode: 49, Cost: 27.497980
+Iteration: 5, Mode: 50, Cost: 27.497980
+Iteration: 5, Mode: 51, Cost: 27.497980
+Iteration: 5, Mode: 52, Cost: 27.497980
+Iteration: 5, Mode: 53, Cost: 27.497980
+Iteration: 5, Mode: 54, Cost: 27.497980
+Iteration: 5, Mode: 55, Cost: 27.497980
+Iteration: 5, Mode: 56, Cost: 27.497980
+Iteration: 5, Mode: 57, Cost: 27.497980
+Iteration: 5, Mode: 58, Cost: 27.497980
+Iteration: 5, Mode: 59, Cost: 27.497980
+Iteration: 5, Mode: 60, Cost: 27.497980
+Iteration: 5, Mode: 61, Cost: 27.497980
+Iteration: 5, Mode: 62, Cost: 27.497980
+Iteration: 5, Mode: 63, Cost: 27.497980
+Iteration: 5, Mode: 64, Cost: 27.497980
+Iteration: 5, Mode: 65, Cost: 27.497980
+rank neval pivotError
+1 291 0.4232013610578614
+2 291 0.4232013610578614
+3 557 1.0955692930895837
+4 945 0.4556388826508003
+5 1499 0.19235112471042715
+6 2079 0.31321111175721666
+7 2928 0.15027908379339314
+8 3795 0.18736670140096695
+9 4710 0.23994684518213738
+10 5767 0.06209193259151724
+11 6774 0.04861007898673139
+12 7932 0.04505186542885231
+13 9291 0.06265975037104135
+14 10542 0.04926907196737751
+15 11853 0.020289725365978506
+16 13059 0.024617425298891854
+17 14764 0.015599019176359419
+18 16341 0.017718262117153022
+19 18384 0.013898223374036678
+20 20536 0.012862631224288046
+21 22381 0.01262997524672202
+22 24084 0.01094949277652335
+23 26461 0.01184642757995849
+24 28475 0.00974620444792998
+25 31204 0.009728379243779867
+26 33696 0.010473557570233827
+27 35793 0.009156059986909298
+28 38353 0.011653533869888544
+29 40705 0.006433470783932083
+30 43058 0.006479670749483801
+31 45982 0.011350742185145396
+32 48106 0.006537834400186848
+33 51012 0.00669616153644173
+34 53506 0.00528908144982107
+35 56711 0.013738134454206713
+36 59669 0.007049897054758031
+37 63111 0.005399481330899458
+38 65765 0.007700242178087374
+39 69488 0.004852886177777516
+40 73302 0.006049434993109393
+41 76160 0.006640569690993248
+42 79804 0.004411372431665922
+43 83348 0.004863576936885605
+44 87261 0.005453887405363789
+45 90868 0.005224750447331644
+46 94363 0.0034916757422780997
+47 98513 0.004602618909223033
+48 102336 0.003657884116014032
+49 105862 0.0029063198905374676
+50 109519 0.004440777605736079
+51 112483 0.0027079251295565876
+52 116670 0.004128181763473626
+53 121117 0.0036549373634152393
+54 125125 0.0029414137134474716
+55 129294 0.0030644691837653504
+56 134025 0.0032286089610936153
+57 137672 0.002697053033752242
+58 142650 0.0032838638256970365
+59 147375 0.00322803417249945
+60 151251 0.002368368738738885
+61 156862 0.002825467574383733
+62 160598 0.001734175207661226
+63 166534 0.003061430219756134
+64 171258 0.0029994101419847374
+65 176311 0.0022873899262199904
+66 181559 0.0018657564768897184
+67 186165 0.002288949964381809
+68 190443 0.0022061990317800984
+69 195464 0.0017941510995291843
+70 200851 0.002271247263638032
+71 205788 0.0016793557582250318
+72 211503 0.0025962630865477287
+73 218015 0.0022925517134005924
+74 223487 0.0017080685607063217
+75 229483 0.0023105072653809566
+76 236133 0.001868640396264415
+77 241191 0.0020280198588088494
+78 246758 0.0018306535162034843
+79 252431 0.0015743243132023965
+80 258054 0.0017626383721285749
+81 263995 0.0014829936273003386
+82 269978 0.0011431002751311758
+83 274914 0.0013169086466187363
+84 279770 0.0013545727549973963
+85 287448 0.0016032829000277582
+86 294530 0.0010540076309470403
+87 299192 0.0014424134705328384
+88 304956 0.0015726907726699435
+89 311175 0.0017637471144134192
+90 317293 0.0012730126875204334
+91 324583 0.0014693791002074463
+92 329817 0.000991807377860282
+93 335455 0.0009470175471563147
+94 342856 0.0011014392853199162
+95 349912 0.0011006185525416767
+96 357551 0.001252022628392191
+97 362562 0.0010527408205033284
+98 370137 0.0014613815716904843
+99 375885 0.0008723803986772916
+100 383762 0.0012007095427351566
+101 390458 0.0011195245008774335
+102 396855 0.001249087073649624
+103 404757 0.0014006128134366747
+104 412972 0.0011932044484970483
+105 419089 0.0007636856825709581
+106 424822 0.0006988956439742261
+107 432568 0.001050645840805109
+108 440933 0.0008369922948893715
+109 450001 0.0008473230126933573
+110 457674 0.0010677116981795964
+111 463851 0.0006174977201885978
+112 472259 0.0008544058649949393
+113 480754 0.0009353080077249554
+114 488344 0.0005344744660056647
+115 495524 0.00070589745984969
+116 502602 0.0007953764738712343
+117 509106 0.0011546555026679395
+118 515543 0.0008038015320431802
+119 525360 0.00044591652791624303
+120 533325 0.0006262504463975249
+121 540771 0.0004401464999344018

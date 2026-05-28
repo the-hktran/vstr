@@ -1,0 +1,732 @@
+Beginning geometry optimization...
+...geometry optimization complete.
+All frequencies: [ 117.65346338  136.68722407  144.27852202  175.13123207  348.06494199
+  611.39481024 1643.51642929 1663.8426392  3740.36732204 3821.55380772
+ 3903.7334134  3920.18547228]
+Iteration: 0, Mode: 0, Cost: 16.687484
+Iteration: 0, Mode: 1, Cost: 16.935091
+Iteration: 0, Mode: 2, Cost: 17.126453
+Iteration: 0, Mode: 3, Cost: 18.565576
+Iteration: 0, Mode: 4, Cost: 19.296254
+Iteration: 0, Mode: 5, Cost: 19.363323
+Iteration: 0, Mode: 6, Cost: 19.479349
+Iteration: 0, Mode: 7, Cost: 19.479505
+Iteration: 0, Mode: 8, Cost: 19.479723
+Iteration: 0, Mode: 9, Cost: 19.479740
+Iteration: 0, Mode: 10, Cost: 19.480560
+Iteration: 0, Mode: 11, Cost: 19.766009
+Iteration: 0, Mode: 12, Cost: 19.769907
+Iteration: 0, Mode: 13, Cost: 19.773238
+Iteration: 0, Mode: 14, Cost: 19.774392
+Iteration: 0, Mode: 15, Cost: 19.808146
+Iteration: 0, Mode: 16, Cost: 19.821359
+Iteration: 0, Mode: 17, Cost: 19.821395
+Iteration: 0, Mode: 18, Cost: 19.821618
+Iteration: 0, Mode: 19, Cost: 19.821621
+Iteration: 0, Mode: 20, Cost: 19.821629
+Iteration: 0, Mode: 21, Cost: 20.220219
+Iteration: 0, Mode: 22, Cost: 22.520443
+Iteration: 0, Mode: 23, Cost: 23.248177
+Iteration: 0, Mode: 24, Cost: 23.397280
+Iteration: 0, Mode: 25, Cost: 23.504909
+Iteration: 0, Mode: 26, Cost: 23.504913
+Iteration: 0, Mode: 27, Cost: 23.505041
+Iteration: 0, Mode: 28, Cost: 23.505082
+Iteration: 0, Mode: 29, Cost: 23.505629
+Iteration: 0, Mode: 30, Cost: 23.527325
+Iteration: 0, Mode: 31, Cost: 23.527554
+Iteration: 0, Mode: 32, Cost: 23.545618
+Iteration: 0, Mode: 33, Cost: 23.546878
+Iteration: 0, Mode: 34, Cost: 23.587600
+Iteration: 0, Mode: 35, Cost: 23.587743
+Iteration: 0, Mode: 36, Cost: 23.600710
+Iteration: 0, Mode: 37, Cost: 23.600713
+Iteration: 0, Mode: 38, Cost: 23.600717
+Iteration: 0, Mode: 39, Cost: 23.622318
+Iteration: 0, Mode: 40, Cost: 24.703167
+Iteration: 0, Mode: 41, Cost: 24.703413
+Iteration: 0, Mode: 42, Cost: 24.703852
+Iteration: 0, Mode: 43, Cost: 24.704287
+Iteration: 0, Mode: 44, Cost: 24.704299
+Iteration: 0, Mode: 45, Cost: 24.704362
+Iteration: 0, Mode: 46, Cost: 24.705297
+Iteration: 0, Mode: 47, Cost: 24.705297
+Iteration: 0, Mode: 48, Cost: 24.705307
+Iteration: 0, Mode: 49, Cost: 24.705468
+Iteration: 0, Mode: 50, Cost: 24.705560
+Iteration: 0, Mode: 51, Cost: 25.013304
+Iteration: 0, Mode: 52, Cost: 25.013622
+Iteration: 0, Mode: 53, Cost: 25.014863
+Iteration: 0, Mode: 54, Cost: 25.037413
+Iteration: 0, Mode: 55, Cost: 25.141744
+Iteration: 0, Mode: 56, Cost: 25.141778
+Iteration: 0, Mode: 57, Cost: 25.141854
+Iteration: 0, Mode: 58, Cost: 25.143048
+Iteration: 0, Mode: 59, Cost: 25.143177
+Iteration: 0, Mode: 60, Cost: 25.295940
+Iteration: 0, Mode: 61, Cost: 25.634782
+Iteration: 0, Mode: 62, Cost: 25.640407
+Iteration: 0, Mode: 63, Cost: 25.650456
+Iteration: 0, Mode: 64, Cost: 26.038893
+Iteration: 0, Mode: 65, Cost: 26.039309
+Iteration: 1, Mode: 0, Cost: 26.399677
+Iteration: 1, Mode: 1, Cost: 26.400752
+Iteration: 1, Mode: 2, Cost: 26.414885
+Iteration: 1, Mode: 3, Cost: 26.421237
+Iteration: 1, Mode: 4, Cost: 26.421337
+Iteration: 1, Mode: 5, Cost: 26.423374
+Iteration: 1, Mode: 6, Cost: 26.469905
+Iteration: 1, Mode: 7, Cost: 26.470133
+Iteration: 1, Mode: 8, Cost: 26.470448
+Iteration: 1, Mode: 9, Cost: 26.470608
+Iteration: 1, Mode: 10, Cost: 26.476848
+Iteration: 1, Mode: 11, Cost: 26.625131
+Iteration: 1, Mode: 12, Cost: 26.625643
+Iteration: 1, Mode: 13, Cost: 26.630268
+Iteration: 1, Mode: 14, Cost: 26.634500
+Iteration: 1, Mode: 15, Cost: 26.637549
+Iteration: 1, Mode: 16, Cost: 26.641581
+Iteration: 1, Mode: 17, Cost: 26.641608
+Iteration: 1, Mode: 18, Cost: 26.641761
+Iteration: 1, Mode: 19, Cost: 26.641901
+Iteration: 1, Mode: 20, Cost: 26.646702
+Iteration: 1, Mode: 21, Cost: 26.646702
+Iteration: 1, Mode: 22, Cost: 26.647416
+Iteration: 1, Mode: 23, Cost: 26.647416
+Iteration: 1, Mode: 24, Cost: 26.648069
+Iteration: 1, Mode: 25, Cost: 26.648391
+Iteration: 1, Mode: 26, Cost: 26.648434
+Iteration: 1, Mode: 27, Cost: 26.650800
+Iteration: 1, Mode: 28, Cost: 26.650806
+Iteration: 1, Mode: 29, Cost: 26.651172
+Iteration: 1, Mode: 30, Cost: 26.651441
+Iteration: 1, Mode: 31, Cost: 26.651550
+Iteration: 1, Mode: 32, Cost: 26.652063
+Iteration: 1, Mode: 33, Cost: 26.652125
+Iteration: 1, Mode: 34, Cost: 26.652829
+Iteration: 1, Mode: 35, Cost: 26.653351
+Iteration: 1, Mode: 36, Cost: 26.653432
+Iteration: 1, Mode: 37, Cost: 26.653508
+Iteration: 1, Mode: 38, Cost: 26.653569
+Iteration: 1, Mode: 39, Cost: 26.761668
+Iteration: 1, Mode: 40, Cost: 26.766839
+Iteration: 1, Mode: 41, Cost: 26.778475
+Iteration: 1, Mode: 42, Cost: 26.782790
+Iteration: 1, Mode: 43, Cost: 26.783293
+Iteration: 1, Mode: 44, Cost: 26.890725
+Iteration: 1, Mode: 45, Cost: 26.904030
+Iteration: 1, Mode: 46, Cost: 26.904228
+Iteration: 1, Mode: 47, Cost: 26.904231
+Iteration: 1, Mode: 48, Cost: 26.906248
+Iteration: 1, Mode: 49, Cost: 26.906249
+Iteration: 1, Mode: 50, Cost: 26.920150
+Iteration: 1, Mode: 51, Cost: 26.920203
+Iteration: 1, Mode: 52, Cost: 26.927423
+Iteration: 1, Mode: 53, Cost: 27.184091
+Iteration: 1, Mode: 54, Cost: 27.184894
+Iteration: 1, Mode: 55, Cost: 27.440128
+Iteration: 1, Mode: 56, Cost: 27.440231
+Iteration: 1, Mode: 57, Cost: 27.440296
+Iteration: 1, Mode: 58, Cost: 27.440302
+Iteration: 1, Mode: 59, Cost: 27.440721
+Iteration: 1, Mode: 60, Cost: 27.441067
+Iteration: 1, Mode: 61, Cost: 27.441067
+Iteration: 1, Mode: 62, Cost: 27.441480
+Iteration: 1, Mode: 63, Cost: 27.441514
+Iteration: 1, Mode: 64, Cost: 27.449695
+Iteration: 1, Mode: 65, Cost: 27.463783
+Iteration: 2, Mode: 0, Cost: 27.463975
+Iteration: 2, Mode: 1, Cost: 27.463980
+Iteration: 2, Mode: 2, Cost: 27.463986
+Iteration: 2, Mode: 3, Cost: 27.465194
+Iteration: 2, Mode: 4, Cost: 27.465592
+Iteration: 2, Mode: 5, Cost: 27.465618
+Iteration: 2, Mode: 6, Cost: 27.465637
+Iteration: 2, Mode: 7, Cost: 27.465637
+Iteration: 2, Mode: 8, Cost: 27.466091
+Iteration: 2, Mode: 9, Cost: 27.466527
+Iteration: 2, Mode: 10, Cost: 27.466532
+Iteration: 2, Mode: 11, Cost: 27.466538
+Iteration: 2, Mode: 12, Cost: 27.466541
+Iteration: 2, Mode: 13, Cost: 27.466827
+Iteration: 2, Mode: 14, Cost: 27.466845
+Iteration: 2, Mode: 15, Cost: 27.467258
+Iteration: 2, Mode: 16, Cost: 27.467276
+Iteration: 2, Mode: 17, Cost: 27.467277
+Iteration: 2, Mode: 18, Cost: 27.467698
+Iteration: 2, Mode: 19, Cost: 27.467768
+Iteration: 2, Mode: 20, Cost: 27.472650
+Iteration: 2, Mode: 21, Cost: 27.472651
+Iteration: 2, Mode: 22, Cost: 27.472653
+Iteration: 2, Mode: 23, Cost: 27.472654
+Iteration: 2, Mode: 24, Cost: 27.473351
+Iteration: 2, Mode: 25, Cost: 27.473441
+Iteration: 2, Mode: 26, Cost: 27.473706
+Iteration: 2, Mode: 27, Cost: 27.475383
+Iteration: 2, Mode: 28, Cost: 27.480531
+Iteration: 2, Mode: 29, Cost: 27.480955
+Iteration: 2, Mode: 30, Cost: 27.481029
+Iteration: 2, Mode: 31, Cost: 27.481032
+Iteration: 2, Mode: 32, Cost: 27.481041
+Iteration: 2, Mode: 33, Cost: 27.481042
+Iteration: 2, Mode: 34, Cost: 27.481048
+Iteration: 2, Mode: 35, Cost: 27.481077
+Iteration: 2, Mode: 36, Cost: 27.481088
+Iteration: 2, Mode: 37, Cost: 27.481112
+Iteration: 2, Mode: 38, Cost: 27.481469
+Iteration: 2, Mode: 39, Cost: 27.481497
+Iteration: 2, Mode: 40, Cost: 27.481509
+Iteration: 2, Mode: 41, Cost: 27.481513
+Iteration: 2, Mode: 42, Cost: 27.481515
+Iteration: 2, Mode: 43, Cost: 27.481671
+Iteration: 2, Mode: 44, Cost: 27.481705
+Iteration: 2, Mode: 45, Cost: 27.481762
+Iteration: 2, Mode: 46, Cost: 27.481769
+Iteration: 2, Mode: 47, Cost: 27.481771
+Iteration: 2, Mode: 48, Cost: 27.481852
+Iteration: 2, Mode: 49, Cost: 27.481897
+Iteration: 2, Mode: 50, Cost: 27.482415
+Iteration: 2, Mode: 51, Cost: 27.482575
+Iteration: 2, Mode: 52, Cost: 27.483170
+Iteration: 2, Mode: 53, Cost: 27.486095
+Iteration: 2, Mode: 54, Cost: 27.493667
+Iteration: 2, Mode: 55, Cost: 27.493789
+Iteration: 2, Mode: 56, Cost: 27.493789
+Iteration: 2, Mode: 57, Cost: 27.493789
+Iteration: 2, Mode: 58, Cost: 27.493792
+Iteration: 2, Mode: 59, Cost: 27.493792
+Iteration: 2, Mode: 60, Cost: 27.493792
+Iteration: 2, Mode: 61, Cost: 27.493794
+Iteration: 2, Mode: 62, Cost: 27.493794
+Iteration: 2, Mode: 63, Cost: 27.493794
+Iteration: 2, Mode: 64, Cost: 27.493796
+Iteration: 2, Mode: 65, Cost: 27.493796
+Iteration: 3, Mode: 0, Cost: 27.494078
+Iteration: 3, Mode: 1, Cost: 27.495234
+Iteration: 3, Mode: 2, Cost: 27.495253
+Iteration: 3, Mode: 3, Cost: 27.495254
+Iteration: 3, Mode: 4, Cost: 27.495311
+Iteration: 3, Mode: 5, Cost: 27.497312
+Iteration: 3, Mode: 6, Cost: 27.497312
+Iteration: 3, Mode: 7, Cost: 27.497313
+Iteration: 3, Mode: 8, Cost: 27.497411
+Iteration: 3, Mode: 9, Cost: 27.497411
+Iteration: 3, Mode: 10, Cost: 27.497424
+Iteration: 3, Mode: 11, Cost: 27.497440
+Iteration: 3, Mode: 12, Cost: 27.497440
+Iteration: 3, Mode: 13, Cost: 27.497440
+Iteration: 3, Mode: 14, Cost: 27.497440
+Iteration: 3, Mode: 15, Cost: 27.497444
+Iteration: 3, Mode: 16, Cost: 27.497444
+Iteration: 3, Mode: 17, Cost: 27.497444
+Iteration: 3, Mode: 18, Cost: 27.497444
+Iteration: 3, Mode: 19, Cost: 27.497444
+Iteration: 3, Mode: 20, Cost: 27.497446
+Iteration: 3, Mode: 21, Cost: 27.497452
+Iteration: 3, Mode: 22, Cost: 27.497471
+Iteration: 3, Mode: 23, Cost: 27.497499
+Iteration: 3, Mode: 24, Cost: 27.497507
+Iteration: 3, Mode: 25, Cost: 27.497507
+Iteration: 3, Mode: 26, Cost: 27.497507
+Iteration: 3, Mode: 27, Cost: 27.497507
+Iteration: 3, Mode: 28, Cost: 27.497509
+Iteration: 3, Mode: 29, Cost: 27.497509
+Iteration: 3, Mode: 30, Cost: 27.497509
+Iteration: 3, Mode: 31, Cost: 27.497509
+Iteration: 3, Mode: 32, Cost: 27.497509
+Iteration: 3, Mode: 33, Cost: 27.497509
+Iteration: 3, Mode: 34, Cost: 27.497509
+Iteration: 3, Mode: 35, Cost: 27.497512
+Iteration: 3, Mode: 36, Cost: 27.497512
+Iteration: 3, Mode: 37, Cost: 27.497512
+Iteration: 3, Mode: 38, Cost: 27.497514
+Iteration: 3, Mode: 39, Cost: 27.497974
+Iteration: 3, Mode: 40, Cost: 27.497974
+Iteration: 3, Mode: 41, Cost: 27.497974
+Iteration: 3, Mode: 42, Cost: 27.497974
+Iteration: 3, Mode: 43, Cost: 27.497974
+Iteration: 3, Mode: 44, Cost: 27.497974
+Iteration: 3, Mode: 45, Cost: 27.497974
+Iteration: 3, Mode: 46, Cost: 27.497974
+Iteration: 3, Mode: 47, Cost: 27.497974
+Iteration: 3, Mode: 48, Cost: 27.497974
+Iteration: 3, Mode: 49, Cost: 27.497974
+Iteration: 3, Mode: 50, Cost: 27.497974
+Iteration: 3, Mode: 51, Cost: 27.497974
+Iteration: 3, Mode: 52, Cost: 27.497974
+Iteration: 3, Mode: 53, Cost: 27.497974
+Iteration: 3, Mode: 54, Cost: 27.497974
+Iteration: 3, Mode: 55, Cost: 27.497974
+Iteration: 3, Mode: 56, Cost: 27.497974
+Iteration: 3, Mode: 57, Cost: 27.497974
+Iteration: 3, Mode: 58, Cost: 27.497974
+Iteration: 3, Mode: 59, Cost: 27.497974
+Iteration: 3, Mode: 60, Cost: 27.497974
+Iteration: 3, Mode: 61, Cost: 27.497974
+Iteration: 3, Mode: 62, Cost: 27.497974
+Iteration: 3, Mode: 63, Cost: 27.497974
+Iteration: 3, Mode: 64, Cost: 27.497975
+Iteration: 3, Mode: 65, Cost: 27.497975
+Iteration: 4, Mode: 0, Cost: 27.497975
+Iteration: 4, Mode: 1, Cost: 27.497975
+Iteration: 4, Mode: 2, Cost: 27.497978
+Iteration: 4, Mode: 3, Cost: 27.497978
+Iteration: 4, Mode: 4, Cost: 27.497978
+Iteration: 4, Mode: 5, Cost: 27.497978
+Iteration: 4, Mode: 6, Cost: 27.497978
+Iteration: 4, Mode: 7, Cost: 27.497978
+Iteration: 4, Mode: 8, Cost: 27.497978
+Iteration: 4, Mode: 9, Cost: 27.497978
+Iteration: 4, Mode: 10, Cost: 27.497978
+Iteration: 4, Mode: 11, Cost: 27.497978
+Iteration: 4, Mode: 12, Cost: 27.497978
+Iteration: 4, Mode: 13, Cost: 27.497978
+Iteration: 4, Mode: 14, Cost: 27.497978
+Iteration: 4, Mode: 15, Cost: 27.497978
+Iteration: 4, Mode: 16, Cost: 27.497978
+Iteration: 4, Mode: 17, Cost: 27.497978
+Iteration: 4, Mode: 18, Cost: 27.497978
+Iteration: 4, Mode: 19, Cost: 27.497978
+Iteration: 4, Mode: 20, Cost: 27.497978
+Iteration: 4, Mode: 21, Cost: 27.497978
+Iteration: 4, Mode: 22, Cost: 27.497979
+Iteration: 4, Mode: 23, Cost: 27.497979
+Iteration: 4, Mode: 24, Cost: 27.497979
+Iteration: 4, Mode: 25, Cost: 27.497979
+Iteration: 4, Mode: 26, Cost: 27.497979
+Iteration: 4, Mode: 27, Cost: 27.497979
+Iteration: 4, Mode: 28, Cost: 27.497979
+Iteration: 4, Mode: 29, Cost: 27.497979
+Iteration: 4, Mode: 30, Cost: 27.497979
+Iteration: 4, Mode: 31, Cost: 27.497979
+Iteration: 4, Mode: 32, Cost: 27.497979
+Iteration: 4, Mode: 33, Cost: 27.497979
+Iteration: 4, Mode: 34, Cost: 27.497979
+Iteration: 4, Mode: 35, Cost: 27.497979
+Iteration: 4, Mode: 36, Cost: 27.497979
+Iteration: 4, Mode: 37, Cost: 27.497979
+Iteration: 4, Mode: 38, Cost: 27.497979
+Iteration: 4, Mode: 39, Cost: 27.497979
+Iteration: 4, Mode: 40, Cost: 27.497979
+Iteration: 4, Mode: 41, Cost: 27.497979
+Iteration: 4, Mode: 42, Cost: 27.497979
+Iteration: 4, Mode: 43, Cost: 27.497979
+Iteration: 4, Mode: 44, Cost: 27.497979
+Iteration: 4, Mode: 45, Cost: 27.497979
+Iteration: 4, Mode: 46, Cost: 27.497979
+Iteration: 4, Mode: 47, Cost: 27.497979
+Iteration: 4, Mode: 48, Cost: 27.497980
+Iteration: 4, Mode: 49, Cost: 27.497980
+Iteration: 4, Mode: 50, Cost: 27.497980
+Iteration: 4, Mode: 51, Cost: 27.497980
+Iteration: 4, Mode: 52, Cost: 27.497980
+Iteration: 4, Mode: 53, Cost: 27.497980
+Iteration: 4, Mode: 54, Cost: 27.497980
+Iteration: 4, Mode: 55, Cost: 27.497980
+Iteration: 4, Mode: 56, Cost: 27.497980
+Iteration: 4, Mode: 57, Cost: 27.497980
+Iteration: 4, Mode: 58, Cost: 27.497980
+Iteration: 4, Mode: 59, Cost: 27.497980
+Iteration: 4, Mode: 60, Cost: 27.497980
+Iteration: 4, Mode: 61, Cost: 27.497980
+Iteration: 4, Mode: 62, Cost: 27.497980
+Iteration: 4, Mode: 63, Cost: 27.497980
+Iteration: 4, Mode: 64, Cost: 27.497980
+Iteration: 4, Mode: 65, Cost: 27.497980
+Iteration: 5, Mode: 0, Cost: 27.497980
+Iteration: 5, Mode: 1, Cost: 27.497980
+Iteration: 5, Mode: 2, Cost: 27.497980
+Iteration: 5, Mode: 3, Cost: 27.497980
+Iteration: 5, Mode: 4, Cost: 27.497980
+Iteration: 5, Mode: 5, Cost: 27.497980
+Iteration: 5, Mode: 6, Cost: 27.497980
+Iteration: 5, Mode: 7, Cost: 27.497980
+Iteration: 5, Mode: 8, Cost: 27.497980
+Iteration: 5, Mode: 9, Cost: 27.497980
+Iteration: 5, Mode: 10, Cost: 27.497980
+Iteration: 5, Mode: 11, Cost: 27.497980
+Iteration: 5, Mode: 12, Cost: 27.497980
+Iteration: 5, Mode: 13, Cost: 27.497980
+Iteration: 5, Mode: 14, Cost: 27.497980
+Iteration: 5, Mode: 15, Cost: 27.497980
+Iteration: 5, Mode: 16, Cost: 27.497980
+Iteration: 5, Mode: 17, Cost: 27.497980
+Iteration: 5, Mode: 18, Cost: 27.497980
+Iteration: 5, Mode: 19, Cost: 27.497980
+Iteration: 5, Mode: 20, Cost: 27.497980
+Iteration: 5, Mode: 21, Cost: 27.497980
+Iteration: 5, Mode: 22, Cost: 27.497980
+Iteration: 5, Mode: 23, Cost: 27.497980
+Iteration: 5, Mode: 24, Cost: 27.497980
+Iteration: 5, Mode: 25, Cost: 27.497980
+Iteration: 5, Mode: 26, Cost: 27.497980
+Iteration: 5, Mode: 27, Cost: 27.497980
+Iteration: 5, Mode: 28, Cost: 27.497980
+Iteration: 5, Mode: 29, Cost: 27.497980
+Iteration: 5, Mode: 30, Cost: 27.497980
+Iteration: 5, Mode: 31, Cost: 27.497980
+Iteration: 5, Mode: 32, Cost: 27.497980
+Iteration: 5, Mode: 33, Cost: 27.497980
+Iteration: 5, Mode: 34, Cost: 27.497980
+Iteration: 5, Mode: 35, Cost: 27.497980
+Iteration: 5, Mode: 36, Cost: 27.497980
+Iteration: 5, Mode: 37, Cost: 27.497980
+Iteration: 5, Mode: 38, Cost: 27.497980
+Iteration: 5, Mode: 39, Cost: 27.497980
+Iteration: 5, Mode: 40, Cost: 27.497980
+Iteration: 5, Mode: 41, Cost: 27.497980
+Iteration: 5, Mode: 42, Cost: 27.497980
+Iteration: 5, Mode: 43, Cost: 27.497980
+Iteration: 5, Mode: 44, Cost: 27.497980
+Iteration: 5, Mode: 45, Cost: 27.497980
+Iteration: 5, Mode: 46, Cost: 27.497980
+Iteration: 5, Mode: 47, Cost: 27.497980
+Iteration: 5, Mode: 48, Cost: 27.497980
+Iteration: 5, Mode: 49, Cost: 27.497980
+Iteration: 5, Mode: 50, Cost: 27.497980
+Iteration: 5, Mode: 51, Cost: 27.497980
+Iteration: 5, Mode: 52, Cost: 27.497980
+Iteration: 5, Mode: 53, Cost: 27.497980
+Iteration: 5, Mode: 54, Cost: 27.497980
+Iteration: 5, Mode: 55, Cost: 27.497980
+Iteration: 5, Mode: 56, Cost: 27.497980
+Iteration: 5, Mode: 57, Cost: 27.497980
+Iteration: 5, Mode: 58, Cost: 27.497980
+Iteration: 5, Mode: 59, Cost: 27.497980
+Iteration: 5, Mode: 60, Cost: 27.497980
+Iteration: 5, Mode: 61, Cost: 27.497980
+Iteration: 5, Mode: 62, Cost: 27.497980
+Iteration: 5, Mode: 63, Cost: 27.497980
+Iteration: 5, Mode: 64, Cost: 27.497980
+Iteration: 5, Mode: 65, Cost: 27.497980
+[0, 10, 7, 11, 3, 2, 1, 6, 8, 4, 9, 5]
+[ 143.0030916  3139.83582215 1673.40582302 3549.15046318 1039.52161883
+  520.31682643  365.16567243 1380.52207032 2872.90118894 1273.65051721
+ 2943.35810681 1325.57807678]
+rank neval pivotError
+1 285 0.668617998266776
+2 285 0.668617998266776
+3 629 2.4066567191524477
+4 1021 0.3988731821427497
+5 1512 0.28470458009055033
+6 2120 0.23427465513938217
+7 2819 0.19636055141269548
+8 3572 0.13498110896860283
+9 4359 0.12705388902385367
+10 5409 0.0833156291389422
+11 6442 0.060582164705695274
+12 7768 0.04362427405218722
+13 9299 0.07002547213297786
+14 10489 0.02232665970698816
+15 11809 0.03478052710534407
+16 13460 0.030428963656347785
+17 15268 0.01562278271951939
+18 16895 0.015515027680617063
+19 18739 0.013132619552436942
+20 20838 0.011755947180812354
+21 22943 0.008832071707251615
+22 24716 0.008985307410607962
+23 26973 0.009920543196658
+24 28855 0.008113125203335458
+25 30898 0.006511264799878069
+26 33946 0.008826751275129552
+27 35871 0.007696179596207442
+28 38429 0.005230776285848837
+29 40987 0.00881415952932152
+30 43320 0.005064396121247705
+31 46146 0.00464552161316692
+32 49601 0.00539743098026263
+33 52233 0.004605326665730103
+34 54855 0.005029750958374546
+35 57728 0.002981318854409387
+36 60885 0.004195654233499518
+37 63612 0.0033866836912320175
+38 66239 0.0038171257761901445
+39 69531 0.0034233538943709285
+40 73644 0.0028131905177666283
+41 77286 0.003023470912963011
+42 81745 0.0037331344149656165
+43 84851 0.0035361585291054654
+44 88913 0.003091442098085234
+45 92205 0.004041440344690617
+46 95591 0.00398356087333851
+47 99279 0.002022499133962574
+48 102998 0.00228914903824487
+49 106442 0.0024078631147379514
+50 110620 0.0023365465089533743
+51 114120 0.0014128867160622116
+52 118060 0.0016490243303719648
+53 121625 0.0020254151145809862
+54 126141 0.0024192470862455795
+55 131091 0.0018787938628818668
+56 135281 0.0018206952605691884
+57 140143 0.0022125390547753643
+58 145378 0.002419138811879329
+59 149834 0.001998946897651954
+60 153812 0.001575285566749296
+61 158167 0.0022197344691123333
+62 162252 0.001238629303512137
+63 167067 0.0018942812189279845
+64 171626 0.001315867724584932
+65 176558 0.0012917354307734052
+66 182229 0.001297614878880915
+67 186691 0.0013862604547081325
+68 190173 0.0008579976974204886
+69 195760 0.0017514989789925162
+70 200890 0.0010796161489820266
+71 204826 0.0012933279899531858
+72 211101 0.0018359907869726078
+73 216644 0.0017195602317645053
+74 221148 0.0014402425310252043
+75 226168 0.0013374777998540477
+76 231010 0.0009443096613085677
+77 237455 0.0010266928886190907
+78 243193 0.0008003819189595363
+79 249442 0.0009522955264541499
+80 254744 0.0011698461986428543
+81 260316 0.0009801016658047557
+82 265636 0.0009116046699820801
+83 271964 0.0009176226132375787
+84 278899 0.0009946216963644672
+85 286907 0.0011083035346894365
+86 291757 0.0013002906533570169
+87 297651 0.0012413720592741595
+88 303974 0.0006542467350498238
+89 310552 0.0012041715285256716
+90 316733 0.0006260716329166138
+91 323625 0.0008762645465343055
+92 330621 0.0007289179224855835
+93 336598 0.0005526440506926633
+94 343641 0.0006158744332340205
+95 350129 0.0008155066362122015
+96 356218 0.0005121836050408224
+97 362587 0.0006522752832405221
+98 368658 0.0006673467164244884
+99 376013 0.0006852956974642832
+100 382389 0.0007313390033193284
+101 389682 0.0006376202838441758
+102 396099 0.000561646997112808
+103 402362 0.0005273717553845036
+104 410171 0.0005704413322780155
+105 419605 0.0008584126446462559
+106 427186 0.0004689524259272604
+107 434714 0.0004807703109678818
+108 443079 0.0006072949133097139
+109 451348 0.0005133109396159297
+110 458703 0.0006138117628131656
+111 467842 0.0004999889138709301
+112 477195 0.0006506654045632665
+113 484510 0.00037852441645075396
+114 490078 0.00043073360570142216
+115 497305 0.00029790339290719503
+116 505335 0.0006223864668644108
+117 514001 0.0006505592165106933
+118 520167 0.00045836098987089846
+119 527270 0.00039240289198183564
+120 535656 0.00039235036988327643
+121 543041 0.0003657870964808019
+Tensor Ranks
+(1, 5, 5)
+(5, 5, 25)
+(25, 5, 121)
+(121, 5, 121)
+(121, 5, 121)
+(121, 5, 121)
+(121, 5, 121)
+(121, 5, 121)
+(121, 5, 121)
+(121, 5, 25)
+(25, 5, 5)
+(5, 5, 1)
+_______________________
+|                     |
+|      Molecule       |
+|_____________________|
+
+Number of Atoms       : 6
+Normal Mode Frequences:
+    143.003092
+    365.165672
+    520.316826
+    1039.521619
+    1273.650517
+    1325.578077
+    1380.522070
+    1673.405823
+    2872.901189
+    2943.358107
+    3139.835822
+    3549.150463
+Number of Grid Points : 5
+Dipole                : False
+Intergral Path        : ./ints.h5
+Minimum Energy        : 0.000000 cm-1
+Rank                  : 5
+TCI Tolerance         : 0.000001
+Minimum Geometry (A)  :
+    -0.496499    0.000564    -0.096480
+    -1.792095    0.000764    -0.896319
+    1.782571    0.760738    0.488461
+    1.783043    -0.759282    0.490565
+    -1.455923    -0.000495    -0.000448
+    1.457806    0.000020    0.004185
+
+  Opt + NM              :::      256.126 (  2.26%)
+  Tensor Train          :::    11073.698 ( 97.74%)
+  ContractTT            :::        0.005 (  0.00%)
+  Total                 :::    11329.830 (100.00%)
+
+3
+______________________________
+|                            |
+|       PARAMETER LIST       |
+|____________________________|
+
+eps_1          : 0.1
+eps_2          : 0.01
+eps_3          : -1.0
+NStates        : 10
+NWalkers       : 200
+NSamples       : 50
+HB Criterion   : pass
+
+===== VCI RESULTS =====
+Initial Basis Size: 455
+11106.29987496			0.8750122714830227|000000000000>
+11584.08691516		w3	0.5372529330748029|010000000000> + -0.6132351971756851|001000000000> + 0.32185394747801704|000010000000>
+11803.02340316		w7	0.5541534303833763|000100000000> + -0.6613123307839522|000000100000>
+11848.31734274		w1	-0.8387648077976122|100000000000> + 0.32662021628645643|300000000000>
+12130.12650038		w8	0.6764540488126982|000000010000> + -0.4782837635808018|000000001000>
+12420.00704604		w6	0.7699623795091443|000001000000>
+12575.57259032		w12	-0.304835919261298|000001000000> + 0.30457922371279667|000000000100> + 0.5009111706161739|000000000010> + -0.5552884863533885|000000000001>
+12705.21738804		w5	-0.7712571032580208|000010000000>
+13303.65285170		w2	-0.5713983572641802|010000000000> + -0.505285135160844|001000000000> + -0.2755971220665112|002000000000>
+13562.96211185		w10	0.7430809622806958|000000000100> + -0.25728402123023214|000000000010>
+
+  Diagonalize           :::        0.080 (  0.52%)
+  Form Hamiltonian      :::       15.276 ( 99.48%)
+  Screen Basis          :::        0.000 (  0.00%)
+  PT2 correction        :::        0.000 (  0.00%)
+  SPT2 correction       :::        0.000 (  0.00%)
+  SSPT2 correction      :::        0.000 (  0.00%)
+  Total                 :::       15.356 (100.00%)
+
+4
+______________________________
+|                            |
+|       PARAMETER LIST       |
+|____________________________|
+
+eps_1          : 0.1
+eps_2          : 0.01
+eps_3          : -1.0
+NStates        : 10
+NWalkers       : 200
+NSamples       : 50
+HB Criterion   : pass
+
+===== VCI RESULTS =====
+Initial Basis Size: 1820
+10479.68382968			0.7702801659733464|000000000000>
+11196.17560969		w1	0.7353565600957062|100000000000> + 0.3433694460973276|110000000000> + -0.3086102826949884|300000000000>
+11378.28561198		w3	-0.5346167632701604|010000000000> + 0.5819882932551421|001000000000> + -0.31076660562692465|000010000000>
+11662.54451445		w7	0.5528755398476607|000100000000> + -0.6541798577762659|000000100000>
+11791.43930007		w2 + w3	0.3657936596292981|020000000000> + -0.4587141197290679|011000000000> + 0.42591578390885887|002000000000> + -0.2648235640447695|001010000000>
+11934.08688757		w8	0.5441372497188327|000000010000> + -0.3328594418228368|000000001000> + -0.3048893383934988|200000000000> + 0.3310125731794952|400000000000>
+11975.60826041		4w1	0.2972838622728438|010000000000> + 0.3477614459589975|000000010000> + -0.30683295446732434|000000001000> + 0.39451830849198716|200000000000> + -0.44140676552423047|400000000000>
+12123.83432271		w6	0.7311362046306998|000001000000>
+12149.40361578		w3 + w7	0.3371280938748205|010100000000> + -0.40546211752680444|010000100000> + -0.3849726944294|001100000000> + 0.4543797451998893|001000100000>
+12266.46148912		w1 + w3	-0.4788644885021747|110000000000> + 0.5613339563001407|101000000000> + -0.3289842212223093|100010000000>
+
+  Diagonalize           :::        1.620 (  0.67%)
+  Form Hamiltonian      :::      241.483 ( 99.33%)
+  Screen Basis          :::        0.000 (  0.00%)
+  PT2 correction        :::        0.000 (  0.00%)
+  SPT2 correction       :::        0.000 (  0.00%)
+  SSPT2 correction      :::        0.000 (  0.00%)
+  Total                 :::      243.103 (100.00%)
+
+5
+______________________________
+|                            |
+|       PARAMETER LIST       |
+|____________________________|
+
+eps_1          : 0.1
+eps_2          : 0.01
+eps_3          : -1.0
+NStates        : 10
+NWalkers       : 200
+NSamples       : 50
+HB Criterion   : pass
+
+===== VCI RESULTS =====
+Initial Basis Size: 6176
+10327.14050633			-0.7576324453853421|000000000000>
+10745.85404727		w1	-0.6894206810983944|100000000000> + -0.29940374901011557|110000000000> + 0.30333700259978813|300000000000>
+10790.41855232		w3	0.4781674322838364|010000000000> + -0.5078359236928538|001000000000> + 0.27345830956234457|000010000000>
+10962.71955942		w7	0.47801675613095806|000100000000> + -0.5621392577894877|000000100000> + 0.2651093952056004|000100200000>
+11223.66729037		w8	-0.5730076040086861|000000010000> + 0.40311249450594483|000000001000>
+11398.71869471		4w1	-0.3573621070037043|010000000000> + -0.3000861392644714|001000000000> + -0.41225736007841735|200000000000> + 0.459350468003432|400000000000>
+11502.56988379		w1 + w3	0.3501541607217436|000001000000> + 0.3570617555719669|110000000000> + -0.41599238113045106|101000000000>
+11535.84540329		w6	-0.37000516850303494|000001000000> + -0.2648272396814302|000000000010> + 0.3142616964588604|000000000001> + -0.2647833205049819|101000000000>
+11589.96637098		w2 + w3	0.3375620908846329|020000000000> + -0.4919011333077286|011000000000> + 0.3651682092748913|002000000000> + -0.2608207353796948|001010000000>
+11635.57311725		w6	-0.5030193849635735|000001000000> + 0.3185190681857936|000000000010> + -0.3555072307624949|000000000001>
+
+  Diagonalize           :::       28.095 (  1.00%)
+  Form Hamiltonian      :::     2792.201 ( 99.00%)
+  Screen Basis          :::        0.000 (  0.00%)
+  PT2 correction        :::        0.000 (  0.00%)
+  SPT2 correction       :::        0.000 (  0.00%)
+  SSPT2 correction      :::        0.000 (  0.00%)
+  Total                 :::     2820.296 (100.00%)
+
+6
+______________________________
+|                            |
+|       PARAMETER LIST       |
+|____________________________|
+
+eps_1          : 0.1
+eps_2          : 0.01
+eps_3          : -1.0
+NStates        : 10
+NWalkers       : 200
+NSamples       : 50
+HB Criterion   : pass
+
+===== VCI RESULTS =====
+Initial Basis Size: 18408
+10043.66288354			-0.6802673603968271|000000000000>
+10383.84623746		w1	-0.6283116148887293|100000000000> + -0.31056693051802003|110000000000> + 0.282665018321828|300000000000>
+10592.37273571		w2	0.4961382172014932|010000000000> + -0.44020368714961594|001000000000> + 0.25328905409757413|000010000000>
+10729.34058267		4w1	-0.35054662507963286|001000000000> + -0.4193693580943079|200000000000> + 0.5122702524763338|400000000000>
+10806.68169699		w7	-0.4674221910772235|000100000000> + 0.553167364765301|000000100000> + -0.25855769168208326|000100200000>
+10918.15729454		w2 + w3	-0.3347141938616672|020000000000> + 0.4204827145529192|011000000000> + -0.3311979132266313|002000000000> + 0.27236175589930955|040000000000>
+11023.64544244		w8	-0.5276966995981721|000000010000> + 0.3741848417446725|000000001000>
+11051.66875876		w1 + w3	-0.3938332665867475|110000000000> + 0.4497321281356098|101000000000> + -0.26133754577154505|120000000000>
+11259.95823996		w1 + w7	0.409410466889762|100100000000> + -0.4891777531354927|100000100000>
+11275.98539305		w3 + w7	-0.2793591994128458|010100000000> + 0.333179343885461|010000100000> + 0.29890854626042457|001100000000> + -0.3433329906935923|001000100000>
+
+  Diagonalize           :::      389.380 (  1.55%)
+  Form Hamiltonian      :::    24775.330 ( 98.45%)
+  Screen Basis          :::        0.000 (  0.00%)
+  PT2 correction        :::        0.000 (  0.00%)
+  SPT2 correction       :::        0.000 (  0.00%)
+  SSPT2 correction      :::        0.000 (  0.00%)
+  Total                 :::    25164.710 (100.00%)
+
+7
+______________________________
+|                            |
+|       PARAMETER LIST       |
+|____________________________|
+
+eps_1          : 0.1
+eps_2          : 0.01
+eps_3          : -1.0
+NStates        : 10
+NWalkers       : 200
+NSamples       : 50
+HB Criterion   : pass
+
