@@ -197,6 +197,7 @@ class TCIMolecule(Molecule):
         self.tci_tol = 1e-6
         self.loc_method = loc_method
         self.order_method = order_method
+        self.rank_checkpoint = 25
         self.Order = 2
         self.OrderPlus = None
         self.calc_integrals = True
@@ -305,9 +306,11 @@ class TCIMolecule(Molecule):
             
             if rank_checkpoint is not None:
                 if i % rank_checkpoint == 0:
-                    cores = ci.get_TensorTrain().core
-                    core_tensors = [np.einsum('irj,nr,mr->ijnm', core, dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(cores, self.dvr_coeff)]
+                    self.cores = ci.get_TensorTrain().core
+                    self.core_tensors = [np.einsum('irj,nr,mr->ijnm', core, dvr_c, dvr_c, optimize=True) for core, dvr_c in zip(self.cores, self.dvr_coeff)]
                     IntsFile = "core_" + str(i) +".h5"
+                    self.SaveCoreTensors(IntsFile = IntsFile)
+                    '''
                     with h5py.File(IntsFile, "a") as chkfile:
                         if "core_tensors" in chkfile:
                             del chkfile["core_tensors"]
@@ -317,6 +320,7 @@ class TCIMolecule(Molecule):
                             del chkfile["cores"]
                         for j, core in enumerate(cores):
                             chkfile.create_dataset("cores/%d" % j, data = cores[j])
+                    '''
 
         return ci.get_TensorTrain().core
 
@@ -326,7 +330,7 @@ class TCIMolecule(Molecule):
         self.gridpts = gridpts
         self.Timer.start(1)
         if tt_method.upper() == 'TCI':
-            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = 25, dip_component = dip_component)
+            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = self.rank_checkpoint, dip_component = dip_component)
             print("Tensor Ranks")
             for core in cores:
                 print(core.shape)
@@ -351,7 +355,7 @@ class TCIMolecule(Molecule):
         self.dvr_coeff = dvr_coeff
         self.Timer.start(1)
         if tt_method.upper() == 'TCI':
-            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = 25, dip_component = dip_component)
+            cores = self.do_tci(gridpts, maxit = rank, tol = tci_tol, rank_checkpoint = self.rank_checkpoint, dip_component = dip_component)
             print("Tensor Ranks")
             for core in cores:
                 print(core.shape)

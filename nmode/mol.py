@@ -285,7 +285,7 @@ class Molecule():
         self.x0 = self.nm.x0 / constants.ANGSTROM_TO_AU
         self.V0 = self.nm.V0 * constants.AU_TO_INVCM
         if self.doShiftPotential:
-            self.ShiftPotential(self.nm.V0)
+            self.ShiftPotential(self._potential(self.nm.x0.reshape(-1)))
             self.nm.V0 = 0
             self.V0 = 0
         self.mu0 = self.nm.mu0
