@@ -1,3 +1,4 @@
+#include <array>
 #include "VCI_headers.h"
 
 // General Functions
@@ -4878,6 +4879,62 @@ SpMat VCISparseHamNModeFromOM(std::vector<WaveFunction> &BasisSet1, std::vector<
     return H;
 }
 
+static inline long unsigned int BinomialNMode(long unsigned int n, long unsigned int k)
+{
+    if (k > n) return 0;
+    if (k == 0 || k == n) return 1;
+    if (k > n - k) k = n - k;
+    long unsigned int value = 1;
+    for (long unsigned int i = 1; i <= k; i++)
+    {
+        value = value * (n - k + i) / i;
+    }
+    return value;
+}
+
+template <size_t Order>
+static inline long unsigned int FlattenPackedStateIndex(const std::array<long unsigned int, Order> &state, long unsigned int MaxQ)
+{
+    long unsigned int idx = 0;
+    for (size_t i = 0; i < Order; i++)
+    {
+        idx = idx * MaxQ + state[i];
+    }
+    return idx;
+}
+
+template <size_t Order>
+static inline long unsigned int PackedIntegralIndex(std::array<long unsigned int, Order> modes, std::array<long unsigned int, Order> bra, std::array<long unsigned int, Order> ket, long unsigned int MaxQ)
+{
+    for (size_t i = 1; i < Order; i++)
+    {
+        size_t j = i;
+        while (j > 0 && modes[j] < modes[j - 1])
+        {
+            std::swap(modes[j], modes[j - 1]);
+            std::swap(bra[j], bra[j - 1]);
+            std::swap(ket[j], ket[j - 1]);
+            j--;
+        }
+    }
+
+    long unsigned int mode_idx = 0;
+    for (size_t i = 0; i < Order; i++)
+    {
+        mode_idx += BinomialNMode(modes[i] + i, i + 1);
+    }
+
+    long unsigned int bra_idx = FlattenPackedStateIndex<Order>(bra, MaxQ);
+    long unsigned int ket_idx = FlattenPackedStateIndex<Order>(ket, MaxQ);
+    if (bra_idx > ket_idx) std::swap(bra_idx, ket_idx);
+
+    long unsigned int packed_states = 1;
+    for (size_t i = 0; i < Order; i++) packed_states *= MaxQ;
+    long unsigned int packed_size = packed_states * (packed_states + 1) / 2;
+    long unsigned int hermitian_idx = ket_idx * (ket_idx + 1) / 2 + bra_idx;
+    return mode_idx * packed_size + hermitian_idx;
+}
+
 SpMat VCISparseHamNModeArray(std::vector<WaveFunction> &BasisSet1, std::vector<WaveFunction> &BasisSet2, std::vector<double> &Frequencies, double V0, double OneModePotential[], double TwoModePotential[], double ThreeModePotential[], double FourModePotential[], double FiveModePotential[], bool DiagonalBlock, int MaxNMode, int MaxQ)
 {
     SpMat H(BasisSet1.size(), BasisSet2.size());
@@ -4891,27 +4948,19 @@ SpMat VCISparseHamNModeArray(std::vector<WaveFunction> &BasisSet1, std::vector<W
     };
     auto Idx2 = [&] (long unsigned int m, long unsigned int n, long unsigned int mi, long unsigned int ni, long unsigned int mj, long unsigned int nj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * M + n * N * N * N * N + mi * N * N * N + ni * N * N + mj * N + nj;
+        return PackedIntegralIndex<2>({m, n}, {mi, ni}, {mj, nj}, MaxQ);
     };
     auto Idx3 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int mj, long unsigned int nj, long unsigned int oj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * M * M + n * N * N * N * N * N * N * M + o * N * N * N * N * N * N + mi * N * N * N * N * N + ni * N * N * N * N + oi * N * N * N + mj * N * N + nj * N + oj;
+        return PackedIntegralIndex<3>({m, n, o}, {mi, ni, oi}, {mj, nj, oj}, MaxQ);
     };
     auto Idx4 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * M * M * M + n * N * N * N * N * N * N * N * N * M * M + o * N * N * N * N * N * N * N * N * M + p * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N + ni * N * N * N * N * N * N + oi * N * N * N * N * N + pi * N * N * N * N + mj * N * N * N + nj * N * N + oj * N + pj;
+        return PackedIntegralIndex<4>({m, n, o, p}, {mi, ni, oi, pi}, {mj, nj, oj, pj}, MaxQ);
     };
     auto Idx5 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int q, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int qi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj, long unsigned int qj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * N * N * M * M * M * M + n * N * N * N * N * N * N * N * N * N * N * M * M * M + o * N * N * N * N * N * N * N * N * N * N * M * M + p * N * N * N * N * N * N * N * N * N * N * M + q * N * N * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N * N * N + ni * N * N * N * N * N * N * N * N + oi * N * N * N * N * N * N * N + pi * N * N * N * N * N * N + qi * N * N * N * N * N + mj * N * N * N * N + nj * N * N * N + oj * N * N + pj * N + qj;
+        return PackedIntegralIndex<5>({m, n, o, p, q}, {mi, ni, oi, pi, qi}, {mj, nj, oj, pj, qj}, MaxQ);
     };
 
     double thr = 1e-4;
@@ -5226,27 +5275,19 @@ SpMat VCISparseHamNModeFromOMArray(std::vector<WaveFunction> &BasisSet1, std::ve
 
     auto Idx2 = [&] (long unsigned int m, long unsigned int n, long unsigned int mi, long unsigned int ni, long unsigned int mj, long unsigned int nj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * M + n * N * N * N * N + mi * N * N * N + ni * N * N + mj * N + nj;
+        return PackedIntegralIndex<2>({m, n}, {mi, ni}, {mj, nj}, MaxQ);
     };
     auto Idx3 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int mj, long unsigned int nj, long unsigned int oj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * M * M + n * N * N * N * N * N * N * M + o * N * N * N * N * N * N + mi * N * N * N * N * N + ni * N * N * N * N + oi * N * N * N + mj * N * N + nj * N + oj;
+        return PackedIntegralIndex<3>({m, n, o}, {mi, ni, oi}, {mj, nj, oj}, MaxQ);
     };
     auto Idx4 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * M * M * M + n * N * N * N * N * N * N * N * N * M * M + o * N * N * N * N * N * N * N * N * M + p * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N + ni * N * N * N * N * N * N + oi * N * N * N * N * N + pi * N * N * N * N + mj * N * N * N + nj * N * N + oj * N + pj;
+        return PackedIntegralIndex<4>({m, n, o, p}, {mi, ni, oi, pi}, {mj, nj, oj, pj}, MaxQ);
     };
     auto Idx5 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int q, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int qi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj, long unsigned int qj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * N * N * M * M * M * M + n * N * N * N * N * N * N * N * N * N * N * M * M * M + o * N * N * N * N * N * N * N * N * N * N * M * M + p * N * N * N * N * N * N * N * N * N * N * M + q * N * N * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N * N * N + ni * N * N * N * N * N * N * N * N + oi * N * N * N * N * N * N * N + pi * N * N * N * N * N * N + qi * N * N * N * N * N + mj * N * N * N * N + nj * N * N * N + oj * N * N + pj * N + qj;
+        return PackedIntegralIndex<5>({m, n, o, p, q}, {mi, ni, oi, pi, qi}, {mj, nj, oj, pj, qj}, MaxQ);
     };
 
     double thr = 1e-4;
@@ -5577,27 +5618,19 @@ std::vector<double> VCISparseHamDiagonalNModeFromOMArray(std::vector<WaveFunctio
     std::vector<double> HamDiag(BasisSet1.size());
     auto Idx2 = [&] (long unsigned int m, long unsigned int n, long unsigned int mi, long unsigned int ni, long unsigned int mj, long unsigned int nj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * M + n * N * N * N * N + mi * N * N * N + ni * N * N + mj * N + nj;
+        return PackedIntegralIndex<2>({m, n}, {mi, ni}, {mj, nj}, MaxQ);
     };
     auto Idx3 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int mj, long unsigned int nj, long unsigned int oj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * M * M + n * N * N * N * N * N * N * M + o * N * N * N * N * N * N + mi * N * N * N * N * N + ni * N * N * N * N + oi * N * N * N + mj * N * N + nj * N + oj;
+        return PackedIntegralIndex<3>({m, n, o}, {mi, ni, oi}, {mj, nj, oj}, MaxQ);
     };
     auto Idx4 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * M * M * M + n * N * N * N * N * N * N * N * N * M * M + o * N * N * N * N * N * N * N * N * M + p * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N + ni * N * N * N * N * N * N + oi * N * N * N * N * N + pi * N * N * N * N + mj * N * N * N + nj * N * N + oj * N + pj;
+        return PackedIntegralIndex<4>({m, n, o, p}, {mi, ni, oi, pi}, {mj, nj, oj, pj}, MaxQ);
     };
     auto Idx5 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int q, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int qi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj, long unsigned int qj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * N * N * M * M * M * M + n * N * N * N * N * N * N * N * N * N * N * M * M * M + o * N * N * N * N * N * N * N * N * N * N * M * M + p * N * N * N * N * N * N * N * N * N * N * M + q * N * N * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N * N * N + ni * N * N * N * N * N * N * N * N + oi * N * N * N * N * N * N * N + pi * N * N * N * N * N * N + qi * N * N * N * N * N + mj * N * N * N * N + nj * N * N * N + oj * N * N + pj * N + qj;
+        return PackedIntegralIndex<5>({m, n, o, p, q}, {mi, ni, oi, pi, qi}, {mj, nj, oj, pj, qj}, MaxQ);
     };
 
     #pragma omp parallel for
@@ -5908,27 +5941,19 @@ double VCISparseHamNModeElementFromOMArray(WaveFunction &BasisSet1, WaveFunction
     int MaxNMode = 2;
     auto Idx2 = [&] (long unsigned int m, long unsigned int n, long unsigned int mi, long unsigned int ni, long unsigned int mj, long unsigned int nj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * M + n * N * N * N * N + mi * N * N * N + ni * N * N + mj * N + nj;
+        return PackedIntegralIndex<2>({m, n}, {mi, ni}, {mj, nj}, MaxQ);
     };
     auto Idx3 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int mj, long unsigned int nj, long unsigned int oj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * M * M + n * N * N * N * N * N * N * M + o * N * N * N * N * N * N + mi * N * N * N * N * N + ni * N * N * N * N + oi * N * N * N + mj * N * N + nj * N + oj;
+        return PackedIntegralIndex<3>({m, n, o}, {mi, ni, oi}, {mj, nj, oj}, MaxQ);
     };
     auto Idx4 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * M * M * M + n * N * N * N * N * N * N * N * N * M * M + o * N * N * N * N * N * N * N * N * M + p * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N + ni * N * N * N * N * N * N + oi * N * N * N * N * N + pi * N * N * N * N + mj * N * N * N + nj * N * N + oj * N + pj;
+        return PackedIntegralIndex<4>({m, n, o, p}, {mi, ni, oi, pi}, {mj, nj, oj, pj}, MaxQ);
     };
     auto Idx5 = [&] (long unsigned int m, long unsigned int n, long unsigned int o, long unsigned int p, long unsigned int q, long unsigned int mi, long unsigned int ni, long unsigned int oi, long unsigned int pi, long unsigned int qi, long unsigned int mj, long unsigned int nj, long unsigned int oj, long unsigned int pj, long unsigned int qj)
     {
-        long unsigned int M = (unsigned long int) Frequencies.size();
-        long unsigned int N = (unsigned long int) MaxQ;
-        return m * N * N * N * N * N * N * N * N * N * N * M * M * M * M + n * N * N * N * N * N * N * N * N * N * N * M * M * M + o * N * N * N * N * N * N * N * N * N * N * M * M + p * N * N * N * N * N * N * N * N * N * N * M + q * N * N * N * N * N * N * N * N * N * N + mi * N * N * N * N * N * N * N * N * N + ni * N * N * N * N * N * N * N * N + oi * N * N * N * N * N * N * N + pi * N * N * N * N * N * N + qi * N * N * N * N * N + mj * N * N * N * N + nj * N * N * N + oj * N * N + pj * N + qj;
+        return PackedIntegralIndex<5>({m, n, o, p, q}, {mi, ni, oi, pi, qi}, {mj, nj, oj, pj, qj}, MaxQ);
     };
 
     std::vector<long unsigned int> ModeOccI;

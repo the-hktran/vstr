@@ -1,10 +1,11 @@
 import sys
 import os
+import math
 import numpy as np
 import scipy
 import numdifftools as nd
 import h5py
-from itertools import permutations
+from itertools import permutations, combinations_with_replacement
 from vstr.utils import init_funcs, constants
 from vstr.ff.force_field import ScaleFC_me
 from vstr.cpp_wrappers.vhci_jf.vhci_jf_functions import VCISparseHamNMode
@@ -25,6 +26,36 @@ def triangle_numbers(n):
 
 def fourth_coeff(n):
     return n * (n**2 + 3*n - 1) // 3
+
+def _nmode_mode_index(indices):
+    return sum(math.comb(mode + i, i + 1) for i, mode in enumerate(indices))
+
+def _nmode_packed_size(order, ngridpts):
+    nstates = ngridpts ** order
+    return nstates * (nstates + 1) // 2
+
+def _pack_nmode_integral(tensor):
+    order = tensor.ndim // 2
+    nstates = tensor.shape[0] ** order
+    matrix = np.reshape(np.asarray(tensor), (nstates, nstates))
+    upper = np.triu_indices(nstates)
+    return np.ascontiguousarray(matrix[upper])
+
+def _unpack_nmode_integral(packed_tensor, order, ngridpts):
+    nstates = ngridpts ** order
+    matrix = np.zeros((nstates, nstates), dtype=packed_tensor.dtype)
+    upper = np.triu_indices(nstates)
+    matrix[upper] = packed_tensor
+    matrix[(upper[1], upper[0])] = packed_tensor
+    return np.reshape(matrix, (ngridpts,) * (2 * order))
+
+def _canonicalize_nmode_tensor(indices, tensor):
+    perm = tuple(np.argsort(indices, kind='stable'))
+    canonical_indices = tuple(indices[i] for i in perm)
+    if perm == tuple(range(len(indices))):
+        return canonical_indices, np.asarray(tensor)
+    axes = perm + tuple(i + len(indices) for i in perm)
+    return canonical_indices, np.transpose(np.asarray(tensor), axes)
 
 def ho_3d(x):
     w = [0.00751569, 0.01746802, 0.01797638]
@@ -443,35 +474,17 @@ class Molecule():
             if "ints" in f:
                 del f["ints"]
             g = f.create_group("ints")
+            g.attrs["storage"] = "canonical_hermitian_packed"
             g1 = g.create_group("1")
             for i in range(self.Nm):
                 g1.create_dataset("%d" % (i + 1), data = self.ints[0][i])
-            if MaxOrder >= 2:
-                g2 = g.create_group("2")
-                for i in range(self.Nm):
-                    for j in range(self.Nm):
-                        g2.create_dataset("%d_%d" % (i + 1, j + 1), data = self.ints[1][i, j])
-                if MaxOrder >= 3:
-                    g3 = g.create_group("3")
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            for k in range(self.Nm):
-                                g3.create_dataset("%d_%d_%d" %(i + 1, j + 1, k + 1), data = self.ints[2][i, j, k])
-                    if MaxOrder >= 4:
-                        g4 = g.create_group("4")
-                        for i in range(self.Nm):
-                            for j in range(self.Nm):
-                                for k in range(self.Nm):
-                                    for l in range(self.Nm):
-                                        g4.create_dataset("%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1), data = self.ints[3][i, j, k, l])
-                        if MaxOrder >= 5:
-                            g5 = g.create_group("5")
-                            for i in range(self.Nm):
-                                for j in range(self.Nm):
-                                    for k in range(self.Nm):
-                                        for l in range(self.Nm):
-                                            for m in range(self.Nm):
-                                                g5.create_dataset("%d_%d_%d_%d_%d" %(i + 1, j + 1, k + 1, l + 1, m + 1), data = self.ints[4][i, j, k, l, m])
+            for order in range(2, MaxOrder + 1):
+                group = g.create_group("%d" % order)
+                for indices in combinations_with_replacement(range(self.Nm), order):
+                    dataset = self.ints[order - 1][indices]
+                    _, canonical_tensor = _canonicalize_nmode_tensor(indices, dataset)
+                    name = "_".join(str(i + 1) for i in indices)
+                    group.create_dataset(name, data = _pack_nmode_integral(canonical_tensor))
 
             if self.use_onemode_states:
                 if "onemode_coeff" in f:
@@ -630,6 +643,19 @@ class Molecule():
             MaxOrder = self.OrderPlus
 
         with h5py.File(IntsFile, "r") as f:
+            def read_integral(order, indices):
+                perm = tuple(np.argsort(indices, kind='stable'))
+                canonical_indices = tuple(indices[i] for i in perm)
+                dataset = f["ints/%d/%s" % (order, "_".join(str(i + 1) for i in canonical_indices))][()]
+                if np.asarray(dataset).ndim == 1:
+                    tensor = _unpack_nmode_integral(np.asarray(dataset), order, self.ngridpts)
+                else:
+                    tensor = np.asarray(dataset)
+                if canonical_indices == tuple(indices):
+                    return tensor
+                inverse_perm = tuple(np.argsort(perm))
+                axes = inverse_perm + tuple(i + order for i in inverse_perm)
+                return np.transpose(tensor, axes)
             for n in range(MaxOrder):
                 if n == 0:
                     self.ints[n] = np.empty(self.Nm, dtype = object)
@@ -639,13 +665,13 @@ class Molecule():
                     self.ints[n] = np.empty((self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
-                            self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
+                            self.ints[n][i, j] = read_integral(n + 1, (i, j))
                 if n == 2:
                     self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm), dtype = object)
                     for i in range(self.Nm):
                         for j in range(self.Nm):
                             for k in range(self.Nm):
-                                self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
+                                self.ints[n][i, j, k] = read_integral(n + 1, (i, j, k))
     
             self.onemode_eig = []
             for i in range(self.Nm):
@@ -695,41 +721,17 @@ class Molecule():
                     self.ints[n] = np.empty((self.Nm, self.ngridpts, self.ngridpts), dtype = float)
                     for i in range(self.Nm):
                         self.ints[n][i] = f["ints/%d/%d" % (n + 1, i + 1)][()]
-                if n == 1:
-                    self.ints[n] = np.empty((self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            self.ints[n][i, j] = f["ints/%d/%d_%d" % (n + 1, i + 1, j + 1)][()]
-                if n == 2:
-                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            for k in range(self.Nm):
-                                self.ints[n][i, j, k] = f["ints/%d/%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1)][()]
-                if n == 3:
-                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            for k in range(self.Nm):
-                                for l in range(self.Nm):
-                                    self.ints[n][i, j, k, l] = f["ints/%d/%d_%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1, l + 1)][()]
-                if n == 4:
-                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            for k in range(self.Nm):
-                                for l in range(self.Nm):
-                                    for m in range(self.Nm):
-                                        self.ints[n][i, j, k, l, m] = f["ints/%d/%d_%d_%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1, l + 1, m + 1)][()]
-                if n == 5:
-                    self.ints[n] = np.empty((self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.Nm, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts, self.ngridpts), dtype = float)
-                    for i in range(self.Nm):
-                        for j in range(self.Nm):
-                            for k in range(self.Nm):
-                                for l in range(self.Nm):
-                                    for m in range(self.Nm):
-                                        for o in range(self.Nm):
-                                            self.ints[n][i, j, k, l, m, o] = f["ints/%d/%d_%d_%d_%d_%d_%d" % (n + 1, i + 1, j + 1, k + 1, l + 1, m + 1, o + 1)][()]
+                else:
+                    order = n + 1
+                    combo_count = math.comb(self.Nm + order - 1, order)
+                    packed_size = _nmode_packed_size(order, self.ngridpts)
+                    self.ints[n] = np.empty((combo_count, packed_size), dtype = float)
+                    for indices in combinations_with_replacement(range(self.Nm), order):
+                        dataset = f["ints/%d/%s" % (order, "_".join(str(i + 1) for i in indices))][()]
+                        packed = np.asarray(dataset)
+                        if packed.ndim != 1:
+                            packed = _pack_nmode_integral(packed)
+                        self.ints[n][_nmode_mode_index(indices)] = packed
     
             if self.use_onemode_states:
                 self.onemode_eig = []
