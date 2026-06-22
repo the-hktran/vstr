@@ -5290,6 +5290,10 @@ SpMat VCISparseHamNModeFromOMArray(std::vector<WaveFunction> &BasisSet1, std::ve
     {
         return PackedIntegralIndex<5>({m, n, o, p, q}, {mi, ni, oi, pi, qi}, {mj, nj, oj, pj, qj}, MaxQ);
     };
+    for (int i = 0; i < 20; i++)
+    {
+        std::cout << ThreeModePotential[5 * 378 + i] << std::endl;
+    }
 
     double thr = 1e-4;
     #pragma omp parallel for
