@@ -4931,7 +4931,8 @@ static inline long unsigned int PackedIntegralIndex(std::array<long unsigned int
     long unsigned int packed_states = 1;
     for (size_t i = 0; i < Order; i++) packed_states *= MaxQ;
     long unsigned int packed_size = packed_states * (packed_states + 1) / 2;
-    long unsigned int hermitian_idx = ket_idx * (ket_idx + 1) / 2 + bra_idx;
+    // long unsigned int hermitian_idx = ket_idx * (ket_idx + 1) / 2 + bra_idx;
+    long unsigned int hermitian_idx = (bra_idx * packed_states) - (bra_idx * (bra_idx + 1) / 2) + ket_idx;
     return mode_idx * packed_size + hermitian_idx;
 }
 
@@ -5325,6 +5326,10 @@ SpMat VCISparseHamNModeFromOMArray(std::vector<WaveFunction> &BasisSet1, std::ve
                         {
                             long unsigned int idx = Idx2(m, n, ModeOccI[m], ModeOccI[n], ModeOccJ[m], ModeOccJ[n]);
                             Vij += TwoModePotential[idx];
+                            if (i == 1 && j == 1)
+                            {
+                                cout << "Mode pair (" << m << ", " << n << ") | Occupation I: (" << ModeOccI[m] << ", " << ModeOccI[n] << ") | Occupation J: (" << ModeOccJ[m] << ", " << ModeOccJ[n] << ") | Two-mode potential: " << TwoModePotential[idx] << endl;
+                            }
                         }
                     }
                 }
@@ -5338,6 +5343,10 @@ SpMat VCISparseHamNModeFromOMArray(std::vector<WaveFunction> &BasisSet1, std::ve
                             {
                                 long unsigned int idx = Idx3(m, n, o, ModeOccI[m], ModeOccI[n], ModeOccI[o], ModeOccJ[m], ModeOccJ[n], ModeOccJ[o]);
                                 Vij += ThreeModePotential[idx];
+                                if (i == 1 && j == 1)
+                                {
+                                    cout << "Mode triplet (" << m << ", " << n << ", " << o << ") | Occupation I: (" << ModeOccI[m] << ", " << ModeOccI[n] << ", " << ModeOccI[o] << ") | Occupation J: (" << ModeOccJ[m] << ", " << ModeOccJ[n] << ", " << ModeOccJ[o] << ") | idx: " << idx << " | Three-mode potential: " << ThreeModePotential[idx] << endl;
+                                }
                             }
                         }
                     }
