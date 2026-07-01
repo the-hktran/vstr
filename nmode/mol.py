@@ -84,6 +84,8 @@ class Molecule():
         self.onemode_coeff = []
         self.onemode_eig = []
         self.use_onemode_states = True
+        self.loc_method = None
+        self.order_method = None
 
         self.ngridpts = 12
         self.Order = 2
@@ -291,6 +293,49 @@ class Molecule():
         self.mu0 = self.nm.mu0
 
         self.CoM = self.calc_com(self.nm.x0)
+
+    def LocalizeNM(self):
+        from vstr.mf.lo import NMBoys
+        if self.loc_method is not None:
+            mlo = NMBoys(self)
+            mol_lo = mlo.kernel()
+            self.nm.Uloc = mlo.U
+            self.nm.freqs = mol_lo.Frequencies / constants.AU_TO_INVCM
+            self.nm.Frequencies = mol_lo.Frequencies
+            self.Frequencies = mol_lo.Frequencies
+            self.nm.nm_coeff = mlo.Q_loc
+
+        if self.order_method is not None:
+            if self.order_method.upper() == 'DIST':
+                from vstr.tci.tci_mol import traveling_salesman_brute_force, traveling_salesman_nearest_neighbor
+                self.distance_matrix = mlo.get_dist_matrix()
+                #path, path_length = traveling_salesman_brute_force(self.distance_matrix)
+                path, path_length = traveling_salesman_nearest_neighbor(self.distance_matrix)
+                self.nm.freqs = self.nm.freqs[path]
+                self.nm.nm_coeff = self.nm.nm_coeff[:, :, path]
+                self.nm.Frequencies = self.nm.Frequencies[path]
+                self.Frequencies = self.Frequencies[path]
+                print(path)
+                print(self.Frequencies)
+
+            elif self.order_method.upper() == 'COORD_ENTROPY':
+                from vstr.tci.tci_mol import fiedler_vector
+                self.distance_matrix = np.zeros((self.nm.freqs.shape[0], self.nm.freqs.shape[0]))
+                gridpts, coeff = self.get_heg(self.ngridpts)
+                for i in range(self.nm.freqs.shape[0]):
+                    for j in range(i+1, self.nm.freqs.shape[0]):
+                        vgrid = np.array([[self.nm.potential_2mode(i, j, qi, qj) for qj in gridpts[j]] for qi in gridpts[i]])
+                        u, s, vh = np.linalg.svd(vgrid)
+                        self.distance_matrix[i, j] = -np.sum(s * np.log(s))
+                        self.distance_matrix[j, i] = self.distance_matrix[i, j]
+                x = fiedler_vector(self.distance_matrix)
+                path = np.argsort(x)
+                self.nm.freqs = self.nm.freqs[path]
+                self.nm.nm_coeff = self.nm.nm_coeff[:, :, path]
+                self.nm.Frequencies = self.nm.Frequencies[path]
+                self.Frequencies = self.Frequencies[path]
+                print(path)
+                print(self.Frequencies)
 
     def CalcNModePotential(self, Order = None, OrderPlus = None):
         if Order is None:
@@ -1025,6 +1070,8 @@ class Molecule():
     def kernel(self, x0 = None):
         self.Timer.start(0)
         self.CalcNM(x0 = x0)
+        if self.loc_method is not None:
+            self.LocalizeNM()
         self.Timer.stop(0)
         if self.calc_integrals:
             print("Calculating integrals...", flush = True)
@@ -1045,6 +1092,7 @@ class NormalModes():
         self.V0 = 0
         self.nm_coeff = None
         self.freqs = None
+        self.Uloc = None
 
         #self.nmodes = 3*self.mol.natoms - 6
         self.nmodes = mol.Nm
@@ -2130,6 +2178,8 @@ class NModePotential():
             else: nho = ngridpts[i]
             omega = self.nm.freqs[i]
             qmat = get_qmat_ho(omega, nho)
+            if self.nm.Uloc is not None:
+                qmat = np.dot(self.nm.Uloc.T, np.dot(qmat, self.nm.Uloc))
             q, u = scipy.linalg.eigh(qmat)
 
             if optimized:
