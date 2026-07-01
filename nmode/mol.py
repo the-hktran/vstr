@@ -397,7 +397,7 @@ class Molecule():
             Order = self.Order
         
         # Did not calculate one-mode integrals yet. Need to do that now
-        if len(self.onemode_coeff) == 0:
+        if self.use_onemode_states and len(self.onemode_coeff) == 0:
             self.nmode = NModePotential(self.nm)
             ints1 = self.nmode.get_ints(1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
             for j in range(self.Nm):
