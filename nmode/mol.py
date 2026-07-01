@@ -397,15 +397,19 @@ class Molecule():
             Order = self.Order
         
         # Did not calculate one-mode integrals yet. Need to do that now
-        if self.use_onemode_states and len(self.onemode_coeff) == 0:
-            self.nmode = NModePotential(self.nm)
-            ints1 = self.nmode.get_ints(1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
-            for j in range(self.Nm):
-                OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
-                OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], [[[[[[]]]]]], [[[[[[[[[]]]]]]]]], True)
-                e, v = np.linalg.eigh(OMH.todense())
-                self.onemode_coeff.append(v)
-                self.onemode_eig.append(e)
+        if len(self.onemode_coeff) == 0:
+            if self.use_onemode_states:
+                self.nmode = NModePotential(self.nm)
+                ints1 = self.nmode.get_ints(1, ngridpts = self.ngridpts, onemode_coeff = self.onemode_coeff)
+                for j in range(self.Nm):
+                    OMBasis = init_funcs.InitGridBasis([self.Frequencies[j]], [self.ngridpts])[0]
+                    OMH = VCISparseHamNMode(OMBasis, OMBasis, [self.Frequencies[j]], self.V0, [self.ints[0][j].tolist()], [[[[[[]]]]]], [[[[[[[[[]]]]]]]]], True)
+                    e, v = np.linalg.eigh(OMH.todense())
+                    self.onemode_coeff.append(v)
+                    self.onemode_eig.append(e)
+            else:
+                self.onemode_coeff = [np.eye(self.ngridpts)] * self.Nm
+                self.onemode_eig = [np.zeros(self.ngridpts)] * self.Nm
 
         self.dip_ints = [np.asarray([[]] * 3), np.asarray([[[[[[[]]]]]]] * 3), np.asarray([[[[[[[[[[]]]]]]]]]] * 3), np.asarray([[[[[[[[[[[[[]]]]]]]]]]]]] * 3), np.asarray([[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]] * 3)]
         if self.ReadDip:
