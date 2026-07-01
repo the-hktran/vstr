@@ -2178,8 +2178,6 @@ class NModePotential():
             else: nho = ngridpts[i]
             omega = self.nm.freqs[i]
             qmat = get_qmat_ho(omega, nho)
-            if self.nm.Uloc is not None:
-                qmat = np.dot(self.nm.Uloc.T, np.dot(qmat, self.nm.Uloc))
             q, u = scipy.linalg.eigh(qmat)
 
             if optimized:
