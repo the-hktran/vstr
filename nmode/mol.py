@@ -1164,7 +1164,10 @@ class NormalModes():
         print("All frequencies:", self.freqs * constants.AU_TO_INVCM)
         if self.mol.LowFrequencyCutoff is not None:
             Cutoff = self.mol.LowFrequencyCutoff / constants.AU_TO_INVCM
-            Keep = self.freqs > Cutoff
+            if Cutoff > 0:
+                Keep = self.freqs > Cutoff
+            else:
+                Keep = self.freqs < -Cutoff
             self.freqs = self.freqs[Keep]
             self.nm_coeff = self.nm_coeff[:, :, Keep]
             self.nmodes = self.nm_coeff.shape[2]
